@@ -249,7 +249,9 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
         localStreamRef.current = stream;
         setLocalStream(stream);
       } catch {
-        setMediaError('Could not access microphone/camera. Joining without media.');
+        setMediaError(
+          'Mic/camera blocked — click the lock icon in the address bar, allow Camera & Microphone, then reload and call again.',
+        );
       }
       if (!disposed) socket.emit(EV.CallJoin, { callId: call.id });
     })();
