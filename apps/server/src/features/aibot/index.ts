@@ -92,9 +92,14 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
 
       let reply: string | null = null;
       try {
-        reply = deps.config.anthropicApiKey
-          ? await claudeReply(deps, website, visitor ?? null, history)
-          : builtinReply(conversationId, website, history);
+        if (deps.config.aiProvider !== 'builtin') {
+          reply = await aiReply(deps, website, visitor ?? null, history).catch((err) => {
+            console.warn('[aibot] AI provider failed, using builtin reply:', (err as Error).message);
+            return builtinReply(conversationId, website, history);
+          });
+        } else {
+          reply = builtinReply(conversationId, website, history);
+        }
       } finally {
         deps.io.of(WIDGET_NAMESPACE).to(room).emit(EV.ChatTyping, {
           conversationId,
@@ -140,15 +145,12 @@ function toClaudeMessages(
   return msgs;
 }
 
-async function claudeReply(
+async function aiReply(
   deps: AppDeps,
   website: WebsiteRow,
   visitor: VisitorRow | null,
   history: MessageRow[],
 ): Promise<string | null> {
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey: deps.config.anthropicApiKey! });
-
   const messages = toClaudeMessages(history);
   if (messages.length === 0) return null;
 
@@ -168,26 +170,75 @@ async function claudeReply(
       `<website_content>\n${knowledge}\n</website_content>`
     : ` Never invent order status, prices, refunds, or policies specific to ${website.name} — for those, say a human agent will confirm shortly.`;
 
+  const system =
+    `You are the AI assistant on the live-chat widget of "${website.name}". ` +
+    `All human support agents are currently busy; you are keeping the customer company until one joins. ` +
+    `Website greeting (tone reference): "${website.greeting}". ` +
+    (visitor?.name ? `The customer's name is ${visitor.name}. ` : '') +
+    `Reply in the same language the customer writes in. Keep replies short (1-3 sentences), warm and helpful. ` +
+    `Collect useful details (order number, issue summary, contact info) so the human agent can start faster. ` +
+    `Do not promise exact wait times.` +
+    knowledgeBlock;
+
+  if (deps.config.aiProvider === 'anthropic') {
+    return anthropicReply(deps, system, messages);
+  }
+  return openAiCompatReply(deps, system, messages);
+}
+
+async function anthropicReply(
+  deps: AppDeps,
+  system: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+): Promise<string | null> {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: deps.config.anthropicApiKey! });
   const response = await client.messages.create({
     model: deps.config.aiModel,
     max_tokens: 500,
-    system:
-      `You are the AI assistant on the live-chat widget of "${website.name}". ` +
-      `All human support agents are currently busy; you are keeping the customer company until one joins. ` +
-      `Website greeting (tone reference): "${website.greeting}". ` +
-      (visitor?.name ? `The customer's name is ${visitor.name}. ` : '') +
-      `Reply in the same language the customer writes in. Keep replies short (1-3 sentences), warm and helpful. ` +
-      `Collect useful details (order number, issue summary, contact info) so the human agent can start faster. ` +
-      `Do not promise exact wait times.` +
-      knowledgeBlock,
+    system,
     messages,
   });
-
   if (response.stop_reason === 'refusal') return null;
   const text = response.content
     .map((b) => (b.type === 'text' ? b.text : ''))
     .join('')
     .trim();
+  return text || null;
+}
+
+/** Groq / Gemini via their OpenAI-compatible chat-completions endpoints. */
+async function openAiCompatReply(
+  deps: AppDeps,
+  system: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+): Promise<string | null> {
+  const endpoint =
+    deps.config.aiProvider === 'gemini'
+      ? 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+      : 'https://api.groq.com/openai/v1/chat/completions';
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    signal: AbortSignal.timeout(25_000),
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${deps.config.aiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: deps.config.aiModel,
+      max_tokens: 500,
+      messages: [{ role: 'system', content: system }, ...messages],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`${deps.config.aiProvider} API ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const text = data.choices?.[0]?.message?.content?.trim();
   return text || null;
 }
 

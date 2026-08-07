@@ -12,6 +12,8 @@ export interface Config {
   dbPoolSize: number;
   dailyApiKey: string | null;
   anthropicApiKey: string | null;
+  aiProvider: 'anthropic' | 'groq' | 'gemini' | 'builtin';
+  aiApiKey: string | null;
   aiModel: string;
   aiGreeter: boolean;
   smtpHost: string | null;
@@ -24,6 +26,35 @@ export interface Config {
   storageDir: string;
   serverRoot: string;
   repoRoot: string;
+}
+
+/**
+ * AI provider resolution:
+ *  - AI_PROVIDER=groq|gemini|anthropic picks explicitly (AI_API_KEY for groq/gemini)
+ *  - else ANTHROPIC_API_KEY → anthropic; else AI_API_KEY → groq; else builtin replies
+ */
+function resolveAi(env: NodeJS.ProcessEnv): {
+  aiProvider: 'anthropic' | 'groq' | 'gemini' | 'builtin';
+  aiApiKey: string | null;
+  aiModel: string;
+} {
+  const raw = (env.AI_PROVIDER || '').toLowerCase();
+  const aiApiKey = env.AI_API_KEY || null;
+  const aiProvider =
+    raw === 'groq' || raw === 'gemini' || raw === 'anthropic'
+      ? raw
+      : env.ANTHROPIC_API_KEY
+        ? 'anthropic'
+        : aiApiKey
+          ? 'groq'
+          : 'builtin';
+  const defaultModel =
+    aiProvider === 'groq'
+      ? 'llama-3.3-70b-versatile'
+      : aiProvider === 'gemini'
+        ? 'gemini-2.5-flash'
+        : 'claude-opus-5';
+  return { aiProvider, aiApiKey, aiModel: env.AI_MODEL || defaultModel };
 }
 
 export function loadConfig(): Config {
@@ -43,7 +74,7 @@ export function loadConfig(): Config {
     dbPoolSize: Number(env.DB_POOL_SIZE || 20),
     dailyApiKey: env.DAILY_API_KEY || null,
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
-    aiModel: env.AI_MODEL || 'claude-opus-5',
+    ...resolveAi(env),
     aiGreeter: env.AI_GREETER !== 'off',
     smtpHost: env.SMTP_HOST || null,
     smtpPort: Number(env.SMTP_PORT || 587),
