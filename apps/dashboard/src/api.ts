@@ -174,7 +174,7 @@ export const api = {
     ),
 
   scanWebsite: (websiteId: string, url: string) =>
-    request<{ ok: boolean; url: string; pages: number; chars: number }>(
+    request<{ ok: boolean; url: string; pages: number; chars: number; urls: number }>(
       `${API.websites}/${encodeURIComponent(websiteId)}/scan`,
       { method: 'POST', body: { url } },
     ),

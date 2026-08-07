@@ -155,7 +155,7 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
       const result = await api.scanWebsite(site.id, url.trim());
       pushToast(
         'Website scanned for AI',
-        `${result.pages} pages indexed — the AI assistant now answers from this site's live content.`,
+        `${result.pages} pages + ${result.urls ?? 0} product links indexed — the AI now answers (and links) from this site's live content.`,
         'success',
       );
     } catch (err) {

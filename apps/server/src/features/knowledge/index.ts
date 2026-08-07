@@ -12,7 +12,8 @@ import type { AppDeps } from '../../core/deps.js';
 import { newId, nowIso } from '../../core/db.js';
 import { requireAgent, requireRole } from '../../core/auth.js';
 
-const MAX_PAGES = 25;
+const MAX_PAGES = 40; // pages crawled with full content
+const URL_INDEX_MAX = 500; // additional sitemap URLs indexed (content fetched live on demand)
 const MAX_DEPTH = 2;
 const PAGE_TIMEOUT_MS = 10_000;
 const CRAWL_DEADLINE_MS = 90_000;
@@ -106,6 +107,78 @@ async function fetchPage(url: string): Promise<{ html: string } | null> {
 export interface ScanResult {
   pages: number;
   chars: number;
+  urls: number; // extra sitemap URLs indexed (thin — fetched live at answer time)
+}
+
+// ─── Sitemap discovery (product URLs beyond the crawl cap) ───
+
+async function fetchRaw(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+      headers: { 'user-agent': 'LiveChatKnowledgeBot/1.0 (+sitemap)' },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+/** Collect page URLs from robots.txt + common sitemap locations (recursive, capped). */
+async function discoverSitemapUrls(origin: string, host: string): Promise<string[]> {
+  const pageUrls = new Set<string>();
+  const sitemapQueue: string[] = [];
+  const seen = new Set<string>();
+
+  const robots = await fetchRaw(`${origin}/robots.txt`);
+  if (robots) {
+    for (const m of robots.matchAll(/^sitemap:\s*(\S+)/gim)) sitemapQueue.push(m[1]);
+  }
+  for (const p of ['/sitemap.xml', '/sitemap_index.xml', '/wp-sitemap.xml']) {
+    sitemapQueue.push(origin + p);
+  }
+
+  let processed = 0;
+  while (sitemapQueue.length > 0 && processed < 15 && pageUrls.size < URL_INDEX_MAX) {
+    const sm = sitemapQueue.shift()!;
+    if (seen.has(sm)) continue;
+    seen.add(sm);
+    processed++;
+    const xml = await fetchRaw(sm);
+    if (!xml || !xml.includes('<loc>')) continue;
+    for (const m of xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)) {
+      const loc = m[1];
+      if (/\.xml(\.gz)?(\?|$)/i.test(loc)) {
+        sitemapQueue.push(loc); // nested sitemap index
+        continue;
+      }
+      try {
+        const u = new URL(loc);
+        if (bareHost(u.hostname) !== host) continue;
+        if (/\.(png|jpe?g|gif|webp|svg|ico|css|js|pdf|zip|mp4|mp3)(\?|$)/i.test(u.pathname)) continue;
+        u.hash = '';
+        pageUrls.add(u.toString());
+        if (pageUrls.size >= URL_INDEX_MAX) break;
+      } catch {
+        /* bad loc */
+      }
+    }
+  }
+  return [...pageUrls];
+}
+
+/** "/soap-boxes/kraft-soap-box" → "kraft soap box" — searchable title for thin entries. */
+function slugTitle(url: string): string | null {
+  try {
+    const segs = new URL(url).pathname.split('/').filter(Boolean);
+    if (segs.length === 0) return null;
+    const last = decodeURIComponent(segs[segs.length - 1]);
+    return last.replace(/\.(html?|php|aspx?)$/i, '').replace(/[-_]+/g, ' ').trim().slice(0, 200) || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Crawl `startUrl` (same host only) and replace the website's stored knowledge. */
@@ -163,6 +236,17 @@ export async function crawlWebsite(
   });
   await Promise.all(workers);
 
+  // Sitemap pass: index EVERY page URL (products included) as thin
+  // entries — their content is fetched live when a question matches.
+  let sitemapUrls: string[] = [];
+  try {
+    sitemapUrls = await discoverSitemapUrls(start.origin, host);
+  } catch {
+    /* no sitemap — BFS results only */
+  }
+  const crawled = new Set(results.map((r) => r.url));
+  const thin = sitemapUrls.filter((u) => !crawled.has(u)).slice(0, URL_INDEX_MAX);
+
   // Replace stored knowledge atomically enough for our purposes.
   await deps.db.run('DELETE FROM knowledge_pages WHERE website_id = ?', [websiteId]);
   const t = nowIso();
@@ -172,22 +256,35 @@ export async function crawlWebsite(
       [newId(), websiteId, r.url, r.title, r.content, t],
     );
   }
+  for (const url of thin) {
+    await deps.db.run(
+      'INSERT INTO knowledge_pages (id, website_id, url, title, content, fetched_at) VALUES (?, ?, ?, ?, NULL, ?)',
+      [newId(), websiteId, url, slugTitle(url), t],
+    );
+  }
 
   return {
     pages: results.length,
     chars: results.reduce((s, r) => s + r.content.length, 0),
+    urls: thin.length,
   };
 }
 
 // ─── Retrieval (keyword scoring — dependency-free) ───────────
 
-function scorePage(terms: string[], page: KnowledgeRow): number {
+function scorePage(
+  terms: string[],
+  urlRarity: Map<string, number>,
+  page: KnowledgeRow,
+): number {
   const hay = `${page.title ?? ''} ${page.content ?? ''}`.toLowerCase();
   const url = page.url.toLowerCase();
   let score = 0;
   for (const term of terms) {
-    // A term in the URL slug (/soap-boxes/) is the strongest possible signal.
-    if (url.includes(term)) score += 25;
+    // URL-slug match is the strongest signal, weighted by how RARE the
+    // term is across all URLs — "eyeliner" (one page) beats "boxes"
+    // (every page on a packaging site).
+    if (url.includes(term)) score += 3 + Math.round(35 * (urlRarity.get(term) ?? 0));
     let count = 0;
     let idx = hay.indexOf(term);
     while (idx !== -1 && count < 5) {
@@ -221,12 +318,21 @@ export async function findRelevantKnowledge(
   if (pages.length === 0) return '';
 
   const terms = [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2))];
+
+  // Rarity of each term across URLs: 1 = appears in one URL, →0 = in all.
+  const urlRarity = new Map<string, number>();
+  for (const term of terms) {
+    let df = 0;
+    for (const p of pages) if (p.url.toLowerCase().includes(term)) df++;
+    urlRarity.set(term, df > 0 ? 1 - df / pages.length : 0);
+  }
+
   const ranked = pages
-    .map((p) => ({ p, s: terms.length ? scorePage(terms, p) : 0 }))
+    .map((p) => ({ p, s: terms.length ? scorePage(terms, urlRarity, p) : 0 }))
     .sort((a, b) => b.s - a.s);
 
   // Top matches first; fall back to the first pages (home etc.) when no term hits.
-  const chosen = (ranked[0].s > 0 ? ranked.filter((r) => r.s > 0) : ranked).slice(0, 2);
+  const chosen = (ranked[0].s > 0 ? ranked.filter((r) => r.s > 0) : ranked).slice(0, 3);
 
   // LIVE re-fetch the chosen pages in parallel (short timeout) so the
   // answer reflects today's content, not the last scan.
