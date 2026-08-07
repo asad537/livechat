@@ -18,6 +18,18 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 };
 
+/** Human-readable reason for a getUserMedia camera failure. */
+function cameraErrorText(err: unknown): string {
+  const name = (err as { name?: string })?.name ?? '';
+  if (name === 'NotReadableError' || name === 'TrackStartError')
+    return 'Camera is in use by another app or tab — close it (Zoom/Meet/other browser) and press the camera button to retry.';
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError')
+    return 'No camera found on this device — joined with audio only.';
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError')
+    return 'Camera blocked — allow it in the browser (lock icon) AND in system settings (Privacy → Camera), then press the camera button to retry.';
+  return 'Camera unavailable — joined with audio only. Press the camera button to retry.';
+}
+
 interface PeerState {
   peerId: string;
   label: string;
@@ -240,13 +252,13 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
       let stream: MediaStream | null = null;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
-      } catch {
+      } catch (camErr) {
         if (isVideo) {
           // Camera busy/blocked — degrade to audio-only instead of no media.
           try {
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             setCamOff(true);
-            setMediaError('Camera unavailable (busy or blocked) — joined with audio only.');
+            setMediaError(cameraErrorText(camErr));
           } catch {
             setMediaError(
               'Mic/camera blocked — click the lock icon in the address bar, allow Camera & Microphone, then reload and call again.',
@@ -290,14 +302,51 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
     setMuted(next);
   };
 
-  const toggleCam = () => {
+  const toggleCam = async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
-    const next = !camOff;
-    stream.getVideoTracks().forEach((t) => {
-      t.enabled = !next;
-    });
-    setCamOff(next);
+    const videoTracks = stream.getVideoTracks();
+
+    if (videoTracks.length > 0) {
+      const next = !camOff;
+      videoTracks.forEach((t) => {
+        t.enabled = !next;
+      });
+      setCamOff(next);
+      return;
+    }
+
+    // Joined audio-only — try to acquire the camera now and renegotiate.
+    try {
+      const cam = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' },
+      });
+      const track = cam.getVideoTracks()[0];
+      if (!track) return;
+      stream.addTrack(track);
+      setLocalStream(new MediaStream(stream.getTracks()));
+      const socket = getSocket();
+      for (const [peerId, pc] of pcsRef.current) {
+        pc.addTrack(track, stream);
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (pc.localDescription && socket) {
+            socket.emit(EV.CallSignal, {
+              callId: call.id,
+              to: peerId,
+              data: { type: 'offer', sdp: pc.localDescription.toJSON() },
+            });
+          }
+        } catch {
+          /* peer left mid-renegotiation */
+        }
+      }
+      setCamOff(false);
+      setMediaError(null);
+    } catch (err) {
+      setMediaError(cameraErrorText(err));
+    }
   };
 
   const inviteCandidates = useMemo(() => {

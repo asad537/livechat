@@ -135,10 +135,46 @@ export class CallSession {
   }
 
   toggleCam(): boolean {
+    const tracks = this.localStream?.getVideoTracks() ?? [];
+    if (tracks.length === 0) {
+      // Joined audio-only (camera was busy) — try to acquire it now.
+      void this.acquireCamera();
+      return this.camOn;
+    }
     this.camOn = !this.camOn;
-    for (const t of this.localStream?.getVideoTracks() ?? []) t.enabled = this.camOn;
+    for (const t of tracks) t.enabled = this.camOn;
     this.onUpdate();
     return this.camOn;
+  }
+
+  /** Late camera acquisition + renegotiation with every connected peer. */
+  private async acquireCamera(): Promise<void> {
+    if (this.closed || !this.localStream) return;
+    try {
+      const cam = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' },
+      });
+      const track = cam.getVideoTracks()[0];
+      if (!track || this.closed) {
+        track?.stop();
+        return;
+      }
+      this.localStream.addTrack(track);
+      for (const [peerId, pc] of this.pcs) {
+        pc.addTrack(track, this.localStream);
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          this.signal(peerId, { type: 'offer', sdp: offer });
+        } catch {
+          /* peer left mid-renegotiation */
+        }
+      }
+      this.camOn = true;
+      this.onUpdate();
+    } catch (err) {
+      console.warn('[livechat] camera unavailable', err);
+    }
   }
 
   tiles(): RemoteTile[] {
