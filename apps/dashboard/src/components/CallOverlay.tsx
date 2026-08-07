@@ -237,21 +237,34 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
     socket.on(EV.CallLeave, onLeave);
 
     void (async () => {
+      let stream: MediaStream | null = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: isVideo,
-        });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+      } catch {
+        if (isVideo) {
+          // Camera busy/blocked — degrade to audio-only instead of no media.
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            setCamOff(true);
+            setMediaError('Camera unavailable (busy or blocked) — joined with audio only.');
+          } catch {
+            setMediaError(
+              'Mic/camera blocked — click the lock icon in the address bar, allow Camera & Microphone, then reload and call again.',
+            );
+          }
+        } else {
+          setMediaError(
+            'Microphone blocked — click the lock icon in the address bar, allow Microphone, then reload and call again.',
+          );
+        }
+      }
+      if (stream) {
         if (disposed) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
         localStreamRef.current = stream;
         setLocalStream(stream);
-      } catch {
-        setMediaError(
-          'Mic/camera blocked — click the lock icon in the address bar, allow Camera & Microphone, then reload and call again.',
-        );
       }
       if (!disposed) socket.emit(EV.CallJoin, { callId: call.id });
     })();

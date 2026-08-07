@@ -66,13 +66,20 @@ export class CallSession {
 
   /** Acquire local media. Must resolve before join(). */
   async init(): Promise<void> {
-    this.localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video:
-        this.kind === 'VIDEO'
-          ? { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' }
-          : false,
-    });
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video:
+          this.kind === 'VIDEO'
+            ? { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' }
+            : false,
+      });
+    } catch (err) {
+      if (this.kind !== 'VIDEO') throw err;
+      // Camera busy/blocked — fall back to audio-only rather than failing the call.
+      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.camOn = false;
+    }
   }
 
   /** Bind signaling handlers and announce ourselves to the server. */
