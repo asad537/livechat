@@ -56,10 +56,17 @@ CREATE TABLE IF NOT EXISTS conversations (
   assigned_user_id VARCHAR(36),
   created_at VARCHAR(32) NOT NULL,
   activated_at VARCHAR(32),
-  closed_at VARCHAR(32)
+  closed_at VARCHAR(32),
+  rating INTEGER,                                      -- CSAT 1-5 (visitor, after close)
+  rating_comment TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_conversations_website ON conversations (website_id, status);
 CREATE INDEX IF NOT EXISTS idx_conversations_assigned ON conversations (assigned_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_conversations_visitor ON conversations (visitor_id, status);
+
+-- CSAT columns (idempotent — duplicate-column errors are ignored by migrate())
+ALTER TABLE conversations ADD COLUMN rating INTEGER;
+ALTER TABLE conversations ADD COLUMN rating_comment TEXT;
 
 CREATE TABLE IF NOT EXISTS assignment_history (
   id VARCHAR(36) PRIMARY KEY,
@@ -84,6 +91,7 @@ CREATE TABLE IF NOT EXISTS messages (
   read_at VARCHAR(32)
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages (conversation_id, sender_type, read_at);
 
 CREATE TABLE IF NOT EXISTS files (
   id VARCHAR(36) PRIMARY KEY,
@@ -118,3 +126,10 @@ CREATE TABLE IF NOT EXISTS call_events (
   event VARCHAR(16) NOT NULL,                          -- INVITED | JOIN | LEAVE | DECLINE | END
   created_at VARCHAR(32) NOT NULL
 );
+
+-- Hot-path indexes for scale
+CREATE INDEX IF NOT EXISTS idx_history_conversation ON assignment_history (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_files_conversation ON files (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_visitors_website ON visitors (website_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members (user_id);
+CREATE INDEX IF NOT EXISTS idx_calls_conversation ON calls (conversation_id);

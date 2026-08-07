@@ -139,7 +139,7 @@ export async function createDb(config: Config): Promise<Db> {
         uri: url,
         charset: 'utf8mb4',
         waitForConnections: true,
-        connectionLimit: 10,
+        connectionLimit: config.dbPoolSize,
       });
       await pool.query('SELECT 1');
       const db = new MySqlDb(pool);

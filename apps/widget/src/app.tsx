@@ -21,6 +21,7 @@ import {
   IconClip,
   IconClose,
   IconSend,
+  RatingCard,
   renderMessages,
   TypingRow,
   type LocalMessage,
@@ -67,6 +68,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [toast, setToast] = useState<string | null>(null);
   const [infoDismissed, setInfoDismissed] = useState(() => lsGet(infoDismissKey) === '1');
   const [invite, setInvite] = useState<Invite | null>(null);
+  const [rated, setRated] = useState(false);
   const [call, setCall] = useState<ActiveCall | null>(null);
   const [, setCallTick] = useState(0);
 
@@ -359,6 +361,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     setMessages([]);
     setAgent(null);
     setAgentTyping(false);
+    setRated(false);
     reportedReads.current.clear();
     const socket = socketRef.current;
     if (socket) {
@@ -366,6 +369,12 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       socket.connect();
     }
     taRef.current?.focus();
+  };
+
+  // ── CSAT rating after close ────────────────────────────────
+  const submitRating = (rating: number, comment: string) => {
+    socketRef.current?.emit(EV.WidgetRate, { rating, comment: comment || undefined });
+    setRated(true);
   };
 
   // ── Calls ──────────────────────────────────────────────────
@@ -487,7 +496,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
           {/* Composer / closed bar */}
           {ended ? (
             <div class="lc-closedbar">
-              <span>{status === 'MISSED' ? 'We missed you — this conversation has ended.' : 'This conversation has ended.'}</span>
+              {status === 'CLOSED' && !rated ? (
+                <RatingCard onSubmit={submitRating} />
+              ) : (
+                <span>
+                  {status === 'MISSED'
+                    ? 'We missed you — this conversation has ended.'
+                    : rated
+                      ? 'Thank you for your feedback! 💚'
+                      : 'This conversation has ended.'}
+                </span>
+              )}
               <button type="button" class="lc-btn" onClick={startNewConversation}>
                 Start new conversation
               </button>

@@ -1,6 +1,7 @@
 // ─── Message list building blocks ────────────────────────────
 import type { ChatMessage } from '@livechat/shared';
 import type { JSX } from 'preact';
+import { useState } from 'preact/hooks';
 import { dayKey, dayLabel, fmtBytes, fmtTime, initials } from './util';
 
 /** Messages carried in local state — pending flag for optimistic sends. */
@@ -220,6 +221,52 @@ export function TypingRow({ agent }: { agent: { name: string; avatarColor: strin
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── CSAT rating card (shown after the conversation closes) ──
+export function RatingCard({
+  onSubmit,
+}: {
+  onSubmit: (rating: number, comment: string) => void;
+}): JSX.Element {
+  const [hover, setHover] = useState(0);
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState('');
+
+  return (
+    <div class="lc-ratebox">
+      <div class="lc-rate-title">How was your experience?</div>
+      <div class="lc-stars">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            class={`lc-star ${(hover || stars) >= n ? 'lc-star-on' : ''}`}
+            onMouseEnter={() => setHover(n)}
+            onMouseLeave={() => setHover(0)}
+            onClick={() => setStars(n)}
+            aria-label={`${n} star${n > 1 ? 's' : ''}`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+      {stars > 0 && (
+        <>
+          <textarea
+            class="lc-rate-comment"
+            placeholder="Any feedback? (optional)"
+            rows={2}
+            value={comment}
+            onInput={(e) => setComment((e.target as HTMLTextAreaElement).value)}
+          />
+          <button type="button" class="lc-btn lc-rate-submit" onClick={() => onSubmit(stars, comment.trim())}>
+            Submit rating
+          </button>
+        </>
+      )}
     </div>
   );
 }

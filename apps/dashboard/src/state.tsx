@@ -18,6 +18,7 @@ import type {
   Website,
 } from '@livechat/shared';
 import { EV } from '@livechat/shared';
+import { desktopNotify, ensureNotifyPermission, playChime } from './notify';
 import { api, clearToken, getToken, setToken } from './api';
 import { connectSocket, disconnectSocket, getSocket } from './socket';
 
@@ -188,6 +189,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       for (const site of payload.websites) {
         socket.emit(EV.AgentWatchWebsite, { websiteId: site.id });
       }
+      ensureNotifyPermission();
       void refreshConversations();
     };
 
@@ -203,7 +205,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         (!prev || prev.assignedUserId !== user.id)
       ) {
         const who = conv.visitor?.name || 'A visitor';
-        pushToast('New chat assigned', `${who} is waiting on ${conv.website?.name ?? 'your site'}.`, 'info');
+        const where = conv.website?.name ?? 'your site';
+        pushToast('New chat assigned', `${who} is waiting on ${where}.`, 'info');
+        playChime('new-chat');
+        desktopNotify('New chat assigned', `${who} is waiting on ${where}.`, `chat-${conv.id}`);
+      } else if (
+        user &&
+        conv.assignedUserId === user.id &&
+        conv.lastMessage?.senderType === 'VISITOR' &&
+        prev?.lastMessage?.id !== conv.lastMessage.id &&
+        !document.hasFocus()
+      ) {
+        // Visitor replied while the agent is looking elsewhere.
+        playChime('message');
+        desktopNotify(
+          conv.visitor?.name || 'Visitor',
+          conv.lastMessage.body || 'New message',
+          `chat-${conv.id}`,
+        );
       }
       setConversations((current) => ({ ...current, [conv.id]: { ...current[conv.id], ...conv } }));
     };

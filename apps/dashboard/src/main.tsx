@@ -9,7 +9,7 @@ const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root element not found');
 
 ReactDOM.createRoot(rootEl).render(
-  <BrowserRouter>
+  <BrowserRouter basename={import.meta.env.BASE_URL}>
     <AppProvider>
       <App />
     </AppProvider>

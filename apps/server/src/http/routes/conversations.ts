@@ -132,7 +132,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const conv = await getConversationRow(deps, req.params.id as string);
       if (!(await canViewConversation(deps, user, conv))) throw new HttpError(403, 'Forbidden');
       const rows = await deps.db.all<MessageRow>(
-        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC',
+        'SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 500) t ORDER BY created_at ASC, id ASC',
         [conv.id],
       );
       res.json(await hydrateMessages(deps, rows));

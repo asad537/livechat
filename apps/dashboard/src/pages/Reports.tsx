@@ -71,6 +71,11 @@ export default function Reports() {
             <StatCard label="Closed" value={data.totals.closed} tone="closed" />
             <StatCard label="Missed" value={data.totals.missed} tone="missed" />
             <StatCard label="Avg first response" value={formatSeconds(data.avgFirstResponseSeconds)} />
+            <StatCard
+              label={`CSAT (${data.csat?.count ?? 0} rating${(data.csat?.count ?? 0) === 1 ? '' : 's'})`}
+              value={data.csat?.average != null ? `★ ${data.csat.average.toFixed(1)}` : '—'}
+              tone="csat"
+            />
           </div>
 
           <div className="card report-card">

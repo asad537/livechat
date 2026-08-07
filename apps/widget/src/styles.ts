@@ -67,39 +67,83 @@ export const WIDGET_CSS = `
 }
 @keyframes lc-pop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
 
-/* ── Header ───────────────────────────────────────────────── */
+/* ── Header (premium) ─────────────────────────────────────── */
 .lc-header {
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--lc-primary), var(--lc-primary-dark));
+  position: relative; flex-shrink: 0; overflow: hidden;
+  background: linear-gradient(120deg, var(--lc-primary-dark) 0%, var(--lc-primary) 58%, var(--lc-primary-dark) 130%);
   color: var(--lc-on-primary);
-  padding: 14px 14px 14px 16px;
+  padding: 16px 14px 16px 16px;
   display: flex; align-items: center; gap: 12px;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .12), 0 4px 14px rgba(15, 23, 42, .12);
 }
+/* soft light bloom top-right + vignette bottom-left for depth */
+.lc-header::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(120px 120px at 85% -20%, rgba(255, 255, 255, .28), transparent 70%),
+    radial-gradient(160px 120px at -10% 130%, rgba(0, 0, 0, .18), transparent 70%);
+}
+/* faint diagonal sheen */
+.lc-header::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, .07) 48%, rgba(255, 255, 255, .12) 52%, rgba(255, 255, 255, .05) 57%, transparent 65%);
+}
+.lc-header > * { position: relative; z-index: 1; }
 .lc-logo {
-  width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-  background: rgba(255, 255, 255, .18);
+  width: 42px; height: 42px; border-radius: 14px; flex-shrink: 0;
+  background: rgba(255, 255, 255, .16);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, .25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 4px 10px rgba(0, 0, 0, .12);
   display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .lc-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .lc-head-info { flex: 1; min-width: 0; }
-.lc-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lc-subtitle { font-size: 12px; opacity: .92; margin-top: 1px; }
-.lc-agent-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 3px;
-  background: rgba(255, 255, 255, .16); border-radius: 999px; padding: 2px 9px 2px 3px; max-width: 100%; }
+.lc-title {
+  font-size: 16px; font-weight: 800; letter-spacing: -.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .12);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lc-subtitle { font-size: 12px; opacity: .92; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.lc-subtitle::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: #4ade80;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .3);
+  animation: lc-online 2.2s ease-in-out infinite;
+}
+.lc-agent-chip {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 12px; margin-top: 4px;
+  background: rgba(255, 255, 255, .14);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, .22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18);
+  border-radius: 999px; padding: 3px 11px 3px 3px; max-width: 100%;
+}
 .lc-agent-chip .lc-agent-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .lc-avatar-dot {
-  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
   color: #fff; font-size: 9px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .55);
 }
-.lc-online-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.lc-online-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+  animation: lc-online 2.2s ease-in-out infinite;
+}
+@keyframes lc-online {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35), 0 0 0 0 rgba(74, 222, 128, .55); }
+  55%      { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35), 0 0 0 5px rgba(74, 222, 128, 0); }
+}
 .lc-iconbtn {
-  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  opacity: .85; transition: background .15s ease, opacity .15s ease;
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .16);
+  opacity: .92;
+  transition: background .15s ease, opacity .15s ease, transform .12s ease;
 }
-.lc-iconbtn:hover { opacity: 1; background: rgba(255, 255, 255, .16); }
+.lc-iconbtn:hover { opacity: 1; background: rgba(255, 255, 255, .22); transform: translateY(-1px); }
+.lc-iconbtn:active { transform: translateY(0) scale(.95); }
 
 /* ── Status strips ────────────────────────────────────────── */
 .lc-strip {
@@ -274,6 +318,23 @@ export const WIDGET_CSS = `
   display: flex; flex-direction: column; align-items: center; gap: 9px;
   font-size: 12.5px; color: #64748b; text-align: center;
 }
+
+/* ── CSAT rating card ─────────────────────────────────────── */
+.lc-ratebox { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.lc-rate-title { font-size: 13.5px; font-weight: 700; color: #0f172a; }
+.lc-stars { display: flex; gap: 4px; }
+.lc-star {
+  font-size: 28px; line-height: 1; color: #d7dee8; padding: 2px 3px;
+  transition: color .12s ease, transform .12s ease;
+}
+.lc-star:hover { transform: scale(1.18); }
+.lc-star-on { color: #f59e0b; text-shadow: 0 2px 8px rgba(245, 158, 11, .35); }
+.lc-rate-comment {
+  width: 100%; resize: none; border: 1.5px solid #e2e8f0; border-radius: 10px;
+  padding: 8px 10px; font-size: 13px; outline: none; background: #f8fafc;
+}
+.lc-rate-comment:focus { border-color: var(--lc-primary); background: #fff; }
+.lc-rate-submit { width: 100%; }
 
 /* ── Toast ────────────────────────────────────────────────── */
 .lc-toast {

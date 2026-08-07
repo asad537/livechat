@@ -12,6 +12,7 @@ import type { AppDeps } from '../core/deps.js';
 import { newId, nowIso } from '../core/db.js';
 import { toUserPublic, type UserRow } from '../core/auth.js';
 import { hydrateMessages, postMessage, type MessageRow } from './messages.js';
+import { sendTranscriptEmail } from '../features/email/index.js';
 
 // ─── Row shapes (snake_case DB columns) ──────────────────────
 
@@ -24,6 +25,8 @@ export interface ConversationRow {
   created_at: string;
   activated_at: string | null;
   closed_at: string | null;
+  rating: number | null;
+  rating_comment: string | null;
 }
 
 export interface VisitorRow {
@@ -110,6 +113,7 @@ export async function loadSummary(
     createdAt: conv.created_at,
     activatedAt: conv.activated_at,
     closedAt: conv.closed_at,
+    rating: conv.rating === null || conv.rating === undefined ? null : Number(conv.rating),
     visitor: visitorRow
       ? toVisitor(visitorRow, deps.presence.isVisitorOnline(conv.visitor_id))
       : undefined,
@@ -188,21 +192,27 @@ export async function findEligibleCsr(
   const website = await deps.db.get<WebsiteRow>('SELECT * FROM websites WHERE id = ?', [websiteId]);
   if (!website) return null;
 
-  const members = await deps.db.all<UserRow>(
-    'SELECT u.* FROM team_members tm JOIN users u ON u.id = tm.user_id WHERE tm.team_id = ?',
+  // One query: every team member with their live ACTIVE-chat count.
+  const members = await deps.db.all<UserRow & { active: number }>(
+    `SELECT u.*,
+            (SELECT COUNT(*) FROM conversations c
+              WHERE c.assigned_user_id = u.id AND c.status = 'ACTIVE') AS active
+       FROM team_members tm
+       JOIN users u ON u.id = tm.user_id
+      WHERE tm.team_id = ?`,
     [website.team_id],
   );
 
-  const candidates: { id: string; active: number }[] = [];
-  for (const member of members) {
-    if (member.id === excludeUserId) continue;
-    if (!deps.presence.isAgentOnline(member.id)) continue;
-    const active = await countActiveChats(deps, member.id);
-    if (active < Number(member.max_chats)) candidates.push({ id: member.id, active });
-  }
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => a.active - b.active);
-  return candidates[0].id;
+  const candidates = members
+    .filter(
+      (m) =>
+        m.id !== excludeUserId &&
+        deps.presence.isAgentOnline(m.id) &&
+        Number(m.active) < Number(m.max_chats),
+    )
+    .sort((a, b) => Number(a.active) - Number(b.active));
+
+  return candidates[0]?.id ?? null;
 }
 
 export async function recordAssignment(
@@ -257,6 +267,8 @@ export async function closeConversation(deps: AppDeps, conversationId: string): 
   await emitConversationStatus(deps, conversationId);
   // Freed capacity may pick up waiting chats.
   await drainQueue(deps, conv.website_id);
+  // Email the transcript to the visitor (no-op without SMTP config).
+  void sendTranscriptEmail(deps, conversationId);
 }
 
 /**

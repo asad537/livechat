@@ -1443,6 +1443,14 @@ p {
   border-top-color: var(--red);
 }
 
+.stat-card.stat-csat {
+  border-top-color: #f59e0b;
+}
+
+.stat-card.stat-csat .stat-value {
+  color: #b45309;
+}
+
 .stat-value {
   font-size: 26px;
   font-weight: 800;

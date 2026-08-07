@@ -78,6 +78,7 @@ function unwrapList<T>(data: unknown, key: string): T[] {
 export interface ReportsOverview {
   totals: { active: number; waiting: number; closed: number; missed: number };
   avgFirstResponseSeconds: number | null;
+  csat: { average: number | null; count: number };
   perAgent: { user: UserPublic; closed: number; active: number }[];
 }
 

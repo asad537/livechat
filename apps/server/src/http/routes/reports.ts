@@ -50,6 +50,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         res.json({
           totals: { active: 0, waiting: 0, closed: 0, missed: 0 },
           avgFirstResponseSeconds: null,
+          csat: { average: null, count: 0 },
           perAgent: agents.map((a) => ({
             user: toUserWithPresence(deps, a),
             closed: 0,
@@ -61,7 +62,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
 
       const siteFilter = `website_id IN (${placeholders(siteIds.length)})`;
 
-      const [statusCounts, responseRows, perAgentCounts] = await Promise.all([
+      const [statusCounts, responseRows, perAgentCounts, ratingRow] = await Promise.all([
         deps.db.all<{ status: string; n: number }>(
           `SELECT status, COUNT(*) AS n FROM conversations WHERE ${siteFilter} GROUP BY status`,
           siteIds,
@@ -76,6 +77,11 @@ export function buildReportsRouter(deps: AppDeps): Router {
              FROM conversations
             WHERE ${siteFilter} AND assigned_user_id IS NOT NULL
             GROUP BY assigned_user_id, status`,
+          siteIds,
+        ),
+        deps.db.get<{ avg: number | null; n: number }>(
+          `SELECT AVG(rating) AS avg, COUNT(rating) AS n
+             FROM conversations WHERE ${siteFilter} AND rating IS NOT NULL`,
           siteIds,
         ),
       ]);
@@ -110,7 +116,12 @@ export function buildReportsRouter(deps: AppDeps): Router {
         return { user: toUserWithPresence(deps, a), closed: counts.closed, active: counts.active };
       });
 
-      res.json({ totals, avgFirstResponseSeconds, perAgent });
+      const csat = {
+        average: ratingRow?.avg != null ? Math.round(Number(ratingRow.avg) * 10) / 10 : null,
+        count: Number(ratingRow?.n ?? 0),
+      };
+
+      res.json({ totals, avgFirstResponseSeconds, csat, perAgent });
     }),
   );
 

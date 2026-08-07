@@ -9,10 +9,16 @@ export interface Config {
   jwtSecret: string;
   databaseUrl: string;      // 'file:...' → SQLite, 'postgres://...' → PostgreSQL
   redisUrl: string | null;
+  dbPoolSize: number;
   dailyApiKey: string | null;
   anthropicApiKey: string | null;
   aiModel: string;
   aiGreeter: boolean;
+  smtpHost: string | null;
+  smtpPort: number;
+  smtpUser: string | null;
+  smtpPass: string | null;
+  smtpFrom: string | null;
   s3Bucket: string | null;
   scanMode: 'permissive' | 'strict';
   storageDir: string;
@@ -34,10 +40,16 @@ export function loadConfig(): Config {
     jwtSecret: env.JWT_SECRET || 'dev-secret-do-not-use-in-production',
     databaseUrl: env.DATABASE_URL || 'mysql://root@127.0.0.1:3306/livechat',
     redisUrl: env.REDIS_URL || null,
+    dbPoolSize: Number(env.DB_POOL_SIZE || 20),
     dailyApiKey: env.DAILY_API_KEY || null,
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
     aiModel: env.AI_MODEL || 'claude-opus-5',
     aiGreeter: env.AI_GREETER !== 'off',
+    smtpHost: env.SMTP_HOST || null,
+    smtpPort: Number(env.SMTP_PORT || 587),
+    smtpUser: env.SMTP_USER || null,
+    smtpPass: env.SMTP_PASS || null,
+    smtpFrom: env.SMTP_FROM || null,
     s3Bucket: env.S3_BUCKET || null,
     scanMode: env.SCAN_MODE === 'strict' ? 'strict' : 'permissive',
     storageDir: env.STORAGE_DIR || path.join(serverRoot, 'storage'),

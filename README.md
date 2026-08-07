@@ -65,6 +65,23 @@ aur domain validation sirf allowed domains par widget chalne deta hai.
 - `npm run build` → widget + dashboard production bundles; dashboard `apps/dashboard/dist`
   kisi bhi static host par, server `npm start`.
 
+## Scaling (jitne marzi users)
+
+Built-in optimizations: gzip + caching, har hot query par DB index, bounded
+message-history loads, single-query agent routing, per-socket rate limiting
+(20 msg/10s) + 4000-char message cap, configurable MySQL pool (`DB_POOL_SIZE`).
+
+Load barhne par yeh seerhi charhein:
+
+1. **~2,000 concurrent visitors tak** — kuch nahi karna; single Node process +
+   MySQL kafi hai. `pm2 start ecosystem.config.cjs` se chalayein.
+2. **~10,000 tak** — `REDIS_URL` set karein (Socket.IO redis adapter khud on
+   ho jata hai: `npm i ioredis @socket.io/redis-adapter -w apps/server`),
+   MySQL ko `DB_POOL_SIZE=50` dein.
+3. **Us se upar** — kai Node instances alag machines/ports par + load balancer
+   with **sticky sessions** (nginx `ip_hash` / cookie) + shared Redis + MySQL
+   read tuning. `widget.js` ko CDN (Cloudflare) ke peeche rakh dein.
+
 ## Architecture
 
 - `apps/server` — Express REST API (`/api/*`), Socket.IO namespaces `/widget` + `/agent`,

@@ -102,6 +102,7 @@ export interface ConversationSummary {
   createdAt: string;
   activatedAt: string | null;
   closedAt: string | null;
+  rating?: number | null;        // CSAT 1–5, set by the visitor after close
   visitor?: Visitor;
   website?: WebsiteBranding;
   assignedUser?: UserPublic | null;
@@ -134,6 +135,7 @@ export const EV = {
   WidgetCallAccept: 'widget:call:accept',    // { callId: string }
   WidgetCallDecline: 'widget:call:decline',  // { callId: string }
   WidgetEndChat: 'widget:end-chat',          // {} — visitor closes the conversation
+  WidgetRate: 'widget:rate',                 // { rating: 1-5, comment?: string } — CSAT after close
 
   // server → widget
   WidgetReady: 'widget:ready',               // { visitor, website: WebsiteBranding, conversation?, messages?, agent? }

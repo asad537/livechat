@@ -69,6 +69,25 @@ const websiteRoom = (id: string): string => `website:${id}`;
 const MISSED_TIMEOUT_MS = 10 * 60 * 1000;
 const QUEUE_MESSAGE = "You're in the queue — an agent will be with you shortly.";
 
+// Scale/abuse guards
+const MAX_MESSAGE_CHARS = 4000;
+const MSG_RATE_MAX = 20; // messages per window per socket
+const MSG_RATE_WINDOW_MS = 10_000;
+
+/** Cheap sliding-window rate limiter, one per socket. */
+function makeLimiter(max: number, windowMs: number): () => boolean {
+  let count = 0;
+  let resetAt = 0;
+  return () => {
+    const now = Date.now();
+    if (now > resetAt) {
+      count = 0;
+      resetAt = now + windowMs;
+    }
+    return ++count <= max;
+  };
+}
+
 // ─── Small utilities ─────────────────────────────────────────
 
 function asString(value: unknown): string | null {
@@ -331,13 +350,18 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
     });
 
     // ── Visitor sends a message ──
+    const allowVisitorMsg = makeLimiter(MSG_RATE_MAX, MSG_RATE_WINDOW_MS);
     socket.on(
       EV.WidgetMessage,
       safe(socket, async (payload: unknown) => {
         const p = (payload ?? {}) as Record<string, unknown>;
-        const body = asString(p.body)?.trim();
+        const body = asString(p.body)?.trim().slice(0, MAX_MESSAGE_CHARS);
         const tempId = asString(p.tempId) ?? undefined;
         if (!body) return;
+        if (!allowVisitorMsg()) {
+          socket.emit(EV.AppError, { message: 'You are sending messages too quickly — please slow down.' });
+          return;
+        }
 
         let conv = await getConversation(deps, data.conversationId);
         if (conv && (conv.status === 'CLOSED' || conv.status === 'MISSED')) conv = undefined;
@@ -416,6 +440,37 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
         if (conv.visitor_id !== data.visitorId) return;
         await closeConversation(deps, conv.id);
+      }),
+    );
+
+    // ── CSAT rating (after close) ──
+    socket.on(
+      EV.WidgetRate,
+      safe(socket, async (payload: unknown) => {
+        const p = (payload ?? {}) as Record<string, unknown>;
+        const rating = Math.round(Number(p.rating));
+        const comment = asString(p.comment)?.trim().slice(0, 500) || null;
+        if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
+
+        // Rate the visitor's most recently closed conversation, once.
+        const conv = await deps.db.get<ConversationRow>(
+          "SELECT * FROM conversations WHERE visitor_id = ? AND status = 'CLOSED' ORDER BY closed_at DESC LIMIT 1",
+          [data.visitorId],
+        );
+        if (!conv || conv.rating != null) return; // only rate once
+
+        await deps.db.run('UPDATE conversations SET rating = ?, rating_comment = ? WHERE id = ?', [
+          rating,
+          comment,
+          conv.id,
+        ]);
+        await postMessage(deps, {
+          conversationId: conv.id,
+          senderType: 'SYSTEM',
+          kind: 'SYSTEM',
+          body: `Customer rated this chat ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}${comment ? ` — “${comment}”` : ''}`,
+        });
+        await emitInboxUpdate(deps, conv.id);
       }),
     );
 
@@ -532,8 +587,9 @@ async function onWidgetConnected(
     await socket.join(convRoom(conv.id));
     if (conv.status === 'OFFERED') cancelMissedTimer(conv.id);
     conversation = (await loadSummary(deps, conv.id)) ?? null;
+    // Bounded: only the latest 150 messages ride the widget handshake.
     const rows = await deps.db.all<MessageRow>(
-      'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC',
+      'SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 150) t ORDER BY created_at ASC, id ASC',
       [conv.id],
     );
     messages = await hydrateMessages(deps, rows);
@@ -613,8 +669,9 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         await socket.join(convRoom(conv.id));
         const [conversation, rows, history] = await Promise.all([
           loadSummary(deps, conv.id),
+          // Bounded: agents get the latest 300 messages on open.
           deps.db.all<MessageRow>(
-            'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC',
+            'SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 300) t ORDER BY created_at ASC, id ASC',
             [conv.id],
           ),
           loadHistory(deps, conv.id),
@@ -625,11 +682,13 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     );
 
     // ── Agent sends a message ──
+    const allowAgentMsg = makeLimiter(MSG_RATE_MAX * 2, MSG_RATE_WINDOW_MS);
     socket.on(
       EV.AgentMessage,
       safe(socket, async (payload: unknown) => {
+        if (!allowAgentMsg()) return;
         const p = (payload ?? {}) as Record<string, unknown>;
-        const body = asString(p.body)?.trim();
+        const body = asString(p.body)?.trim().slice(0, MAX_MESSAGE_CHARS);
         const tempId = asString(p.tempId) ?? undefined;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv || !body) return;

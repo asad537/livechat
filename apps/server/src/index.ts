@@ -2,6 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { loadConfig } from './core/config.js';
@@ -19,6 +20,7 @@ async function main(): Promise<void> {
   const presence = createPresence();
 
   const app = express();
+  app.use(compression()); // gzip/brotli responses (widget.js 102KB → ~32KB on the wire)
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
 
@@ -57,11 +59,24 @@ async function main(): Promise<void> {
       res.status(404).type('text/plain').send('// widget not built yet — run: npm run build -w apps/widget');
       return;
     }
+    // Cache 5 min in the browser (ETag revalidation after that) — keeps embed
+    // pages fast without delaying widget updates for long.
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
     res.sendFile(file);
   });
   app.use('/demo', express.static(demoDir));
+
+  // Production dashboard (built SPA) at /app — `npm run build -w apps/dashboard`
+  const dashboardDist = path.join(config.repoRoot, 'apps', 'dashboard', 'dist');
+  if (fs.existsSync(path.join(dashboardDist, 'index.html'))) {
+    app.use('/app', express.static(dashboardDist));
+    app.get('/app/*', (_req, res) => res.sendFile(path.join(dashboardDist, 'index.html')));
+  }
+
   app.get('/health', (_req, res) => res.json({ ok: true, db: db.dialect }));
-  app.get('/', (_req, res) => res.redirect('/demo/acme.html'));
+  app.get('/', (_req, res) =>
+    res.redirect(fs.existsSync(path.join(dashboardDist, 'index.html')) ? '/app/' : '/demo/acme.html'),
+  );
 
   server.listen(config.port, () => {
     console.log(`[livechat] server    → ${config.publicUrl}`);
