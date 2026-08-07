@@ -1,0 +1,197 @@
+// ─────────────────────────────────────────────────────────────
+// Shared contract between server, widget and dashboard.
+// Import via the `@livechat/shared` alias (tsconfig paths / vite alias).
+// ─────────────────────────────────────────────────────────────
+
+export type Role = 'ADMIN' | 'LEAD' | 'CSR';
+export type ConversationStatus = 'WAITING' | 'OFFERED' | 'ACTIVE' | 'CLOSED' | 'MISSED';
+export type SenderType = 'VISITOR' | 'AGENT' | 'SYSTEM' | 'BOT';
+export type MessageKind = 'TEXT' | 'FILE' | 'CALL' | 'SYSTEM';
+export type ScanStatus = 'PENDING' | 'CLEAN' | 'BLOCKED';
+export type CallKind = 'AUDIO' | 'VIDEO';
+export type CallStatus = 'INVITED' | 'ACTIVE' | 'DECLINED' | 'ENDED';
+export type CallProvider = 'BUILTIN' | 'DAILY';
+export type AssignmentReason = 'AUTO' | 'OFFER' | 'TRANSFER';
+
+export interface UserPublic {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  maxChats: number;
+  avatarColor: string;
+  online?: boolean;
+  activeChats?: number;
+}
+
+export interface WebsiteBranding {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  greeting: string;
+}
+
+export interface Website extends WebsiteBranding {
+  widgetKey: string;
+  domains: string[];
+  teamId: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  members?: (UserPublic & { isLead: boolean })[];
+}
+
+export interface Visitor {
+  id: string;
+  websiteId: string;
+  name: string | null;
+  email: string | null;
+  lastSeenAt: string;
+  online?: boolean;
+  currentPage?: string | null;
+}
+
+export interface FileMeta {
+  id: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  scanStatus: ScanStatus;
+  downloadUrl?: string;
+}
+
+export interface CallMeta {
+  id: string;
+  conversationId: string;
+  kind: CallKind;
+  provider: CallProvider;
+  status: CallStatus;
+  roomUrl: string | null;
+  startedBy: string; // 'AGENT:<userId>' | 'VISITOR:<visitorId>'
+  createdAt: string;
+  endedAt: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderType: SenderType;
+  senderUserId: string | null;
+  body: string;
+  kind: MessageKind;
+  fileId: string | null;
+  callId: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+  readAt: string | null;
+  file?: FileMeta | null;
+  call?: CallMeta | null;
+  sender?: { name: string; avatarColor: string } | null;
+  tempId?: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  websiteId: string;
+  visitorId: string;
+  status: ConversationStatus;
+  assignedUserId: string | null;
+  createdAt: string;
+  activatedAt: string | null;
+  closedAt: string | null;
+  visitor?: Visitor;
+  website?: WebsiteBranding;
+  assignedUser?: UserPublic | null;
+  lastMessage?: ChatMessage | null;
+  unreadCount?: number;
+}
+
+export interface AssignmentRecord {
+  id: string;
+  conversationId: string;
+  fromUserId: string | null;
+  toUserId: string;
+  reason: AssignmentReason;
+  createdAt: string;
+  fromUser?: UserPublic | null;
+  toUser?: UserPublic | null;
+}
+
+// ─── Socket.IO namespaces ────────────────────────────────────
+export const WIDGET_NAMESPACE = '/widget';
+export const AGENT_NAMESPACE = '/agent';
+
+// ─── Socket.IO event names ───────────────────────────────────
+export const EV = {
+  // widget client → server
+  WidgetMessage: 'widget:message',           // { body: string, tempId: string }
+  WidgetTyping: 'widget:typing',             // { typing: boolean }
+  WidgetRead: 'widget:read',                 // { messageIds: string[] }
+  WidgetInfo: 'widget:info',                 // { name?: string, email?: string }
+  WidgetCallAccept: 'widget:call:accept',    // { callId: string }
+  WidgetCallDecline: 'widget:call:decline',  // { callId: string }
+  WidgetEndChat: 'widget:end-chat',          // {} — visitor closes the conversation
+
+  // server → widget
+  WidgetReady: 'widget:ready',               // { visitor, website: WebsiteBranding, conversation?, messages?, agent? }
+
+  // both namespaces, server → client
+  ChatMessage: 'chat:message',               // { message: ChatMessage }
+  ChatReceipt: 'chat:receipt',               // { conversationId, messageIds: string[], deliveredAt?, readAt? }
+  ChatTyping: 'chat:typing',                 // { conversationId, from: 'VISITOR'|'AGENT', typing: boolean }
+  ChatStatus: 'chat:status',                 // { conversation: ConversationSummary }
+  ChatAgent: 'chat:agent',                   // { conversationId, agent: {name, avatarColor} | null }
+
+  // calls (both namespaces)
+  CallInvite: 'call:invite',                 // { call: CallMeta, from: {name} }
+  CallStatus: 'call:status',                 // { call: CallMeta }
+  CallSignal: 'call:signal',                 // { callId, from: string, to?: string, data: any }  (WebRTC SDP/ICE relay)
+  CallPeers: 'call:peers',                   // { callId, peers: {peerId, label}[] } sent on join (builtin provider)
+  CallJoin: 'call:join',                     // client → server { callId } ; server → others { callId, peerId, label }
+  CallLeave: 'call:leave',                   // client → server { callId } ; server → others { callId, peerId }
+
+  // agent client → server
+  AgentOpen: 'agent:open',                   // { conversationId } join conversation room, returns via ack: { messages, conversation, history }
+  AgentMessage: 'agent:message',             // { conversationId, body, tempId }
+  AgentStartChat: 'agent:start-chat',        // { websiteId, visitorId, body } CSR-initiated → OFFERED
+  AgentAccept: 'agent:accept',               // { conversationId }
+  AgentClose: 'agent:close',                 // { conversationId }
+  AgentTransfer: 'agent:transfer',           // { conversationId, toUserId }
+  AgentTyping: 'agent:typing',               // { conversationId, typing: boolean }
+  AgentRead: 'agent:read',                   // { conversationId, messageIds: string[] }
+  AgentWatchWebsite: 'agent:watch-website',  // { websiteId } subscribe to visitor list + inbox of a website
+  AgentCallStart: 'agent:call:start',        // { conversationId, kind: CallKind }
+  AgentCallInvite: 'agent:call:invite-participant', // { callId, userId }
+
+  // server → agent
+  AgentReady: 'agent:ready',                 // { me: UserPublic, websites: Website[], teams: Team[] }
+  InboxUpdate: 'inbox:update',               // { conversation: ConversationSummary }
+  VisitorsUpdate: 'visitors:update',         // { websiteId, visitors: Visitor[] }
+  PresenceUpdate: 'presence:update',         // { userId, online: boolean }
+
+  // errors (both namespaces)
+  AppError: 'app:error',                     // { message: string }
+} as const;
+
+// ─── REST API paths (server prefix /api) ─────────────────────
+export const API = {
+  login: '/api/auth/login',
+  me: '/api/me',
+  users: '/api/users',
+  teams: '/api/teams',
+  websites: '/api/websites',
+  conversations: '/api/conversations',
+  uploads: '/api/uploads',
+  files: '/api/files',
+  reports: '/api/reports/overview',
+  widgetBoot: '/api/widget/boot',
+} as const;
+
+export const DEFAULT_MAX_CHATS = 3;
+
+// File limits (diagram: quarantine → scan → compress → private download)
+export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+export const BLOCKED_EXTENSIONS = ['exe', 'bat', 'cmd', 'sh', 'msi', 'scr', 'com', 'pif', 'jar'];

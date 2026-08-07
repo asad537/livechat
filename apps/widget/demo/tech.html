@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TechNova Cloud — Ship faster on infrastructure that scales</title>
+<style>
+  :root {
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --blue-soft: #dbeafe;
+    --ink: #0b1220;
+    --muted: #5b6675;
+    --bg: #f6f8fd;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  .topbar {
+    background: var(--blue-dark);
+    color: #e5edff;
+    text-align: center;
+    font-size: 13px;
+    padding: 8px 16px;
+    letter-spacing: .02em;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(246, 248, 253, .92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e4e9f4;
+  }
+  .nav {
+    max-width: 1080px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; gap: 28px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; }
+  .logo-mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 14.5px; }
+  .nav-links a { text-decoration: none; color: var(--muted); font-weight: 600; transition: color .15s; }
+  .nav-links a:hover { color: var(--blue-dark); }
+  .nav .cta {
+    background: var(--blue); color: #fff; text-decoration: none;
+    padding: 9px 18px; border-radius: 10px; font-weight: 700; font-size: 14px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .3); transition: transform .15s, box-shadow .15s;
+  }
+  .nav .cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37, 99, 235, .38); }
+
+  .hero {
+    max-width: 1080px; margin: 0 auto; padding: 72px 24px 56px;
+    display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--blue-soft); color: var(--blue-dark);
+    font-size: 12.5px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    margin-bottom: 18px; letter-spacing: .02em;
+  }
+  .hero h1 { font-size: 46px; line-height: 1.12; letter-spacing: -.02em; margin-bottom: 18px; }
+  .hero h1 em { font-style: normal; color: var(--blue); }
+  .hero p { font-size: 17px; color: var(--muted); max-width: 46ch; margin-bottom: 26px; }
+  .hero-actions { display: flex; gap: 14px; align-items: center; }
+  .btn-primary {
+    background: var(--blue); color: #fff; text-decoration: none;
+    padding: 13px 26px; border-radius: 12px; font-weight: 700; font-size: 15.5px;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, .32); transition: transform .15s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-ghost { text-decoration: none; font-weight: 700; font-size: 15px; color: var(--blue-dark); }
+  .hero-art {
+    background: #0b1530;
+    border-radius: 20px; padding: 22px;
+    box-shadow: 0 24px 48px rgba(11, 21, 48, .28);
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  .term-bar { display: flex; gap: 7px; margin-bottom: 16px; }
+  .term-bar i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .term-bar i:nth-child(1) { background: #ff5f57; }
+  .term-bar i:nth-child(2) { background: #febc2e; }
+  .term-bar i:nth-child(3) { background: #28c840; }
+  .term-line { font-size: 13px; line-height: 1.9; color: #cbd5e1; }
+  .term-line .p { color: #60a5fa; }
+  .term-line .g { color: #4ade80; }
+  .term-line .c { color: #64748b; }
+
+  .stats { background: #fff; border-top: 1px solid #e4e9f4; border-bottom: 1px solid #e4e9f4; }
+  .stats-inner {
+    max-width: 1080px; margin: 0 auto; padding: 34px 24px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; text-align: center;
+  }
+  .stat b { font-size: 30px; color: var(--blue-dark); display: block; letter-spacing: -.02em; }
+  .stat span { color: var(--muted); font-size: 14px; }
+
+  .section { max-width: 1080px; margin: 0 auto; padding: 64px 24px; }
+  .section-head { text-align: center; margin-bottom: 40px; }
+  .section-head h2 { font-size: 30px; letter-spacing: -.01em; margin-bottom: 8px; }
+  .section-head p { color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .card {
+    background: #fff; border: 1px solid #e4e9f4; border-radius: 18px; padding: 26px 22px;
+    transition: transform .18s, box-shadow .18s;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(11, 18, 32, .09); }
+  .card .icon {
+    width: 46px; height: 46px; border-radius: 13px; background: var(--blue-soft);
+    display: flex; align-items: center; justify-content: center; font-size: 23px; margin-bottom: 14px;
+  }
+  .card h3 { font-size: 17px; margin-bottom: 6px; }
+  .card p { font-size: 14px; color: var(--muted); }
+
+  .quote-band { background: var(--blue-dark); color: #eff5ff; }
+  .quote-inner { max-width: 820px; margin: 0 auto; padding: 58px 24px; text-align: center; }
+  .quote-inner blockquote { font-size: 22px; font-weight: 600; line-height: 1.45; letter-spacing: -.01em; }
+  .quote-inner cite { display: block; margin-top: 16px; font-style: normal; font-size: 14px; color: #bfdbfe; }
+
+  footer { background: #0b1220; color: #94a3b8; }
+  .footer-inner {
+    max-width: 1080px; margin: 0 auto; padding: 42px 24px;
+    display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between;
+    font-size: 14px;
+  }
+  .footer-inner .logo { color: #e2e8f0; font-size: 16px; }
+  .partner-link {
+    color: #93c5fd; font-weight: 700; text-decoration: none;
+    border: 1px solid #24324e; padding: 9px 16px; border-radius: 10px; transition: background .15s;
+  }
+  .partner-link:hover { background: #131c30; }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 48px; }
+    .grid, .stats-inner { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 34px; }
+    .nav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">⚡ New: edge functions in 34 regions — deploy globally in one command</div>
+
+  <header>
+    <nav class="nav">
+      <div class="logo"><span class="logo-mark">▲</span> TechNova Cloud</div>
+      <div class="nav-links">
+        <a href="#features">Platform</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#docs">Docs</a>
+        <a href="acme.html">Customer story</a>
+      </div>
+      <a class="cta" href="#pricing">Start free</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <span class="badge">✓ SOC 2 Type II · 99.99% uptime SLA</span>
+      <h1>Ship faster on infrastructure that <em>scales itself</em>.</h1>
+      <p>Push your code, we handle the rest — global CDN, autoscaling containers, managed
+         Postgres and zero-config CI/CD. From first commit to production in under two minutes.</p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="#pricing">Deploy your first app</a>
+        <a class="btn-ghost" href="#docs">Read the docs →</a>
+      </div>
+    </div>
+    <div class="hero-art">
+      <div class="term-bar"><i></i><i></i><i></i></div>
+      <div class="term-line">
+        <span class="c"># deploy in one command</span><br />
+        <span class="p">$</span> technova deploy<br />
+        <span class="g">✓</span> building image ......... done<br />
+        <span class="g">✓</span> pushing to 34 regions .. done<br />
+        <span class="g">✓</span> live at <span class="p">app.technova.cloud</span><br />
+        <span class="c"># 1.8s total</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="stats-inner">
+      <div class="stat"><b>34</b><span>edge regions worldwide</span></div>
+      <div class="stat"><b>1.8s</b><span>average deploy time</span></div>
+      <div class="stat"><b>99.99%</b><span>uptime, backed by SLA</span></div>
+    </div>
+  </div>
+
+  <section class="section" id="features">
+    <div class="section-head">
+      <h2>Everything you need to run in production</h2>
+      <p>One platform, no glue code, no 2am pages.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="icon">🚀</div><h3>Instant autoscaling</h3><p>Traffic spikes to a million requests? Containers scale out in seconds and back down when it's quiet.</p></div>
+      <div class="card"><div class="icon">🗄️</div><h3>Managed Postgres</h3><p>Automated backups, read replicas and point-in-time restore. You write queries; we keep it alive.</p></div>
+      <div class="card"><div class="icon">💬</div><h3>Human support, fast</h3><p>Stuck on a deploy or a billing question? Chat with our engineers right here — no ticket queues.</p></div>
+    </div>
+  </section>
+
+  <div class="quote-band" id="pricing">
+    <div class="quote-inner">
+      <blockquote>“We moved our whole storefront to TechNova in a weekend. Deploys went from 40 minutes to under two — and the support chat actually gets an engineer, not a bot.”</blockquote>
+      <cite>— Acme Organics engineering team</cite>
+    </div>
+  </div>
+
+  <section class="section" id="docs">
+    <div class="section-head">
+      <h2>Loved by teams that ship daily</h2>
+      <p>From weekend projects to Series C startups.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="icon">🔐</div><h3>Secure by default</h3><p>Automatic TLS, isolated build sandboxes and per-environment secrets. Compliance without the checklist.</p></div>
+      <div class="card"><div class="icon">📊</div><h3>Real-time observability</h3><p>Logs, metrics and traces streamed live — find the slow query before your users do.</p></div>
+      <div class="card"><div class="icon">🌍</div><h3>Global by design</h3><p>Your app runs close to every user. One deploy, 34 regions, zero extra config.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="logo"><span class="logo-mark">▲</span> TechNova Cloud</div>
+      <div>© 2026 TechNova, Inc. · Built for developers who ship.</div>
+      <a class="partner-link" href="acme.html">See how Acme Organics runs on TechNova →</a>
+    </div>
+  </footer>
+
+  <script src="http://localhost:4000/widget.js" data-livechat-key="wk_tech_demo" async></script>
+</body>
+</html>

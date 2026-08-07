@@ -1,0 +1,22 @@
+{
+  "name": "livechat",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Premium multi-tenant live chat platform: embeddable widget, CSR dashboard, calls, secure file sharing",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,dashboard,widget -c blue,magenta,green \"npm run dev -w apps/server\" \"npm run dev -w apps/dashboard\" \"npm run watch -w apps/widget\"",
+    "build": "npm run build -w apps/widget && npm run build -w apps/dashboard && npm run typecheck -w apps/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "start": "npm run start -w apps/server",
+    "reset": "rm -rf apps/server/data apps/server/storage"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

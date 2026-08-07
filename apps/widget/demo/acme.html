@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Acme Organics — Farm-fresh groceries, delivered</title>
+<style>
+  :root {
+    --green: #16a34a;
+    --green-dark: #15803d;
+    --green-soft: #dcfce7;
+    --ink: #14231a;
+    --muted: #5b6f62;
+    --cream: #f7faf5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--cream);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  .topbar {
+    background: var(--green-dark);
+    color: #eafcef;
+    text-align: center;
+    font-size: 13px;
+    padding: 8px 16px;
+    letter-spacing: .02em;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(247, 250, 245, .92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e3ede4;
+  }
+  .nav {
+    max-width: 1080px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; gap: 28px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; }
+  .logo-mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--green), var(--green-dark));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 14.5px; }
+  .nav-links a { text-decoration: none; color: var(--muted); font-weight: 600; transition: color .15s; }
+  .nav-links a:hover { color: var(--green-dark); }
+  .nav .cta {
+    background: var(--green); color: #fff; text-decoration: none;
+    padding: 9px 18px; border-radius: 10px; font-weight: 700; font-size: 14px;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, .3); transition: transform .15s, box-shadow .15s;
+  }
+  .nav .cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(22, 163, 74, .38); }
+
+  .hero {
+    max-width: 1080px; margin: 0 auto; padding: 72px 24px 56px;
+    display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--green-soft); color: var(--green-dark);
+    font-size: 12.5px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    margin-bottom: 18px; letter-spacing: .02em;
+  }
+  .hero h1 { font-size: 46px; line-height: 1.12; letter-spacing: -.02em; margin-bottom: 18px; }
+  .hero h1 em { font-style: normal; color: var(--green); }
+  .hero p { font-size: 17px; color: var(--muted); max-width: 46ch; margin-bottom: 26px; }
+  .hero-actions { display: flex; gap: 14px; align-items: center; }
+  .btn-primary {
+    background: var(--green); color: #fff; text-decoration: none;
+    padding: 13px 26px; border-radius: 12px; font-weight: 700; font-size: 15.5px;
+    box-shadow: 0 8px 20px rgba(22, 163, 74, .32); transition: transform .15s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-ghost { text-decoration: none; font-weight: 700; font-size: 15px; color: var(--green-dark); }
+  .hero-art {
+    background: linear-gradient(160deg, #e8f7ec, #cdeed7);
+    border-radius: 24px; padding: 30px;
+    box-shadow: 0 24px 48px rgba(21, 128, 61, .14);
+  }
+  .basket { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .basket-item {
+    background: #fff; border-radius: 16px; padding: 18px 16px; text-align: center;
+    box-shadow: 0 4px 10px rgba(20, 35, 26, .06);
+  }
+  .basket-item .emoji { font-size: 34px; display: block; margin-bottom: 6px; }
+  .basket-item strong { font-size: 14px; display: block; }
+  .basket-item span { font-size: 12.5px; color: var(--muted); }
+
+  .stats {
+    background: #fff; border-top: 1px solid #e3ede4; border-bottom: 1px solid #e3ede4;
+  }
+  .stats-inner {
+    max-width: 1080px; margin: 0 auto; padding: 34px 24px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; text-align: center;
+  }
+  .stat b { font-size: 30px; color: var(--green-dark); display: block; letter-spacing: -.02em; }
+  .stat span { color: var(--muted); font-size: 14px; }
+
+  .section { max-width: 1080px; margin: 0 auto; padding: 64px 24px; }
+  .section-head { text-align: center; margin-bottom: 40px; }
+  .section-head h2 { font-size: 30px; letter-spacing: -.01em; margin-bottom: 8px; }
+  .section-head p { color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .card {
+    background: #fff; border: 1px solid #e3ede4; border-radius: 18px; padding: 26px 22px;
+    transition: transform .18s, box-shadow .18s;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(20, 35, 26, .09); }
+  .card .icon {
+    width: 46px; height: 46px; border-radius: 13px; background: var(--green-soft);
+    display: flex; align-items: center; justify-content: center; font-size: 23px; margin-bottom: 14px;
+  }
+  .card h3 { font-size: 17px; margin-bottom: 6px; }
+  .card p { font-size: 14px; color: var(--muted); }
+
+  .quote-band { background: var(--green-dark); color: #f0fdf4; }
+  .quote-inner { max-width: 820px; margin: 0 auto; padding: 58px 24px; text-align: center; }
+  .quote-inner blockquote { font-size: 22px; font-weight: 600; line-height: 1.45; letter-spacing: -.01em; }
+  .quote-inner cite { display: block; margin-top: 16px; font-style: normal; font-size: 14px; color: #bbf7d0; }
+
+  footer { background: #10american1a12; background: #0f1a13; color: #9fb8a6; }
+  .footer-inner {
+    max-width: 1080px; margin: 0 auto; padding: 42px 24px;
+    display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between;
+    font-size: 14px;
+  }
+  .footer-inner .logo { color: #ecfdf3; font-size: 16px; }
+  .partner-link {
+    color: #86efac; font-weight: 700; text-decoration: none;
+    border: 1px solid #2c4433; padding: 9px 16px; border-radius: 10px; transition: background .15s;
+  }
+  .partner-link:hover { background: #1a2b1f; }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 48px; }
+    .grid, .stats-inner { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 34px; }
+    .nav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">🌱 Free carbon-neutral delivery on orders over $40 — today only</div>
+
+  <header>
+    <nav class="nav">
+      <div class="logo"><span class="logo-mark">🥬</span> Acme Organics</div>
+      <div class="nav-links">
+        <a href="#produce">Produce</a>
+        <a href="#why">Why Acme</a>
+        <a href="#reviews">Reviews</a>
+        <a href="tech.html">Our tech partner</a>
+      </div>
+      <a class="cta" href="#produce">Shop now</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <span class="badge">✓ Certified organic since 2009</span>
+      <h1>Farm-fresh groceries, <em>picked this morning</em>, at your door tonight.</h1>
+      <p>We partner with 140+ family farms to bring you seasonal produce, pasture-raised dairy and small-batch pantry staples — harvested, packed and delivered within 24 hours.</p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="#produce">Build your basket</a>
+        <a class="btn-ghost" href="#why">How it works →</a>
+      </div>
+    </div>
+    <div class="hero-art">
+      <div class="basket">
+        <div class="basket-item"><span class="emoji">🍓</span><strong>Heirloom strawberries</strong><span>$4.90 / punnet</span></div>
+        <div class="basket-item"><span class="emoji">🥑</span><strong>Hass avocados</strong><span>$1.80 each</span></div>
+        <div class="basket-item"><span class="emoji">🥖</span><strong>Sourdough loaf</strong><span>$5.50 · baked daily</span></div>
+        <div class="basket-item"><span class="emoji">🥛</span><strong>Grass-fed milk</strong><span>$3.20 / litre</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="stats-inner">
+      <div class="stat"><b>140+</b><span>partner family farms</span></div>
+      <div class="stat"><b>24 hrs</b><span>from harvest to doorstep</span></div>
+      <div class="stat"><b>98.6%</b><span>orders rated “perfectly fresh”</span></div>
+    </div>
+  </div>
+
+  <section class="section" id="why">
+    <div class="section-head">
+      <h2>Why families choose Acme</h2>
+      <p>Everything we deliver is traceable back to the field it grew in.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="icon">🚜</div><h3>Direct from growers</h3><p>No warehouses sitting on stock for weeks. Your order is picked after you place it — never before.</p></div>
+      <div class="card"><div class="icon">📦</div><h3>Zero-waste packaging</h3><p>Compostable trays and returnable coolers. We collect the empties on your next delivery.</p></div>
+      <div class="card"><div class="icon">💬</div><h3>Real human support</h3><p>Questions about an order or an allergen? Chat with our team right from this page — we answer in minutes.</p></div>
+    </div>
+  </section>
+
+  <div class="quote-band" id="reviews">
+    <div class="quote-inner">
+      <blockquote>“The strawberries actually taste like strawberries. My kids fight over the veggie box now — I never thought I'd type that sentence.”</blockquote>
+      <cite>— Priya M., subscriber for 3 years</cite>
+    </div>
+  </div>
+
+  <section class="section" id="produce">
+    <div class="section-head">
+      <h2>This week's harvest</h2>
+      <p>Rotating weekly, always seasonal.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="icon">🥕</div><h3>Rainbow carrot bunch</h3><p>Sweet enough to snack raw. Grown by Hilltop Acres, 40 km away. <b>$2.90</b></p></div>
+      <div class="card"><div class="icon">🍅</div><h3>Vine tomatoes</h3><p>Picked ripe, never gassed. Perfect for weekend bruschetta. <b>$4.20 / kg</b></p></div>
+      <div class="card"><div class="icon">🍯</div><h3>Wildflower honey</h3><p>Single-apiary, raw and unfiltered from the Meadow Bee Co. <b>$8.90</b></p></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="logo"><span class="logo-mark">🥬</span> Acme Organics</div>
+      <div>© 2026 Acme Organics Co-op · Grown with care, delivered with love.</div>
+      <a class="partner-link" href="tech.html">Our storefront runs on TechNova Cloud →</a>
+    </div>
+  </footer>
+
+  <script src="http://localhost:4000/widget.js" data-livechat-key="wk_acme_demo" async></script>
+</body>
+</html>
