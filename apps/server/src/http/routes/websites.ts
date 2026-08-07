@@ -52,6 +52,90 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
     }),
   );
 
+  // GET /api/websites/stats — per-website chat + AI-knowledge stats (scoped)
+  router.get(
+    `${API.websites}/stats`,
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      if (siteIds.length === 0) {
+        res.json({});
+        return;
+      }
+      const ph = placeholders(siteIds.length);
+      const [convCounts, activeCounts, knowledge] = await Promise.all([
+        deps.db.all<{ website_id: string; n: number }>(
+          `SELECT website_id, COUNT(*) AS n FROM conversations WHERE website_id IN (${ph}) GROUP BY website_id`,
+          siteIds,
+        ),
+        deps.db.all<{ website_id: string; n: number }>(
+          `SELECT website_id, COUNT(*) AS n FROM conversations
+            WHERE website_id IN (${ph}) AND status IN ('WAITING','OFFERED','ACTIVE')
+            GROUP BY website_id`,
+          siteIds,
+        ),
+        deps.db.all<{ website_id: string; pages: number; urls: number; last: string }>(
+          `SELECT website_id,
+                  SUM(CASE WHEN content IS NOT NULL THEN 1 ELSE 0 END) AS pages,
+                  SUM(CASE WHEN content IS NULL THEN 1 ELSE 0 END) AS urls,
+                  MAX(fetched_at) AS last
+             FROM knowledge_pages WHERE website_id IN (${ph}) GROUP BY website_id`,
+          siteIds,
+        ),
+      ]);
+      const stats: Record<
+        string,
+        { chats: number; open: number; aiPages: number; aiUrls: number; aiLastScan: string | null }
+      > = {};
+      for (const id of siteIds) {
+        stats[id] = { chats: 0, open: 0, aiPages: 0, aiUrls: 0, aiLastScan: null };
+      }
+      for (const r of convCounts) stats[r.website_id].chats = Number(r.n);
+      for (const r of activeCounts) stats[r.website_id].open = Number(r.n);
+      for (const r of knowledge) {
+        stats[r.website_id].aiPages = Number(r.pages);
+        stats[r.website_id].aiUrls = Number(r.urls);
+        stats[r.website_id].aiLastScan = r.last ?? null;
+      }
+      res.json(stats);
+    }),
+  );
+
+  // DELETE /api/websites/:id — ADMIN; removes the website AND all its data
+  router.delete(
+    `${API.websites}/:id`,
+    auth,
+    requireRole('ADMIN'),
+    h(async (req, res) => {
+      const id = String(req.params.id);
+      const site = await deps.db.get<WebsiteRow>('SELECT * FROM websites WHERE id = ?', [id]);
+      if (!site) throw new HttpError(404, 'Website not found');
+
+      const convIds = (
+        await deps.db.all<{ id: string }>('SELECT id FROM conversations WHERE website_id = ?', [id])
+      ).map((r) => r.id);
+
+      if (convIds.length > 0) {
+        const ph = placeholders(convIds.length);
+        await deps.db.run(`DELETE FROM messages WHERE conversation_id IN (${ph})`, convIds);
+        await deps.db.run(`DELETE FROM files WHERE conversation_id IN (${ph})`, convIds);
+        await deps.db.run(
+          `DELETE FROM call_events WHERE call_id IN (SELECT id FROM calls WHERE conversation_id IN (${ph}))`,
+          convIds,
+        );
+        await deps.db.run(`DELETE FROM calls WHERE conversation_id IN (${ph})`, convIds);
+        await deps.db.run(`DELETE FROM assignment_history WHERE conversation_id IN (${ph})`, convIds);
+        await deps.db.run(`DELETE FROM conversations WHERE id IN (${ph})`, convIds);
+      }
+      await deps.db.run('DELETE FROM visitors WHERE website_id = ?', [id]);
+      await deps.db.run('DELETE FROM knowledge_pages WHERE website_id = ?', [id]);
+      await deps.db.run('DELETE FROM websites WHERE id = ?', [id]);
+
+      res.json({ ok: true, deletedConversations: convIds.length });
+    }),
+  );
+
   // POST /api/websites — ADMIN
   router.post(
     API.websites,

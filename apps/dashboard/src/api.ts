@@ -173,6 +173,17 @@ export const api = {
       websiteId ? `${API.reports}?websiteId=${encodeURIComponent(websiteId)}` : API.reports,
     ),
 
+  websiteStats: () =>
+    request<Record<string, { chats: number; open: number; aiPages: number; aiUrls: number; aiLastScan: string | null }>>(
+      `${API.websites}/stats`,
+    ),
+
+  deleteWebsite: (websiteId: string) =>
+    request<{ ok: boolean; deletedConversations: number }>(
+      `${API.websites}/${encodeURIComponent(websiteId)}`,
+      { method: 'DELETE' },
+    ),
+
   searchConversations: async (q: string): Promise<ConversationSummary[]> =>
     unwrapList<ConversationSummary>(
       await request<unknown>(`${API.conversations}/search?q=${encodeURIComponent(q)}`),

@@ -120,6 +120,10 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [scanningId, setScanningId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [stats, setStats] = useState<
+    Record<string, { chats: number; open: number; aiPages: number; aiUrls: number; aiLastScan: string | null }>
+  >({});
 
   const load = useCallback(async () => {
     try {
@@ -143,6 +147,40 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
     }
   };
 
+  const loadStats = useCallback(async () => {
+    try {
+      setStats(await api.websiteStats());
+    } catch {
+      /* stats are decorative */
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
+
+  const remove = async (site: Website) => {
+    const st = stats[site.id];
+    const warning =
+      `Delete "${site.name}" PERMANENTLY?\n\n` +
+      `This removes the website, its widget key${st ? `, ${st.chats} conversation(s)` : ', all conversations'}, ` +
+      `messages, calls, files and AI knowledge. This cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    if (!window.confirm(`Really delete "${site.name}"? Last chance.`)) return;
+    setDeletingId(site.id);
+    try {
+      const result = await api.deleteWebsite(site.id);
+      pushToast('Website deleted', `${site.name} + ${result.deletedConversations} conversation(s) removed.`, 'success');
+      void load();
+      void loadStats();
+      void refreshDirectory();
+    } catch (err) {
+      pushToast('Delete failed', err instanceof Error ? err.message : 'Could not delete website', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const scan = async (site: Website) => {
     const suggested = site.domains[0] ? `https://${site.domains[0]}` : 'https://';
     const url = window.prompt(
@@ -158,6 +196,7 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
         `${result.pages} pages + ${result.urls ?? 0} product links indexed — the AI now answers (and links) from this site's live content.`,
         'success',
       );
+      void loadStats();
     } catch (err) {
       pushToast('Scan failed', err instanceof Error ? err.message : 'Could not scan website', 'error');
     } finally {
@@ -206,8 +245,27 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(site)}>
                 Edit
               </button>
+              <button
+                className="btn btn-ghost btn-sm btn-danger"
+                disabled={deletingId === site.id}
+                onClick={() => void remove(site)}
+                title="Delete this website and all of its data"
+              >
+                {deletingId === site.id ? 'Deleting…' : 'Delete'}
+              </button>
             </div>
             <div className="website-card-greeting">“{site.greeting}”</div>
+            {stats[site.id] && (
+              <div className="website-card-stats">
+                <span className="chip">💬 {stats[site.id].chats} chats</span>
+                {stats[site.id].open > 0 && <span className="chip chip-open">{stats[site.id].open} open</span>}
+                <span className="chip">
+                  {stats[site.id].aiPages > 0
+                    ? `🤖 AI: ${stats[site.id].aiPages} pages + ${stats[site.id].aiUrls} links`
+                    : '🤖 AI: not scanned yet'}
+                </span>
+              </div>
+            )}
             <div className="embed-row">
               <div className="embed-meta">
                 <span className="embed-label">Widget key</span>

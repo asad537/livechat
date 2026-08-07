@@ -1443,6 +1443,38 @@ p {
   border-top-color: var(--red);
 }
 
+/* ── Website card extras ───────────────────────────────────── */
+.btn-danger {
+  color: var(--red, #ef4444);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.website-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 10px;
+}
+
+.website-card-stats .chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bg, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  color: #475569;
+  font-weight: 600;
+}
+
+.website-card-stats .chip-open {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
 /* ── Conversation search ───────────────────────────────────── */
 .conv-search {
   display: flex;
