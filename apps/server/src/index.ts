@@ -12,6 +12,7 @@ import type { AppDeps } from './core/deps.js';
 import { ensureSeed } from './seed.js';
 import { buildApiRouter } from './http/router.js';
 import { attachRealtime } from './realtime/index.js';
+import { startKnowledgeRefresher } from './features/knowledge/index.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
 
   app.use(buildApiRouter(deps));
   attachRealtime(deps);
+  startKnowledgeRefresher(deps); // daily re-scan of AI website knowledge
 
   // Embeddable widget bundle + demo business sites
   const widgetDist = path.join(config.repoRoot, 'apps', 'widget', 'dist');

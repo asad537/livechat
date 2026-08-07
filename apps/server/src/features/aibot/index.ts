@@ -12,6 +12,7 @@
 import { EV, WIDGET_NAMESPACE, type ChatMessage } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { postMessage, type MessageRow } from '../../domain/messages.js';
+import { findRelevantKnowledge } from '../knowledge/index.js';
 
 interface ConvRow {
   id: string;
@@ -151,18 +152,34 @@ async function claudeReply(
   const messages = toClaudeMessages(history);
   if (messages.length === 0) return null;
 
+  // Live website knowledge: index finds the right pages, which are
+  // re-fetched fresh so today's products/prices are what the AI sees.
+  const lastQuestions = messages
+    .filter((m) => m.role === 'user')
+    .slice(-2)
+    .map((m) => m.content)
+    .join(' ');
+  const knowledge = await findRelevantKnowledge(deps, website.id, lastQuestions).catch(() => '');
+
+  const knowledgeBlock = knowledge
+    ? `\n\nUse the following LIVE content from ${website.name}'s own website as your source of truth. ` +
+      `When the answer is here (products, services, prices, policies, contact info), answer confidently and specifically from it. ` +
+      `If it is not covered here, say a human agent will confirm shortly — never invent specifics.\n` +
+      `<website_content>\n${knowledge}\n</website_content>`
+    : ` Never invent order status, prices, refunds, or policies specific to ${website.name} — for those, say a human agent will confirm shortly.`;
+
   const response = await client.messages.create({
     model: deps.config.aiModel,
-    max_tokens: 400,
+    max_tokens: 500,
     system:
       `You are the AI assistant on the live-chat widget of "${website.name}". ` +
       `All human support agents are currently busy; you are keeping the customer company until one joins. ` +
       `Website greeting (tone reference): "${website.greeting}". ` +
       (visitor?.name ? `The customer's name is ${visitor.name}. ` : '') +
       `Reply in the same language the customer writes in. Keep replies short (1-3 sentences), warm and helpful. ` +
-      `Answer general questions where you safely can, and collect useful details (order number, issue summary, contact info) so the human agent can start faster. ` +
-      `Never invent order status, prices, refunds, or policies specific to ${website.name} — for those, say a human agent will confirm shortly. ` +
-      `Do not promise exact wait times.`,
+      `Collect useful details (order number, issue summary, contact info) so the human agent can start faster. ` +
+      `Do not promise exact wait times.` +
+      knowledgeBlock,
     messages,
   });
 

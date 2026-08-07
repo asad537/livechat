@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import type { AppDeps } from '../core/deps.js';
 import { buildFilesRouter } from '../features/files/index.js';
 import { buildCallsRouter } from '../features/calls/index.js';
+import { buildKnowledgeRouter } from '../features/knowledge/index.js';
 import { HttpError } from './helpers.js';
 import { buildAuthRouter } from './routes/auth.js';
 import { buildUsersRouter } from './routes/users.js';
@@ -28,6 +29,7 @@ export function buildApiRouter(deps: AppDeps): Router {
 
   router.use(buildFilesRouter(deps)); // /api/uploads, /api/files/:id/download
   router.use(buildCallsRouter(deps)); // /api/calls/daily-webhook
+  router.use(buildKnowledgeRouter(deps)); // /api/websites/:id/scan (AI knowledge)
 
   // Central error handler for everything mounted above.
   router.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

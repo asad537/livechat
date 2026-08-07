@@ -127,6 +127,16 @@ CREATE TABLE IF NOT EXISTS call_events (
   created_at VARCHAR(32) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS knowledge_pages (
+  id VARCHAR(36) PRIMARY KEY,
+  website_id VARCHAR(36) NOT NULL,
+  url TEXT NOT NULL,
+  title VARCHAR(512),
+  content TEXT,                                        -- extracted page text (capped ~50KB)
+  fetched_at VARCHAR(32) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_website ON knowledge_pages (website_id);
+
 -- Hot-path indexes for scale
 CREATE INDEX IF NOT EXISTS idx_history_conversation ON assignment_history (conversation_id);
 CREATE INDEX IF NOT EXISTS idx_files_conversation ON files (conversation_id);

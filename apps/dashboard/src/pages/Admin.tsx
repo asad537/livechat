@@ -119,6 +119,7 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
   const [editing, setEditing] = useState<Website | null>(null);
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [scanningId, setScanningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -139,6 +140,28 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
       window.setTimeout(() => setCopiedId((c) => (c === site.id ? null : c)), 2000);
     } catch {
       pushToast('Copy failed', 'Clipboard is not available in this browser.', 'error');
+    }
+  };
+
+  const scan = async (site: Website) => {
+    const suggested = site.domains[0] ? `https://${site.domains[0]}` : 'https://';
+    const url = window.prompt(
+      'Website URL to scan for AI answers (products, pricing, policies):',
+      suggested,
+    );
+    if (!url) return;
+    setScanningId(site.id);
+    try {
+      const result = await api.scanWebsite(site.id, url.trim());
+      pushToast(
+        'Website scanned for AI',
+        `${result.pages} pages indexed — the AI assistant now answers from this site's live content.`,
+        'success',
+      );
+    } catch (err) {
+      pushToast('Scan failed', err instanceof Error ? err.message : 'Could not scan website', 'error');
+    } finally {
+      setScanningId(null);
     }
   };
 
@@ -194,6 +217,14 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
               <button className="btn btn-ghost btn-sm" onClick={() => void copy(site)}>
                 {copiedId === site.id ? <IconCheck size={14} /> : <IconCopy size={14} />}
                 {copiedId === site.id ? ' Copied' : ' Copy embed code'}
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={scanningId === site.id}
+                onClick={() => void scan(site)}
+                title="Crawl this website so the AI assistant answers from its live content"
+              >
+                {scanningId === site.id ? 'Scanning…' : '🤖 Scan website for AI'}
               </button>
             </div>
           </div>

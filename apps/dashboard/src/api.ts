@@ -172,6 +172,12 @@ export const api = {
     request<ReportsOverview>(
       websiteId ? `${API.reports}?websiteId=${encodeURIComponent(websiteId)}` : API.reports,
     ),
+
+  scanWebsite: (websiteId: string, url: string) =>
+    request<{ ok: boolean; url: string; pages: number; chars: number }>(
+      `${API.websites}/${encodeURIComponent(websiteId)}/scan`,
+      { method: 'POST', body: { url } },
+    ),
 };
 
 // ─── File upload / download ──────────────────────────────────
