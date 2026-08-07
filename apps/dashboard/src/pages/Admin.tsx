@@ -9,7 +9,8 @@ import { IconCheck, IconCopy, IconPlus, IconUserPlus, IconX } from '../icons';
 type Tab = 'websites' | 'teams' | 'users';
 
 function embedSnippet(widgetKey: string): string {
-  return `<script src="http://localhost:4000/widget.js" data-livechat-key="${widgetKey}" async></script>`;
+  // Same origin as the dashboard — on production that's https://your-domain/widget.js
+  return `<script src="${window.location.origin}/widget.js" data-livechat-key="${widgetKey}" async></script>`;
 }
 
 // ─── Website form ────────────────────────────────────────────
