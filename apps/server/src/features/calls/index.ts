@@ -246,7 +246,10 @@ async function handleLeave(
     entry.socket.emit(EV.CallLeave, { callId, peerId: socket.id });
   }
 
-  if (peers.size === 0) {
+  // A call needs at least two participants — when someone hangs up and
+  // one (or zero) remain, end the call for EVERYONE. The remaining
+  // participant's UI closes via the ENDED CallStatus broadcast.
+  if (peers.size <= 1) {
     callRooms.delete(callId);
     const call = await getCall(deps, callId);
     if (call && call.status !== 'ENDED' && call.status !== 'DECLINED') {

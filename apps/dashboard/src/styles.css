@@ -1443,6 +1443,13 @@ p {
   border-top-color: var(--red);
 }
 
+.msg-link {
+  word-break: break-all;
+  text-decoration: underline;
+  color: inherit;
+  font-weight: 600;
+}
+
 .stat-card.stat-csat {
   border-top-color: #f59e0b;
 }

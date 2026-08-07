@@ -319,6 +319,11 @@ export const WIDGET_CSS = `
   font-size: 12.5px; color: #64748b; text-align: center;
 }
 
+/* ── Links inside messages ────────────────────────────────── */
+.lc-bubble .lc-link { word-break: break-all; text-decoration: underline; }
+.lc-bubble-a .lc-link { color: var(--lc-primary); font-weight: 600; }
+.lc-bubble-v .lc-link { color: inherit; }
+
 /* ── CSAT rating card ─────────────────────────────────────── */
 .lc-ratebox { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
 .lc-rate-title { font-size: 13.5px; font-weight: 700; color: #0f172a; }

@@ -73,6 +73,28 @@ export const IconHangup = (): JSX.Element => (
   </svg>
 );
 
+// ─── Clickable links in message text ─────────────────────────
+
+const URL_RE = /https?:\/\/[^\s<>"')\]]+[^\s<>"')\].,!?;:]/g;
+
+/** Render plain text with URLs as clickable links (safe — no innerHTML). */
+export function linkify(text: string): (string | JSX.Element)[] {
+  const parts: (string | JSX.Element)[] = [];
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) parts.push(text.slice(last, idx));
+    parts.push(
+      <a key={idx} class="lc-link" href={m[0]} target="_blank" rel="noopener noreferrer">
+        {m[0]}
+      </a>,
+    );
+    last = idx + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 // ─── Ticks (sent / delivered / read) ─────────────────────────
 
 export function Ticks({ m }: { m: LocalMessage }): JSX.Element {
@@ -154,7 +176,7 @@ export function MessageRow({ m, server, token, fallbackAgent }: MessageRowProps)
       <CallCard m={m} />
     ) : (
       <div class={`lc-bubble ${m.senderType === 'VISITOR' ? 'lc-bubble-v' : 'lc-bubble-a'} ${m.pending ? 'lc-pending' : ''}`}>
-        {m.body}
+        {linkify(m.body)}
       </div>
     );
 

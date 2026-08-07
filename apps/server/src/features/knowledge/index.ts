@@ -183,8 +183,11 @@ export async function crawlWebsite(
 
 function scorePage(terms: string[], page: KnowledgeRow): number {
   const hay = `${page.title ?? ''} ${page.content ?? ''}`.toLowerCase();
+  const url = page.url.toLowerCase();
   let score = 0;
   for (const term of terms) {
+    // A term in the URL slug (/soap-boxes/) is the strongest possible signal.
+    if (url.includes(term)) score += 25;
     let count = 0;
     let idx = hay.indexOf(term);
     while (idx !== -1 && count < 5) {

@@ -72,3 +72,28 @@ export function newTempId(): string {
   tempCounter += 1;
   return `tmp_${Date.now().toString(36)}_${tempCounter}_${Math.random().toString(36).slice(2, 8)}`;
 }
+
+// ─── Clickable links in message text ─────────────────────────
+import React from 'react';
+
+const URL_RE = /https?:\/\/[^\s<>"')\]]+[^\s<>"')\].,!?;:]/g;
+
+/** Render plain text with URLs as clickable links (safe — no innerHTML). */
+export function linkify(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) parts.push(text.slice(last, idx));
+    parts.push(
+      React.createElement(
+        'a',
+        { key: idx, className: 'msg-link', href: m[0], target: '_blank', rel: 'noopener noreferrer' },
+        m[0],
+      ),
+    );
+    last = idx + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}

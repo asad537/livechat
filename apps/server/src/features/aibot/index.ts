@@ -166,7 +166,9 @@ async function aiReply(
   const knowledgeBlock = knowledge
     ? `\n\nUse the following LIVE content from ${website.name}'s own website as your source of truth. ` +
       `When the answer is here (products, services, prices, policies, contact info), answer confidently and specifically from it. ` +
-      `If it is not covered here, say a human agent will confirm shortly — never invent specifics.\n` +
+      `When you mention a product, service or category that has a page URL in the content (the URLs in parentheses under each heading), include that exact URL in your reply so the customer can open the page directly. ` +
+      `Only ever share URLs that literally appear in the website content — never construct, shorten or guess a URL. ` +
+      `If something is not covered here, say a human agent will confirm shortly — never invent specifics.\n` +
       `<website_content>\n${knowledge}\n</website_content>`
     : ` Never invent order status, prices, refunds, or policies specific to ${website.name} — for those, say a human agent will confirm shortly.`;
 
@@ -175,7 +177,9 @@ async function aiReply(
     `All human support agents are currently busy; you are keeping the customer company until one joins. ` +
     `Website greeting (tone reference): "${website.greeting}". ` +
     (visitor?.name ? `The customer's name is ${visitor.name}. ` : '') +
-    `Reply in the same language the customer writes in. Keep replies short (1-3 sentences), warm and helpful. ` +
+    `CRITICAL LANGUAGE RULE: always reply in exactly the language and style the customer used in their LAST message. ` +
+    `Urdu script → reply in Urdu script. Roman Urdu (Urdu in English letters, e.g. "kya aap boxes banate hain") → reply in Roman Urdu. English → English. ` +
+    `Keep replies short (1-3 sentences), warm and helpful. ` +
     `Collect useful details (order number, issue summary, contact info) so the human agent can start faster. ` +
     `Do not promise exact wait times.` +
     knowledgeBlock;

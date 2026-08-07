@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ChatMessage } from '@livechat/shared';
 import { fileDownloadUrl } from '../api';
-import { formatBytes, formatTime } from '../util';
+import { formatBytes, formatTime, linkify } from '../util';
 import {
   IconDoubleCheck,
   IconDownload,
@@ -101,7 +101,7 @@ export default function MessageBubble({ message }: Props) {
         ) : message.kind === 'CALL' ? (
           <CallCard message={message} />
         ) : (
-          <span className="msg-text">{message.body}</span>
+          <span className="msg-text">{linkify(message.body)}</span>
         )}
         <span className="msg-meta">
           <span className="msg-time">{formatTime(message.createdAt)}</span>
