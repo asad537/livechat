@@ -25,6 +25,7 @@ interface PeerState {
 }
 
 interface SignalData {
+  type?: 'offer' | 'answer' | 'candidate';
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
 }
@@ -67,6 +68,7 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
 
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const labelsRef = useRef<Map<string, string>>(new Map());
+  const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const endedRef = useRef(false);
   const isVideo = call.kind === 'VIDEO';
@@ -116,7 +118,7 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
       }
 
       pc.onicecandidate = (e) => {
-        if (e.candidate) sendSignal(peerId, { candidate: e.candidate.toJSON() });
+        if (e.candidate) sendSignal(peerId, { type: 'candidate', candidate: e.candidate.toJSON() });
       };
       pc.ontrack = (e) => {
         const remote = e.streams[0] ?? null;
@@ -140,13 +142,28 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
           try {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            if (pc.localDescription) sendSignal(peerId, { sdp: pc.localDescription.toJSON() });
+            if (pc.localDescription) {
+              sendSignal(peerId, { type: 'offer', sdp: pc.localDescription.toJSON() });
+            }
           } catch {
             /* peer might have left mid-negotiation */
           }
         })();
       }
       return pc;
+    };
+
+    const flushPendingIce = async (peerId: string, pc: RTCPeerConnection) => {
+      const queue = pendingIceRef.current.get(peerId);
+      if (!queue) return;
+      pendingIceRef.current.delete(peerId);
+      for (const candidate of queue) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch {
+          /* stale candidate */
+        }
+      }
     };
 
     const removePeer = (peerId: string) => {
@@ -185,13 +202,23 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
         try {
           if (payload.data.sdp) {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.data.sdp));
+            await flushPendingIce(payload.from, pc);
             if (payload.data.sdp.type === 'offer') {
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
-              if (pc.localDescription) sendSignal(payload.from, { sdp: pc.localDescription.toJSON() });
+              if (pc.localDescription) {
+                sendSignal(payload.from, { type: 'answer', sdp: pc.localDescription.toJSON() });
+              }
             }
           } else if (payload.data.candidate) {
-            await pc.addIceCandidate(new RTCIceCandidate(payload.data.candidate));
+            if (pc.remoteDescription) {
+              await pc.addIceCandidate(new RTCIceCandidate(payload.data.candidate));
+            } else {
+              // Remote description not set yet — queue and flush later.
+              const queue = pendingIceRef.current.get(payload.from) ?? [];
+              queue.push(payload.data.candidate);
+              pendingIceRef.current.set(payload.from, queue);
+            }
           }
         } catch {
           /* stale signal for a closed connection */

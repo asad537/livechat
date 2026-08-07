@@ -18,7 +18,7 @@ export interface RemoteTile {
 }
 
 interface SignalData {
-  type: 'offer' | 'answer' | 'candidate';
+  type?: 'offer' | 'answer' | 'candidate';
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
 }
@@ -202,6 +202,12 @@ export class CallSession {
 
   private async handleSignal(from: string, data: SignalData): Promise<void> {
     if (this.closed || !data) return;
+    // Tolerant: infer the signal kind when the sender omitted `type`
+    // (sdp.type carries offer/answer; a bare candidate is a candidate).
+    if (!data.type) {
+      if (data.sdp?.type === 'offer' || data.sdp?.type === 'answer') data.type = data.sdp.type;
+      else if (data.candidate) data.type = 'candidate';
+    }
     try {
       if (data.type === 'offer' && data.sdp) {
         const pc = (await this.connectTo(from, this.labels.get(from), false)) ?? this.pcs.get(from);
