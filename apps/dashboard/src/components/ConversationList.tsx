@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ConversationStatus, ConversationSummary } from '@livechat/shared';
 import { useApp } from '../state';
+import { api } from '../api';
 import { classNames, formatWhen, initials } from '../util';
 
 interface Props {
@@ -31,6 +32,28 @@ function preview(c: ConversationSummary): string {
 export default function ConversationList({ selectedId, onSelect }: Props) {
   const { me, conversations } = useApp();
   const [tab, setTab] = useState<Tab>('mine');
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ConversationSummary[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // Debounced server search: visitor name/email + message content.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const t = window.setTimeout(() => {
+      api
+        .searchConversations(q)
+        .then((res) => setSearchResults(res))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [query]);
 
   const all = useMemo(
     () => Object.values(conversations).sort((a, b) => lastActivity(b) - lastActivity(a)),
@@ -64,8 +87,28 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
 
   const showAllTab = me?.role === 'LEAD' || me?.role === 'ADMIN';
 
+  const displayItems = searchResults ?? items;
+
   return (
     <div className="conv-list">
+      <div className="conv-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Search name, email or message…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {query && (
+          <button className="conv-search-clear" onClick={() => setQuery('')} title="Clear">
+            ✕
+          </button>
+        )}
+      </div>
+      {searchResults === null && (
       <div className="conv-tabs">
         <button
           className={classNames('conv-tab', tab === 'mine' && 'active')}
@@ -88,13 +131,25 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
           </button>
         )}
       </div>
+      )}
       <div className="conv-scroll">
-        {items.length === 0 && (
-          <div className="empty-hint">
-            {tab === 'queue' ? 'Queue is empty.' : 'No conversations here yet.'}
+        {searchResults !== null && (
+          <div className="conv-search-status">
+            {searching ? 'Searching…' : `${searchResults.length} result${searchResults.length === 1 ? '' : 's'}`}
           </div>
         )}
-        {items.map((c) => {
+        {displayItems.length === 0 && (
+          <div className="empty-hint">
+            {searchResults !== null
+              ? searching
+                ? ''
+                : 'No matches found.'
+              : tab === 'queue'
+                ? 'Queue is empty.'
+                : 'No conversations here yet.'}
+          </div>
+        )}
+        {displayItems.map((c) => {
           const name = c.visitor?.name || `Visitor ${c.visitorId.slice(0, 6)}`;
           const unread = c.unreadCount ?? 0;
           return (

@@ -173,6 +173,12 @@ export const api = {
       websiteId ? `${API.reports}?websiteId=${encodeURIComponent(websiteId)}` : API.reports,
     ),
 
+  searchConversations: async (q: string): Promise<ConversationSummary[]> =>
+    unwrapList<ConversationSummary>(
+      await request<unknown>(`${API.conversations}/search?q=${encodeURIComponent(q)}`),
+      'conversations',
+    ),
+
   scanWebsite: (websiteId: string, url: string) =>
     request<{ ok: boolean; url: string; pages: number; chars: number; urls: number }>(
       `${API.websites}/${encodeURIComponent(websiteId)}/scan`,

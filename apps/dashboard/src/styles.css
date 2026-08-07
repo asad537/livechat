@@ -1443,6 +1443,54 @@ p {
   border-top-color: var(--red);
 }
 
+/* ── Conversation search ───────────────────────────────────── */
+.conv-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 4px;
+  padding: 8px 12px;
+  background: var(--bg, #f1f5f9);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  color: #64748b;
+}
+
+.conv-search:focus-within {
+  border-color: var(--accent, #6366f1);
+  background: #fff;
+}
+
+.conv-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text, #0f172a);
+  min-width: 0;
+}
+
+.conv-search-clear {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 2px 4px;
+}
+
+.conv-search-clear:hover {
+  color: #475569;
+}
+
+.conv-search-status {
+  padding: 8px 16px 2px;
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 .msg-link {
   word-break: break-all;
   text-decoration: underline;

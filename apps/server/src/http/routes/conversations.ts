@@ -45,6 +45,64 @@ export function buildConversationsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAgent(deps.db, deps.config);
 
+  // GET /api/conversations/search?q= — visitor name/email + message content
+  router.get(
+    `${API.conversations}/search`,
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      // %/_ are LIKE wildcards — neutralize instead of dialect-specific ESCAPE.
+      const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
+      if (q.length < 2) {
+        res.json([]);
+        return;
+      }
+      const like = `%${q}%`;
+
+      const where: string[] = [];
+      const params: unknown[] = [];
+      if (user.role !== 'ADMIN') {
+        const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+        if (siteIds.length === 0) {
+          res.json([]);
+          return;
+        }
+        if (user.role === 'CSR') {
+          // Own chats + the unassigned queue of accessible sites.
+          where.push(
+            `(c.assigned_user_id = ? OR (c.assigned_user_id IS NULL
+               AND c.website_id IN (${placeholders(siteIds.length)})))`,
+          );
+          params.push(user.id, ...siteIds);
+        } else {
+          where.push(`c.website_id IN (${placeholders(siteIds.length)})`);
+          params.push(...siteIds);
+        }
+      }
+      where.push(
+        `(v.name LIKE ? OR v.email LIKE ? OR EXISTS (
+            SELECT 1 FROM messages m
+             WHERE m.conversation_id = c.id AND m.body LIKE ?))`,
+      );
+      params.push(like, like, like);
+
+      const rows = await deps.db.all<{ id: string }>(
+        `SELECT c.id FROM conversations c
+           JOIN visitors v ON v.id = c.visitor_id
+          WHERE ${where.join(' AND ')}
+          ORDER BY c.created_at DESC
+          LIMIT 20`,
+        params,
+      );
+      const summaries: ConversationSummary[] = [];
+      for (const row of rows) {
+        const summary = await loadSummary(deps, row.id);
+        if (summary) summaries.push(summary);
+      }
+      res.json(summaries);
+    }),
+  );
+
   // GET /api/conversations?websiteId=&status=&scope=mine|team|all
   router.get(
     API.conversations,
