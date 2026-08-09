@@ -20,6 +20,7 @@ import {
 } from '../core/auth.js';
 import { hydrateMessages, postMessage, type MessageRow } from '../domain/messages.js';
 import { maybeBotReply } from '../features/aibot/index.js';
+import { clientIp, updateVisitorGeo } from '../features/geo/index.js';
 import {
   activateConversation,
   closeConversation,
@@ -330,6 +331,8 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         page: asString(auth.page),
         websiteRow: website,
       });
+      // Capture IP + city/country (best-effort, non-blocking).
+      updateVisitorGeo(deps, visitorRow.id, clientIp(socket));
       next();
     })().catch((err: unknown) => {
       next(err instanceof Error ? err : new Error('Widget handshake failed'));

@@ -498,6 +498,20 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                 </span>
               </div>
             )}
+            {(conversation.visitor?.city || conversation.visitor?.country) && (
+              <div className="side-kv">
+                <span className="side-k">📍 Location</span>
+                <span className="side-v">
+                  {[conversation.visitor?.city, conversation.visitor?.country].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            )}
+            {conversation.visitor?.ip && (
+              <div className="side-kv">
+                <span className="side-k">IP address</span>
+                <span className="side-v">{conversation.visitor.ip}</span>
+              </div>
+            )}
             <div className="side-kv">
               <span className="side-k">Started</span>
               <span className="side-v">

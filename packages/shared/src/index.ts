@@ -52,6 +52,9 @@ export interface Visitor {
   lastSeenAt: string;
   online?: boolean;
   currentPage?: string | null;
+  ip?: string | null;
+  country?: string | null;
+  city?: string | null;
 }
 
 export interface FileMeta {

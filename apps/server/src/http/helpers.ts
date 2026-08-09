@@ -84,6 +84,9 @@ export interface VisitorRow {
   email: string | null;
   created_at: string;
   last_seen_at: string;
+  ip?: string | null;
+  geo_country?: string | null;
+  geo_city?: string | null;
 }
 
 export interface ConversationRow {
@@ -128,6 +131,9 @@ export function toVisitor(row: VisitorRow): Visitor {
     name: row.name ?? null,
     email: row.email ?? null,
     lastSeenAt: row.last_seen_at,
+    ip: row.ip ?? null,
+    country: row.geo_country ?? null,
+    city: row.geo_city ?? null,
   };
 }
 

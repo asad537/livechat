@@ -68,6 +68,11 @@ CREATE INDEX IF NOT EXISTS idx_conversations_visitor ON conversations (visitor_i
 ALTER TABLE conversations ADD COLUMN rating INTEGER;
 ALTER TABLE conversations ADD COLUMN rating_comment TEXT;
 
+-- Visitor IP + geo (idempotent)
+ALTER TABLE visitors ADD COLUMN ip VARCHAR(64);
+ALTER TABLE visitors ADD COLUMN geo_country VARCHAR(64);
+ALTER TABLE visitors ADD COLUMN geo_city VARCHAR(64);
+
 CREATE TABLE IF NOT EXISTS assignment_history (
   id VARCHAR(36) PRIMARY KEY,
   conversation_id VARCHAR(36) NOT NULL,

@@ -22,7 +22,11 @@ export default function VisitorCard({ visitor, accentColor, onStartChat }: Props
             {name}
             <span className={classNames('dot', visitor.online ? 'dot-online' : 'dot-offline')} />
           </span>
-          <span className="visitor-card-sub">{visitor.email || 'No email'}</span>
+          <span className="visitor-card-sub">
+            {visitor.email || 'No email'}
+            {(visitor.city || visitor.country) &&
+              ` · 📍 ${[visitor.city, visitor.country].filter(Boolean).join(', ')}`}
+          </span>
         </div>
       </div>
       <div className="visitor-card-body">
