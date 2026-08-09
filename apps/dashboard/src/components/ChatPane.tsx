@@ -68,8 +68,19 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   const canSend = useMemo(() => {
     if (!me || !conversation) return false;
     if (conversation.status === 'CLOSED' || conversation.status === 'MISSED') return false;
+    if (conversation.status === 'WAITING') {
+      // Zendesk-style: typing in a queued chat joins it.
+      return (
+        conversation.assignedUserId === me.id ||
+        conversation.assignedUserId == null ||
+        me.role === 'LEAD' ||
+        me.role === 'ADMIN'
+      );
+    }
     return conversation.assignedUserId === me.id || me.role === 'ADMIN';
   }, [me, conversation]);
+
+  const joinByTyping = canSend && conversation?.status === 'WAITING';
 
   const watchingReadOnly = !!conversation && !canSend && !openError &&
     conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' &&
@@ -401,6 +412,12 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
         </div>
 
         {/* Composer */}
+        {joinByTyping && (
+          <div className="composer-join-hint">
+            <span className="composer-join-eye">👀</span> You&apos;re viewing this chat — start
+            typing to join
+          </div>
+        )}
         <div className="composer">
           {conversation?.status === 'CLOSED' || conversation?.status === 'MISSED' ? (
             <div className="composer-closed">
@@ -435,7 +452,9 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               </button>
               <textarea
                 className="composer-input"
-                placeholder={uploading ? 'Uploading…' : 'Type a reply…'}
+                placeholder={
+                  uploading ? 'Uploading…' : joinByTyping ? 'Type to join the chat…' : 'Type a reply…'
+                }
                 value={draft}
                 rows={1}
                 onChange={(e) => {

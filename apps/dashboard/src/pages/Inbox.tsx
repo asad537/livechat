@@ -6,10 +6,15 @@ import ChatPane from '../components/ChatPane';
 import { IconInbox } from '../icons';
 
 export default function Inbox() {
-  const { refreshConversations, conversations } = useApp();
+  const { refreshConversations, conversations, openChatTab } = useApp();
   const location = useLocation();
   const preselect = (location.state as { conversationId?: string } | null)?.conversationId ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(preselect);
+
+  // Every opened chat gets a tab in the bottom dock.
+  useEffect(() => {
+    if (selectedId) openChatTab(selectedId);
+  }, [selectedId, openChatTab]);
 
   useEffect(() => {
     void refreshConversations();

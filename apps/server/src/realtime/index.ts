@@ -20,6 +20,7 @@ import {
 } from '../core/auth.js';
 import { hydrateMessages, postMessage, type MessageRow } from '../domain/messages.js';
 import { maybeBotReply } from '../features/aibot/index.js';
+import { captureVisitorInfo } from '../features/capture/index.js';
 import { clientIp, updateVisitorGeo } from '../features/geo/index.js';
 import {
   activateConversation,
@@ -457,6 +458,12 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           tempId,
         });
 
+        // Auto-capture contact details the visitor typed (email / phone / name).
+        if (await captureVisitorInfo(deps, data.visitorId, body)) {
+          await emitInboxUpdate(deps, conv.id);
+          void broadcastVisitors(deps, data.websiteId);
+        }
+
         if (wasOffered) {
           // Customer replied to a CSR-initiated offer → ACTIVE, no accept step.
           await activateConversation(deps, conv.id);
@@ -754,7 +761,42 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           socket.emit(EV.AppError, { message: 'Conversation is closed' });
           return;
         }
-        if (!canSendAsAgent(conv, data.userId, data.role)) {
+        if (conv.status === 'WAITING') {
+          // Zendesk-style "start typing to join": messaging a queued chat claims it.
+          const isMine = conv.assigned_user_id === data.userId;
+          const isBoss = data.role === 'LEAD' || data.role === 'ADMIN';
+          const allowed =
+            isMine ||
+            (isBoss
+              ? await canManageConversation(deps, conv, data.userId, data.role)
+              : !conv.assigned_user_id &&
+                (await userCanAccessWebsite(deps, data.userId, data.role, conv.website_id)));
+          if (!allowed) {
+            socket.emit(EV.AppError, { message: 'This conversation is not assigned to you' });
+            return;
+          }
+          if (!isMine) {
+            await recordAssignment(
+              deps,
+              conv.id,
+              conv.assigned_user_id,
+              data.userId,
+              conv.assigned_user_id ? 'TRANSFER' : 'AUTO',
+            );
+            await deps.db.run('UPDATE conversations SET assigned_user_id = ? WHERE id = ?', [
+              data.userId,
+              conv.id,
+            ]);
+          }
+          await socket.join(convRoom(conv.id));
+          await postMessage(deps, {
+            conversationId: conv.id,
+            senderType: 'SYSTEM',
+            kind: 'SYSTEM',
+            body: `${data.name} has joined the chat`,
+          });
+          await activateConversation(deps, conv.id);
+        } else if (!canSendAsAgent(conv, data.userId, data.role)) {
           socket.emit(EV.AppError, { message: 'Only the assigned agent can send messages here' });
           return;
         }
@@ -865,6 +907,12 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           ]);
         }
         await socket.join(convRoom(conv.id));
+        await postMessage(deps, {
+          conversationId: conv.id,
+          senderType: 'SYSTEM',
+          kind: 'SYSTEM',
+          body: `${data.name} has joined the chat`,
+        });
         await activateConversation(deps, conv.id);
       }),
     );

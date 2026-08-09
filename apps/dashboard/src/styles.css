@@ -3037,3 +3037,109 @@ th.vt-num {
     width: 100%;
   }
 }
+
+/* ── "Start typing to join" hint (Zendesk-style) ── */
+.composer-join-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: linear-gradient(90deg, transparent, var(--accent-soft), transparent);
+  border-top: 1px dashed var(--border);
+}
+
+.composer-join-eye {
+  font-size: 14px;
+  animation: vt-pulse 2s ease-in-out infinite;
+}
+
+/* ── Bottom chat dock (open-chat tabs on every page) ── */
+.chat-dock {
+  position: fixed;
+  left: 250px;
+  right: 16px;
+  bottom: 0;
+  display: flex;
+  gap: 6px;
+  padding: 0 8px;
+  z-index: 40;
+  pointer-events: none;
+  overflow-x: auto;
+}
+
+.chat-dock-tab {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.12s, background 0.12s;
+}
+
+.chat-dock-tab:hover {
+  transform: translateY(-2px);
+}
+
+.chat-dock-tab.active {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.chat-dock-tab.closed {
+  opacity: 0.65;
+}
+
+.chat-dock-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar-xs {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.chat-dock-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.chat-dock-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .chat-dock {
+    left: 70px;
+  }
+}

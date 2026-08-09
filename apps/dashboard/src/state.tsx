@@ -48,6 +48,9 @@ interface AppContextValue {
   toasts: Toast[];
   incomingCall: IncomingCall | null;
   activeCall: CallMeta | null;
+  openChats: string[];
+  openChatTab(id: string): void;
+  closeChatTab(id: string): void;
   login(email: string, password: string): Promise<void>;
   logout(): void;
   pushToast(title: string, body?: string, kind?: Toast['kind']): void;
@@ -387,6 +390,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveCall(null);
   }, []);
 
+  // ── Bottom chat dock (Zendesk-style open-chat tabs) ──
+  const [openChats, setOpenChats] = useState<string[]>([]);
+  const openChatTab = useCallback((id: string) => {
+    setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-7), id]));
+  }, []);
+  const closeChatTab = useCallback((id: string) => {
+    setOpenChats((prev) => prev.filter((c) => c !== id));
+  }, []);
+
   const value: AppContextValue = {
     authed: !!token,
     booting: !!token && !me,
@@ -400,6 +412,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toasts,
     incomingCall,
     activeCall,
+    openChats,
+    openChatTab,
+    closeChatTab,
     login,
     logout,
     pushToast,
