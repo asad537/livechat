@@ -87,6 +87,13 @@ export interface VisitorRow {
   ip?: string | null;
   geo_country?: string | null;
   geo_city?: string | null;
+  geo_cc?: string | null;
+  user_agent?: string | null;
+  referrer?: string | null;
+  total_visits?: number | null;
+  session_started_at?: string | null;
+  phone?: string | null;
+  notes?: string | null;
 }
 
 export interface ConversationRow {
@@ -134,6 +141,13 @@ export function toVisitor(row: VisitorRow): Visitor {
     ip: row.ip ?? null,
     country: row.geo_country ?? null,
     city: row.geo_city ?? null,
+    countryCode: row.geo_cc ?? null,
+    userAgent: row.user_agent ?? null,
+    referrer: row.referrer ?? null,
+    totalVisits: row.total_visits ?? 0,
+    sessionStartedAt: row.session_started_at ?? null,
+    phone: row.phone ?? null,
+    notes: row.notes ?? null,
   };
 }
 

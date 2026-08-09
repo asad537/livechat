@@ -237,30 +237,65 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
       }
 
       const online = deps.presence.onlineVisitors(websiteId);
-      if (online.length === 0) {
-        res.json([]);
-        return;
-      }
-      const ids = online.map((v) => v.visitorId);
+      const onlinePage = new Map(online.map((p) => [p.visitorId, p.page ?? null]));
+
+      // Online rows + recently-seen offline rows (last 24h, capped) in one list.
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const idFilter = online.length
+        ? `OR id IN (${placeholders(online.length)})`
+        : '';
       const rows = await deps.db.all<VisitorRow>(
-        `SELECT * FROM visitors WHERE website_id = ? AND id IN (${placeholders(ids.length)})`,
-        [websiteId, ...ids],
+        `SELECT * FROM visitors WHERE website_id = ? AND (last_seen_at >= ? ${idFilter})
+          ORDER BY last_seen_at DESC LIMIT 200`,
+        [websiteId, dayAgo, ...online.map((v) => v.visitorId)],
       );
-      const byId = new Map(rows.map((r) => [r.id, r]));
-      const visitors: Visitor[] = online.map((p) => {
-        const row = byId.get(p.visitorId);
-        const base: Visitor = row
-          ? toVisitor(row)
-          : {
-              id: p.visitorId,
-              websiteId,
-              name: null,
-              email: null,
-              lastSeenAt: nowIso(),
-            };
-        return { ...base, online: true, currentPage: p.page ?? null };
+      const rowIds = rows.map((r) => r.id);
+      const pagesBy = new Map<string, number>();
+      const chatsBy = new Map<string, number>();
+      if (rowIds.length > 0) {
+        const pageCounts = await deps.db.all<{ visitor_id: string; n: number }>(
+          `SELECT vp.visitor_id, COUNT(*) AS n FROM visitor_pages vp
+             JOIN visitors v ON v.id = vp.visitor_id
+            WHERE vp.visitor_id IN (${placeholders(rowIds.length)})
+              AND vp.created_at >= COALESCE(v.session_started_at, v.created_at)
+            GROUP BY vp.visitor_id`,
+          rowIds,
+        );
+        const chatCounts = await deps.db.all<{ visitor_id: string; n: number }>(
+          `SELECT visitor_id, COUNT(*) AS n FROM conversations
+            WHERE visitor_id IN (${placeholders(rowIds.length)}) GROUP BY visitor_id`,
+          rowIds,
+        );
+        for (const r of pageCounts) pagesBy.set(r.visitor_id, Number(r.n));
+        for (const r of chatCounts) chatsBy.set(r.visitor_id, Number(r.n));
+      }
+      const seen = new Set(rows.map((r) => r.id));
+      const visitors: Visitor[] = rows.map((row) => ({
+        ...toVisitor(row),
+        online: onlinePage.has(row.id),
+        currentPage: onlinePage.get(row.id) ?? null,
+        sessionPages: pagesBy.get(row.id) ?? 0,
+        chats: chatsBy.get(row.id) ?? 0,
+      }));
+      // Presence entries whose row is missing (brand-new visitor) still show up.
+      for (const p of online) {
+        if (seen.has(p.visitorId)) continue;
+        visitors.push({
+          id: p.visitorId,
+          websiteId,
+          name: null,
+          email: null,
+          lastSeenAt: nowIso(),
+          online: true,
+          currentPage: p.page ?? null,
+          sessionPages: 0,
+          chats: 0,
+        });
+      }
+      visitors.sort((a, b) => {
+        if (!!a.online !== !!b.online) return a.online ? -1 : 1;
+        return a.lastSeenAt < b.lastSeenAt ? 1 : -1;
       });
-      visitors.sort((a, b) => (a.lastSeenAt < b.lastSeenAt ? 1 : -1));
       res.json(visitors);
     }),
   );

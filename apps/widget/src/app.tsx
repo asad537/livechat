@@ -112,6 +112,8 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
           widgetKey,
           visitorToken: lsGet(tokenKey) || undefined,
           page: window.location.href,
+          pageTitle: document.title || undefined,
+          referrer: document.referrer || undefined,
         }),
       reconnectionDelayMax: 8000,
     });

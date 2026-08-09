@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../state';
 import ConversationList from '../components/ConversationList';
 import ChatPane from '../components/ChatPane';
@@ -6,16 +7,24 @@ import { IconInbox } from '../icons';
 
 export default function Inbox() {
   const { refreshConversations, conversations } = useApp();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const location = useLocation();
+  const preselect = (location.state as { conversationId?: string } | null)?.conversationId ?? null;
+  const [selectedId, setSelectedId] = useState<string | null>(preselect);
 
   useEffect(() => {
     void refreshConversations();
   }, [refreshConversations]);
 
-  // Drop the selection if the conversation disappears from scope.
+  // Navigations from other pages (e.g. the visitor drawer) can preselect a chat.
   useEffect(() => {
-    if (selectedId && !conversations[selectedId]) setSelectedId(null);
-  }, [selectedId, conversations]);
+    if (preselect) setSelectedId(preselect);
+  }, [preselect]);
+
+  // Drop the selection if the conversation disappears from scope.
+  // (Preselected chats arrive via the AgentOpen ack, so don't race them.)
+  useEffect(() => {
+    if (selectedId && selectedId !== preselect && !conversations[selectedId]) setSelectedId(null);
+  }, [selectedId, conversations, preselect]);
 
   return (
     <div className="inbox-layout">

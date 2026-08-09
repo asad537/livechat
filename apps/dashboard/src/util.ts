@@ -67,6 +67,83 @@ export function formatSeconds(seconds: number | null | undefined): string {
   return `${h}h ${m % 60}m`;
 }
 
+// ─── Visitor module helpers ──────────────────────────────────
+
+/** ISO-2 country code → flag emoji (e.g. "PK" → 🇵🇰). */
+export function flagEmoji(cc: string | null | undefined): string {
+  if (!cc || !/^[a-z]{2}$/i.test(cc)) return '🌐';
+  const base = 0x1f1e6 - 65;
+  const up = cc.toUpperCase();
+  return String.fromCodePoint(base + up.charCodeAt(0), base + up.charCodeAt(1));
+}
+
+/** Lightweight user-agent sniff — enough for browser/OS/device chips. */
+export function uaParse(ua: string | null | undefined): {
+  browser: string;
+  os: string;
+  device: 'Mobile' | 'Desktop';
+} {
+  const s = ua ?? '';
+  let browser = 'Unknown';
+  if (/edg\//i.test(s)) browser = 'Edge';
+  else if (/opr\/|opera/i.test(s)) browser = 'Opera';
+  else if (/samsungbrowser/i.test(s)) browser = 'Samsung Internet';
+  else if (/firefox\//i.test(s)) browser = 'Firefox';
+  else if (/chrome\/|crios\//i.test(s)) browser = 'Chrome';
+  else if (/safari\//i.test(s)) browser = 'Safari';
+  let os = 'Unknown';
+  if (/windows nt/i.test(s)) os = 'Windows';
+  else if (/iphone|ipad|ipod/i.test(s)) os = 'iOS';
+  else if (/android/i.test(s)) os = 'Android';
+  else if (/mac os x|macintosh/i.test(s)) os = 'macOS';
+  else if (/linux/i.test(s)) os = 'Linux';
+  const device: 'Mobile' | 'Desktop' = /mobi|iphone|ipod|android.*mobile/i.test(s)
+    ? 'Mobile'
+    : 'Desktop';
+  return { browser, os, device };
+}
+
+/** Live "time on site" label from a session start timestamp (ticks per render). */
+export function durationSince(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const start = Date.parse(iso);
+  if (Number.isNaN(start)) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - start) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/** Compact page label: pathname (or host for the root page). */
+export function pageLabel(url: string | null | undefined): string {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    return u.pathname === '/' ? u.host : decodeURIComponent(u.pathname);
+  } catch {
+    return url;
+  }
+}
+
+/** Referrer host, or a friendly source name for known engines. */
+export function referrerLabel(url: string | null | undefined): string {
+  if (!url) return 'Direct';
+  try {
+    const host = new URL(url).host.replace(/^www\./, '');
+    if (/google\./i.test(host)) return 'Google';
+    if (/bing\./i.test(host)) return 'Bing';
+    if (/facebook\.|fb\./i.test(host)) return 'Facebook';
+    if (/instagram\./i.test(host)) return 'Instagram';
+    if (/t\.co$|twitter\.|x\.com$/i.test(host)) return 'X (Twitter)';
+    if (/linkedin\./i.test(host)) return 'LinkedIn';
+    if (/youtube\./i.test(host)) return 'YouTube';
+    return host;
+  } catch {
+    return 'Direct';
+  }
+}
+
 let tempCounter = 0;
 export function newTempId(): string {
   tempCounter += 1;

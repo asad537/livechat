@@ -169,23 +169,45 @@ function scheduleMissedTimer(deps: AppDeps, conversationId: string): void {
 async function buildVisitorList(deps: AppDeps, websiteId: string): Promise<Visitor[]> {
   const online = deps.presence.onlineVisitors(websiteId);
   if (online.length === 0) return [];
-  const placeholders = online.map(() => '?').join(',');
+  const ids = online.map((o) => o.visitorId);
+  const placeholders = ids.map(() => '?').join(',');
   const rows = await deps.db.all<VisitorRow>(
     `SELECT * FROM visitors WHERE id IN (${placeholders})`,
-    online.map((o) => o.visitorId),
+    ids,
   );
   const byId = new Map(rows.map((r) => [r.id, r]));
+  // Pages viewed + chats per visitor (grouped, one query each).
+  const pageCounts = await deps.db.all<{ visitor_id: string; n: number }>(
+    `SELECT vp.visitor_id, COUNT(*) AS n FROM visitor_pages vp
+       JOIN visitors v ON v.id = vp.visitor_id
+      WHERE vp.visitor_id IN (${placeholders})
+        AND vp.created_at >= COALESCE(v.session_started_at, v.created_at)
+      GROUP BY vp.visitor_id`,
+    ids,
+  );
+  const chatCounts = await deps.db.all<{ visitor_id: string; n: number }>(
+    `SELECT visitor_id, COUNT(*) AS n FROM conversations
+      WHERE visitor_id IN (${placeholders}) GROUP BY visitor_id`,
+    ids,
+  );
+  const pagesBy = new Map(pageCounts.map((r) => [r.visitor_id, Number(r.n)]));
+  const chatsBy = new Map(chatCounts.map((r) => [r.visitor_id, Number(r.n)]));
   return online.map((o) => {
     const row = byId.get(o.visitorId);
-    return {
-      id: o.visitorId,
-      websiteId,
-      name: row?.name ?? null,
-      email: row?.email ?? null,
-      lastSeenAt: row?.last_seen_at ?? nowIso(),
-      online: true,
-      currentPage: o.page,
-    };
+    const base: Visitor = row
+      ? toVisitor(row, true, o.page)
+      : {
+          id: o.visitorId,
+          websiteId,
+          name: null,
+          email: null,
+          lastSeenAt: nowIso(),
+          online: true,
+          currentPage: o.page,
+        };
+    base.sessionPages = pagesBy.get(o.visitorId) ?? 0;
+    base.chats = chatsBy.get(o.visitorId) ?? 0;
+    return base;
   });
 }
 
@@ -331,6 +353,39 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         page: asString(auth.page),
         websiteRow: website,
       });
+
+      // ── Visit/session tracking (Zendesk-style) ──
+      const now = nowIso();
+      const gapMs = Date.now() - Date.parse(visitorRow.last_seen_at || visitorRow.created_at);
+      const newSession = !visitorRow.session_started_at || gapMs > 30 * 60 * 1000;
+      await deps.db.run(
+        `UPDATE visitors SET
+           last_seen_at = ?,
+           user_agent = ?,
+           referrer = CASE WHEN ? != '' THEN ? ELSE referrer END,
+           total_visits = total_visits + ?,
+           session_started_at = CASE WHEN ? = 1 THEN ? ELSE COALESCE(session_started_at, ?) END
+         WHERE id = ?`,
+        [
+          now,
+          (asString(socket.handshake.headers['user-agent'] as string) ?? '').slice(0, 500) || null,
+          asString(auth.referrer)?.slice(0, 500) ?? '',
+          asString(auth.referrer)?.slice(0, 500) ?? '',
+          newSession ? 1 : 0,
+          newSession ? 1 : 0,
+          now,
+          now,
+          visitorRow.id,
+        ],
+      );
+      // Page journey entry for this page load.
+      const pageUrl = asString(auth.page)?.slice(0, 1000) ?? null;
+      if (pageUrl) {
+        await deps.db.run(
+          'INSERT INTO visitor_pages (id, visitor_id, url, title, created_at) VALUES (?, ?, ?, ?, ?)',
+          [newId(), visitorRow.id, pageUrl, asString(auth.pageTitle)?.slice(0, 500) ?? null, now],
+        );
+      }
       // Capture IP + city/country (best-effort, non-blocking).
       updateVisitorGeo(deps, visitorRow.id, clientIp(socket));
       next();

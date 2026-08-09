@@ -47,17 +47,26 @@ export function updateVisitorGeo(deps: AppDeps, visitorId: string, ip: string | 
       inFlight.add(visitorId);
       try {
         const res = await fetch(
-          `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,city`,
+          `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,countryCode,city`,
           { signal: AbortSignal.timeout(5000) },
         );
         if (!res.ok) return;
-        const data = (await res.json()) as { status?: string; country?: string; city?: string };
+        const data = (await res.json()) as {
+          status?: string;
+          country?: string;
+          countryCode?: string;
+          city?: string;
+        };
         if (data.status !== 'success') return;
-        await deps.db.run('UPDATE visitors SET geo_country = ?, geo_city = ? WHERE id = ?', [
-          (data.country ?? '').slice(0, 64) || null,
-          (data.city ?? '').slice(0, 64) || null,
-          visitorId,
-        ]);
+        await deps.db.run(
+          'UPDATE visitors SET geo_country = ?, geo_city = ?, geo_cc = ? WHERE id = ?',
+          [
+            (data.country ?? '').slice(0, 64) || null,
+            (data.city ?? '').slice(0, 64) || null,
+            (data.countryCode ?? '').slice(0, 4) || null,
+            visitorId,
+          ],
+        );
       } finally {
         inFlight.delete(visitorId);
       }

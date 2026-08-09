@@ -55,6 +55,21 @@ export interface Visitor {
   ip?: string | null;
   country?: string | null;
   city?: string | null;
+  countryCode?: string | null;      // ISO-2, for the flag
+  userAgent?: string | null;
+  referrer?: string | null;
+  totalVisits?: number;
+  sessionStartedAt?: string | null; // current/last session start (time-on-site)
+  sessionPages?: number;            // pages viewed this session
+  phone?: string | null;
+  notes?: string | null;
+  chats?: number;                   // lifetime conversation count
+}
+
+export interface VisitorPage {
+  url: string | null;
+  title: string | null;
+  at: string;
 }
 
 export interface FileMeta {

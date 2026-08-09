@@ -9,6 +9,7 @@ import { buildUsersRouter } from './routes/users.js';
 import { buildTeamsRouter } from './routes/teams.js';
 import { buildWebsitesRouter } from './routes/websites.js';
 import { buildConversationsRouter } from './routes/conversations.js';
+import { buildVisitorsRouter } from './routes/visitors.js';
 import { buildReportsRouter } from './routes/reports.js';
 import { buildWidgetRouter } from './routes/widget.js';
 
@@ -25,6 +26,7 @@ export function buildApiRouter(deps: AppDeps): Router {
   router.use(buildTeamsRouter(deps)); // /api/teams
   router.use(buildWebsitesRouter(deps)); // /api/websites (+ /:id/visitors)
   router.use(buildConversationsRouter(deps)); // /api/conversations
+  router.use(buildVisitorsRouter(deps)); // /api/visitors/:id (profile, CRM, past chats)
   router.use(buildReportsRouter(deps)); // /api/reports/overview
 
   router.use(buildFilesRouter(deps)); // /api/uploads, /api/files/:id/download

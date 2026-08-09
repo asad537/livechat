@@ -73,6 +73,15 @@ ALTER TABLE visitors ADD COLUMN ip VARCHAR(64);
 ALTER TABLE visitors ADD COLUMN geo_country VARCHAR(64);
 ALTER TABLE visitors ADD COLUMN geo_city VARCHAR(64);
 
+-- Visitor tracking + CRM (idempotent)
+ALTER TABLE visitors ADD COLUMN geo_cc VARCHAR(4);
+ALTER TABLE visitors ADD COLUMN user_agent TEXT;
+ALTER TABLE visitors ADD COLUMN referrer TEXT;
+ALTER TABLE visitors ADD COLUMN total_visits INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE visitors ADD COLUMN session_started_at VARCHAR(32);
+ALTER TABLE visitors ADD COLUMN phone VARCHAR(64);
+ALTER TABLE visitors ADD COLUMN notes TEXT;
+
 CREATE TABLE IF NOT EXISTS assignment_history (
   id VARCHAR(36) PRIMARY KEY,
   conversation_id VARCHAR(36) NOT NULL,
@@ -131,6 +140,15 @@ CREATE TABLE IF NOT EXISTS call_events (
   event VARCHAR(16) NOT NULL,                          -- INVITED | JOIN | LEAVE | DECLINE | END
   created_at VARCHAR(32) NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS visitor_pages (
+  id VARCHAR(36) PRIMARY KEY,
+  visitor_id VARCHAR(36) NOT NULL,
+  url TEXT,
+  title VARCHAR(512),
+  created_at VARCHAR(32) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visitor_pages ON visitor_pages (visitor_id, created_at);
 
 CREATE TABLE IF NOT EXISTS knowledge_pages (
   id VARCHAR(36) PRIMARY KEY,

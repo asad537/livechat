@@ -7,6 +7,7 @@ import type {
   Team,
   UserPublic,
   Visitor,
+  VisitorPage,
   Website,
 } from '@livechat/shared';
 import { API } from '@livechat/shared';
@@ -195,7 +196,49 @@ export const api = {
       `${API.websites}/${encodeURIComponent(websiteId)}/scan`,
       { method: 'POST', body: { url } },
     ),
+
+  visitorProfile: (visitorId: string) =>
+    request<VisitorProfile>(`/api/visitors/${encodeURIComponent(visitorId)}`),
+
+  updateVisitor: (
+    visitorId: string,
+    patch: { name?: string; email?: string; phone?: string; notes?: string },
+  ) =>
+    request<Visitor>(`/api/visitors/${encodeURIComponent(visitorId)}`, {
+      method: 'PATCH',
+      body: patch,
+    }),
+
+  visitorConversations: async (visitorId: string): Promise<VisitorChat[]> =>
+    unwrapList<VisitorChat>(
+      await request<unknown>(`/api/visitors/${encodeURIComponent(visitorId)}/conversations`),
+      'conversations',
+    ),
 };
+
+// ─── Visitor module shapes ───────────────────────────────────
+export interface VisitorProfile {
+  visitor: Visitor;
+  sessionPath: VisitorPage[];
+  stats: {
+    chats: number;
+    pagesAllTime: number;
+    ratedChats: number;
+    avgRating: number | null;
+    firstSeenAt: string;
+  };
+}
+
+export interface VisitorChat {
+  id: string;
+  status: string;
+  createdAt: string;
+  closedAt: string | null;
+  rating: number | null;
+  agentName: string | null;
+  messageCount: number;
+  preview: string | null;
+}
 
 // ─── File upload / download ──────────────────────────────────
 export async function uploadFile(conversationId: string, file: File): Promise<void> {
