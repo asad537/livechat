@@ -477,27 +477,6 @@ export const WIDGET_CSS = `
   .lc-invite { right: 10px; left: 10px; width: auto; bottom: 14px; }
 }
 
-/* Custom tooltips (replace native title) */
-:where(.lc-root) [data-tip] { position: relative; }
-:where(.lc-root) [data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: rgba(15, 23, 42, 0.92);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 9px;
-  border-radius: 7px;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(-3px);
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 6;
-}
-:where(.lc-root) [data-tip]:hover::after { opacity: 1; transform: translateY(0); }
 
 /* Inline end-chat confirmation */
 :where(.lc-root) .lc-confirm {

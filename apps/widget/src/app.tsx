@@ -495,7 +495,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
             <button
               type="button"
               class="lc-iconbtn"
-              data-tip="Minimize"
+              aria-label="Minimize"
               onClick={() => {
                 markDismissed(true);
                 setOpen(false);
