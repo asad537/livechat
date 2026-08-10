@@ -325,7 +325,10 @@ export default function Dashboard() {
                 <div className="rp-topic" key={t.word}>
                   <span className="rp-topic-name">{t.word}</span>
                   <span className="rp-topic-track">
-                    <span className="rp-topic-fill" style={{ width: `${Math.max(3, t.pct)}%` }} />
+                    <span
+                      className="rp-topic-fill"
+                      style={{ width: `${Math.max(6, (t.pct / Math.max(1, topics[0]?.pct ?? 1)) * 88)}%` }}
+                    />
                   </span>
                   <span className="rp-topic-val">{t.pct}%</span>
                 </div>
@@ -351,13 +354,13 @@ export default function Dashboard() {
                       ['Resolved', funnel.resolved, '#6ee7b7'],
                     ] as const
                   ).map(([label, n, color], i, arr) => {
-                    const top = arr[0][1] || 1;
+                    const TAPER = [100, 82, 66, 52];
                     const prev = i > 0 ? arr[i - 1][1] : null;
                     return (
                       <div className="db-funnel-row" key={label}>
                         <div
                           className="db-funnel-bar"
-                          style={{ width: `${Math.max(22, (n / top) * 100)}%`, background: color }}
+                          style={{ width: `${TAPER[i]}%`, background: color }}
                         >
                           {n.toLocaleString()}
                         </div>

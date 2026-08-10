@@ -4691,3 +4691,78 @@ img.avatar {
 .report-card > h3 {
   margin-bottom: 10px;
 }
+
+/* Row-3 cards fill their height like the design */
+.rp-cards4 .report-card .chart-with-y {
+  flex: 1;
+  min-height: 0;
+}
+
+.rp-cards4 .report-card .chart-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.rp-cards4 .report-card .chart-body > svg,
+.rp-cards4 .report-card .chart-body > .rp-hours {
+  flex: 1;
+  min-height: 120px;
+  height: auto;
+}
+
+.rp-cards4 .report-card .chart-y {
+  padding-bottom: 24px;
+}
+
+.db-card-head h3 {
+  white-space: nowrap;
+}
+
+.db-chip-select {
+  padding: 5px 9px;
+  font-size: 11.5px;
+}
+
+/* Chats-by-hour: solid packed bars, flat zero baseline */
+.rp-hours {
+  gap: 2px;
+}
+
+.rp-hour-bar {
+  border-radius: 2px 2px 0 0;
+  opacity: 0.5;
+}
+
+.rp-hour-col.peak .rp-hour-bar {
+  opacity: 1;
+}
+
+.db-view-all {
+  margin-top: auto;
+}
+
+.db-funnel {
+  flex: 1;
+  justify-content: center;
+  gap: 8px;
+}
+
+.db-funnel-bar {
+  height: 38px;
+}
+
+/* One pill: calendar icon + select together (beat .filters select styling) */
+.filters .db-date {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.filters .db-date .db-date-select {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 4px 8px 0;
+  margin: 0;
+  min-width: 0;
+}
