@@ -218,7 +218,7 @@ export default function Reports() {
 
           {/* ── 14-day volume ── */}
           <div className="card report-card">
-            <h3>Chats per day — last 14 days</h3>
+            <h3>Chats per day — last {data.trendWindow ?? 14} days</h3>
             <div className="trend-wrap">
               <div className="trend-y">
                 <span>{maxTrend}</span>
@@ -247,7 +247,7 @@ export default function Reports() {
           <div className="rp-cards3">
             <div className="card report-card">
               <h3>
-                Response time trend <span className="report-hint">— last 14 days</span>
+                Response time trend <span className="report-hint">— last {data.trendWindow ?? 14} days</span>
               </h3>
               <TrendLines detail={data.trendDetail ?? []} />
             </div>
@@ -261,7 +261,7 @@ export default function Reports() {
             </div>
             <div className="card report-card">
               <h3>
-                Chats by hour <span className="report-hint">— today</span>
+                Chats by hour <span className="report-hint">— {RANGE_HINT[range]}</span>
               </h3>
               {byHour.some((n) => n > 0) ? (
                 <>

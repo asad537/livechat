@@ -103,6 +103,7 @@ export default function Dashboard() {
   const perAgent = [...(data?.perAgent ?? [])].sort((a, b) => b.handled - a.handled).slice(0, 5);
   const sites = data?.websitePerf ?? [];
   const todayChats = data ? data.totals.closed + data.totals.active + data.totals.waiting : 0;
+  const tw = data?.trendWindow ?? 14;
 
   const SITE_COLORS = ['#7c3aed', '#0ea5e9', '#f59e0b', '#db2777', '#10b981', '#6366f1'];
 
@@ -236,7 +237,7 @@ export default function Dashboard() {
           <div className="db-row-main db-stretch">
             <div className="card report-card db-span2">
               <h3>
-                Chats over time <span className="report-hint">— last 14 days</span>
+                Chats over time <span className="report-hint">— last {tw} days</span>
               </h3>
               <AreaChart trend={data.trend ?? []} />
             </div>
@@ -265,13 +266,13 @@ export default function Dashboard() {
             <div className="card report-card">
               <div className="db-card-head">
                 <h3>Response Time Trend</h3>
-                <span className="db-chip-select">Last 14 days</span>
+                <span className="db-chip-select">Last {tw} days</span>
               </div>
               <TrendLines detail={data.trendDetail ?? []} />
             </div>
             <div className="card report-card">
               <h3>
-                Chats by Hour <span className="report-hint">(Today)</span>
+                Chats by Hour <span className="report-hint">({RANGE_HINT[range]})</span>
               </h3>
               {byHour.some((n) => n > 0) ? (
                 <>
@@ -312,7 +313,7 @@ export default function Dashboard() {
                   </div>
                 </>
               ) : (
-                <p className="rp-empty">No chats today yet.</p>
+                <p className="rp-empty">No chats in this period yet.</p>
               )}
             </div>
             <div className="card report-card">

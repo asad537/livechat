@@ -142,7 +142,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const yesterdayStart = new Date(Date.parse(todayStart) - 24 * 3600_000).toISOString();
-      const trendSince = new Date(Date.now() - 14 * 24 * 3600_000).toISOString();
+      const trendWindow = range === '7d' ? 7 : range === '30d' || range === 'all' ? 30 : 14;
+      const trendSince = new Date(Date.now() - trendWindow * 24 * 3600_000).toISOString();
       const visitorSince = since ?? '1970';
 
       const [
@@ -153,7 +154,6 @@ export function buildReportsRouter(deps: AppDeps): Router {
         countryRows,
         transferRows,
         msgRows,
-        todayRows,
         yesterdayRows,
       ] = await Promise.all([
         deps.db.all<ConvRow>(
@@ -196,10 +196,6 @@ export function buildReportsRouter(deps: AppDeps): Router {
             WHERE ${cSiteFilter}${cRangeFilter}
             ORDER BY m.conversation_id, m.created_at LIMIT 20000`,
           [...siteIds, ...rangeParams],
-        ),
-        deps.db.all<{ created_at: string }>(
-          `SELECT created_at FROM conversations WHERE ${siteFilter} AND created_at >= ?`,
-          [...siteIds, todayStart],
         ),
         deps.db.all<{ status: string; created_at: string; activated_at: string | null; closed_at: string | null }>(
           `SELECT status, created_at, activated_at, closed_at FROM conversations
@@ -349,9 +345,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
         peakHour = { start: bestStart, share: pct(best, totalStarts) ?? 0 };
       }
 
-      // ── Today's chats by hour ──
-      const byHour = Array.from({ length: 24 }, () => 0);
-      for (const r of todayRows) byHour[new Date(r.created_at).getHours()] += 1;
+      // ── Chats by hour (selected range) ──
+      const byHour = [...hourCounts];
 
       // ── Visitors / funnel / conversion ──
       const visitorsSeen = Number(visitorAgg?.n ?? 0);
@@ -464,7 +459,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         durationSeconds: number | null;
         replySeconds: number | null;
       }[] = [];
-      for (let i = 13; i >= 0; i--) {
+      for (let i = trendWindow - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -521,6 +516,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         websitePerf,
         yesterdayFrtSeconds: avg(yFrt),
         yesterday: { chats: yChats, closed: yClosed, missed: yMissed, frtSeconds: avg(yFrt) },
+        trendWindow,
       });
     }),
   );

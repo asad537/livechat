@@ -125,6 +125,7 @@ export interface ReportsOverview {
   websitePerf?: WebsitePerfRow[];
   yesterdayFrtSeconds?: number | null;
   yesterday?: { chats: number; closed: number; missed: number; frtSeconds: number | null };
+  trendWindow?: number;
 }
 
 export interface CreateWebsiteInput {
