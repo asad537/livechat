@@ -457,16 +457,8 @@ export const WIDGET_CSS = `
 
 /* ── End-chat header button ───────────────────────────────── */
 /* Static outlined circle — no hover effect */
-.lc-endbtn,
-.lc-endbtn:hover {
-  background: transparent;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  box-shadow: none;
-  transform: none;
-  opacity: 1;
-  color: inherit;
-}
+/* Matches the minimize button — soft glass circle */
+.lc-endbtn { color: inherit; }
 
 /* ── Mobile: full-screen panel ────────────────────────────── */
 @media (max-width: 480px) {
