@@ -562,6 +562,12 @@ p {
   gap: 18px;
 }
 
+/* Never squash page sections to fit the viewport — the page scrolls instead.
+   (Flex children default to shrink:1, which was clipping table rows.) */
+.page > * {
+  flex-shrink: 0;
+}
+
 .page-head {
   display: flex;
   align-items: flex-start;
