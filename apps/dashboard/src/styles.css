@@ -2476,10 +2476,14 @@ p {
 }
 
 .vt-who {
+  min-width: 200px;
+}
+
+/* Flex lives on an inner wrapper — flex directly on a <td> breaks row height. */
+.vt-who-cell {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 200px;
 }
 
 .vt-who-meta {
@@ -2512,12 +2516,22 @@ p {
   max-width: 220px;
 }
 
+.vt-page {
+  max-width: 280px;
+}
+
+.vt-page .vt-muted,
+.vt-site {
+  white-space: nowrap;
+}
+
 .vt-page-url {
   display: inline-block;
-  max-width: 220px;
+  max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
   color: var(--accent-strong);
   font-weight: 500;
 }

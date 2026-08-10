@@ -121,20 +121,22 @@ export default function Visitors() {
         onClick={() => setDrawerId(v.id)}
       >
         <td className="vt-who">
-          <span className="avatar" style={{ background: siteColor(v) }}>
-            {initials(name)}
-          </span>
-          <div className="vt-who-meta">
-            <span className="vt-name">
-              <span className="vt-flag" title={v.country ?? undefined}>
-                {flagEmoji(v.countryCode)}
+          <div className="vt-who-cell">
+            <span className="avatar" style={{ background: siteColor(v) }}>
+              {initials(name)}
+            </span>
+            <div className="vt-who-meta">
+              <span className="vt-name">
+                <span className="vt-flag" title={v.country ?? undefined}>
+                  {flagEmoji(v.countryCode)}
+                </span>
+                {name}
+                <span className={classNames('dot', v.online ? 'dot-online' : 'dot-offline')} />
               </span>
-              {name}
-              <span className={classNames('dot', v.online ? 'dot-online' : 'dot-offline')} />
-            </span>
-            <span className="vt-sub">
-              {v.email || (v.city || v.country ? [v.city, v.country].filter(Boolean).join(', ') : 'No email')}
-            </span>
+              <span className="vt-sub">
+                {v.email || (v.city || v.country ? [v.city, v.country].filter(Boolean).join(', ') : 'No email')}
+              </span>
+            </div>
           </div>
         </td>
         <td className="vt-site">
