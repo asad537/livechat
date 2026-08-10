@@ -29,33 +29,61 @@ const RANGE_HINT: Record<ReportRange, string> = {
   all: 'all time',
 };
 
-function StatTile({
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <div className="rp-section-label">{children}</div>;
+}
+
+function Delta({ now, before, invert }: { now: number; before: number; invert?: boolean }) {
+  if (before <= 0 && now <= 0) return null;
+  if (before <= 0) return <span className="rp-delta rp-delta-up">new</span>;
+  const diff = Math.round(((now - before) / before) * 100);
+  if (diff === 0) return <span className="rp-delta rp-delta-flat">no change</span>;
+  const good = invert ? diff < 0 : diff > 0;
+  return (
+    <span className={classNames('rp-delta', good ? 'rp-delta-up' : 'rp-delta-down')}>
+      {diff > 0 ? '↑' : '↓'} {Math.abs(diff)}% vs yesterday
+    </span>
+  );
+}
+
+function Tile({
   label,
   value,
-  tone,
   icon,
   tint,
   color,
+  foot,
 }: {
   label: string;
   value: React.ReactNode;
-  tone?: string;
-  icon?: React.ReactNode;
-  tint?: string;
-  color?: string;
+  icon: React.ReactNode;
+  tint: string;
+  color: string;
+  foot?: React.ReactNode;
 }) {
   const long = typeof value === 'string' && value.length > 8;
   return (
-    <div className={classNames('card stat-card rp-tile', tone && `stat-${tone}`)}>
-      <div className="rp-tile-top">
-        <span className={classNames('stat-value', long && 'stat-value-sm')}>{value}</span>
-        {icon && (
-          <span className="rp-tile-icon" style={tint ? { background: tint, color } : undefined}>
-            {icon}
-          </span>
-        )}
+    <div className="rp-kpi">
+      <div className="rp-kpi-top">
+        <span className="rp-kpi-label">{label}</span>
+        <span className="rp-kpi-icon" style={{ background: tint, color }}>
+          {icon}
+        </span>
       </div>
-      <span className="stat-label">{label}</span>
+      <span className={classNames('rp-kpi-value', long && 'rp-kpi-value-sm')}>{value}</span>
+      {foot ? <div className="rp-kpi-foot">{foot}</div> : <div className="rp-kpi-foot rp-kpi-foot-empty" />}
+    </div>
+  );
+}
+
+function CardHead({ title, hint, right }: { title: string; hint?: string; right?: React.ReactNode }) {
+  return (
+    <div className="rp-card-head">
+      <h3>
+        {title}
+        {hint && <span className="report-hint"> — {hint}</span>}
+      </h3>
+      {right}
     </div>
   );
 }
@@ -98,6 +126,7 @@ export default function Reports() {
   const countries = data?.countries ?? [];
   const csatDist = data?.csatDist ?? [0, 0, 0, 0, 0];
   const csatTotal = csatDist.reduce((a, b) => a + b, 0);
+  const y = data?.yesterday;
 
   // ── Insights strip (computed from real data) ──
   const insights: { icon: React.ReactNode; title: string; sub: string }[] = [];
@@ -117,10 +146,8 @@ export default function Reports() {
         sub: `Best performer · ${best.handled} chats${best.resolutionRate != null ? ` · ${best.resolutionRate}% resolved` : ''}`,
       });
     }
-    if (data.avgFirstResponseSeconds != null && data.yesterdayFrtSeconds != null && data.yesterdayFrtSeconds > 0) {
-      const diff = Math.round(
-        ((data.yesterdayFrtSeconds - data.avgFirstResponseSeconds) / data.yesterdayFrtSeconds) * 100,
-      );
+    if (data.avgFirstResponseSeconds != null && y?.frtSeconds != null && y.frtSeconds > 0) {
+      const diff = Math.round(((y.frtSeconds - data.avgFirstResponseSeconds) / y.frtSeconds) * 100);
       insights.push({
         icon: <IconClock size={18} />,
         title: `${Math.abs(diff)}% ${diff >= 0 ? 'faster' : 'slower'}`,
@@ -147,7 +174,7 @@ export default function Reports() {
   }
 
   return (
-    <div className="page">
+    <div className="page rp-page">
       <div className="page-head">
         <div>
           <h2>Reports</h2>
@@ -184,68 +211,125 @@ export default function Reports() {
 
       {data && (
         <>
-          {/* ── Tiles row 1 ── */}
-          <div className="stat-grid">
-            <StatTile label="Active now" value={data.totals.active} icon={<IconMessage size={17} />} tint="#dcfce7" color="#16a34a" />
-            <StatTile label="In queue" value={data.totals.waiting} icon={<IconUsers size={17} />} tint="#ffedd5" color="#ea580c" />
-            <StatTile label="Closed" value={data.totals.closed} icon={<IconCheckCircle size={17} />} tint="#dbeafe" color="#2563eb" />
-            <StatTile label="Missed" value={data.totals.missed} icon={<IconPhoneOff size={17} />} tint="#fee2e2" color="#dc2626" />
-            <StatTile label="Avg first response" value={formatSeconds(data.avgFirstResponseSeconds)} icon={<IconClock size={17} />} tint="#ede9fe" color="#7c3aed" />
-            <StatTile
-              label={`CSAT (${data.csat?.count ?? 0} rating${(data.csat?.count ?? 0) === 1 ? '' : 's'})`}
+          {/* ── Overview ── */}
+          <SectionLabel>Overview</SectionLabel>
+          <div className="rp-kpis">
+            <Tile
+              label="Active now"
+              value={data.totals.active}
+              icon={<IconMessage size={18} />}
+              tint="#dcfce7"
+              color="#16a34a"
+            />
+            <Tile
+              label="In queue"
+              value={data.totals.waiting}
+              icon={<IconUsers size={18} />}
+              tint="#ffedd5"
+              color="#ea580c"
+            />
+            <Tile
+              label="Closed"
+              value={data.totals.closed}
+              icon={<IconCheckCircle size={18} />}
+              tint="#dbeafe"
+              color="#2563eb"
+              foot={y ? <Delta now={data.totals.closed} before={y.closed} /> : undefined}
+            />
+            <Tile
+              label="Missed"
+              value={data.totals.missed}
+              icon={<IconPhoneOff size={18} />}
+              tint="#fee2e2"
+              color="#dc2626"
+              foot={y ? <Delta now={data.totals.missed} before={y.missed} invert /> : undefined}
+            />
+            <Tile
+              label="Avg first response"
+              value={formatSeconds(data.avgFirstResponseSeconds)}
+              icon={<IconClock size={18} />}
+              tint="#ede9fe"
+              color="#7c3aed"
+              foot={
+                data.avgFirstResponseSeconds != null && y?.frtSeconds != null ? (
+                  <Delta now={data.avgFirstResponseSeconds} before={y.frtSeconds} invert />
+                ) : undefined
+              }
+            />
+            <Tile
+              label="CSAT"
               value={
                 data.csat?.average != null ? (
                   <>
                     {data.csat.average.toFixed(1)}
-                    <span className="rp-tile-suffix">/5</span>
+                    <span className="rp-kpi-suffix">/5</span>
                   </>
                 ) : (
                   '—'
                 )
               }
-              icon={<IconStar size={17} />}
+              icon={<IconStar size={18} />}
               tint="#fef3c7"
               color="#d97706"
+              foot={
+                <span className="rp-kpi-muted">
+                  {data.csat?.count ?? 0} rating{(data.csat?.count ?? 0) === 1 ? '' : 's'}
+                </span>
+              }
             />
           </div>
 
-          {/* ── Tiles row 2 ── */}
-          <div className="stat-grid">
-            <StatTile
+          {/* ── Performance ── */}
+          <SectionLabel>Performance &amp; audience</SectionLabel>
+          <div className="rp-kpis">
+            <Tile
               label="Resolution rate"
               value={tiles?.resolutionRate != null ? `${tiles.resolutionRate}%` : '—'}
-              icon={<IconChart size={17} />}
+              icon={<IconChart size={18} />}
               tint="#f3e8ff"
               color="#9333ea"
             />
-            <StatTile label="Avg chat duration" value={formatSeconds(tiles?.avgChatDurationSeconds)} icon={<IconClock size={17} />} tint="#ede9fe" color="#7c3aed" />
-            <StatTile label="Avg response time" value={formatSeconds(tiles?.avgReplySeconds)} icon={<IconClock size={17} />} tint="#dbeafe" color="#2563eb" />
-            <StatTile
+            <Tile
+              label="Avg chat duration"
+              value={formatSeconds(tiles?.avgChatDurationSeconds)}
+              icon={<IconClock size={18} />}
+              tint="#ede9fe"
+              color="#7c3aed"
+            />
+            <Tile
+              label="Avg response time"
+              value={formatSeconds(tiles?.avgReplySeconds)}
+              icon={<IconClock size={18} />}
+              tint="#dbeafe"
+              color="#2563eb"
+            />
+            <Tile
               label="Peak hours"
               value={peak ? `${hourLabel(peak.start)} – ${hourLabel(peak.start + 2)}` : '—'}
-              icon={<IconClock size={17} />}
+              icon={<IconClock size={18} />}
               tint="#f3e8ff"
               color="#9333ea"
             />
-            <StatTile
+            <Tile
               label="Returning visitors"
               value={tiles?.returningRate != null ? `${tiles.returningRate}%` : '—'}
-              icon={<IconUsers size={17} />}
+              icon={<IconUsers size={18} />}
               tint="#dcfce7"
               color="#16a34a"
             />
-            <StatTile
+            <Tile
               label="Visitor → chat rate"
               value={tiles?.conversionRate != null ? `${tiles.conversionRate}%` : '—'}
-              icon={<IconAlert size={17} />}
+              icon={<IconAlert size={18} />}
               tint="#ffedd5"
               color="#ea580c"
             />
           </div>
 
-          {/* ── 14-day volume ── */}
+          {/* ── Trends ── */}
+          <SectionLabel>Trends</SectionLabel>
           <div className="card report-card">
-            <h3>Chats per day — last {data.trendWindow ?? 14} days</h3>
+            <CardHead title="Chats over time" hint={`last ${data.trendWindow ?? 14} days`} />
             <div className="trend-wrap">
               <div className="trend-y">
                 <span>{maxTrend}</span>
@@ -253,43 +337,37 @@ export default function Reports() {
                 <span>0</span>
               </div>
               <div className="trend-chart trend-grid">
-              {trend.map((t) => (
-                <div
-                  key={t.day}
-                  className={classNames('trend-col', t.day === todayKey && 'today')}
-                  title={`${dayFull(t.day)} — ${t.count} chat${t.count === 1 ? '' : 's'}`}
-                >
-                  {(t.count === maxTrend || t.day === todayKey) && t.count > 0 && (
-                    <span className="trend-count">{t.count}</span>
-                  )}
-                  <div className="trend-bar" style={{ height: `${Math.max(3, (t.count / maxTrend) * 100)}%` }} />
-                  <span className="trend-day">{dayLabel(t.day)}</span>
-                </div>
-              ))}
+                {trend.map((t) => (
+                  <div
+                    key={t.day}
+                    className={classNames('trend-col', t.day === todayKey && 'today')}
+                    title={`${dayFull(t.day)} — ${t.count} chat${t.count === 1 ? '' : 's'}`}
+                  >
+                    {(t.count === maxTrend || t.day === todayKey) && t.count > 0 && (
+                      <span className="trend-count">{t.count}</span>
+                    )}
+                    <div className="trend-bar" style={{ height: `${Math.max(3, (t.count / maxTrend) * 100)}%` }} />
+                    <span className="trend-day">{dayLabel(t.day)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* ── Trend / outcomes / by-hour ── */}
-          <div className="rp-cards3">
+          <div className="rp-cards3 db-stretch">
             <div className="card report-card">
-              <h3>
-                Response time trend <span className="report-hint">— {range === 'today' ? 'today, hourly' : `last ${data.trendWindow ?? 14} days`}</span>
-              </h3>
+              <CardHead
+                title="Response time trend"
+                hint={range === 'today' ? 'today, hourly' : `last ${data.trendWindow ?? 14} days`}
+              />
               <TrendLines detail={data.trendDetail ?? []} mode={data.trendMode ?? 'day'} />
             </div>
             <div className="card report-card">
-              <h3>
-                Chat outcomes <span className="report-hint">— {RANGE_HINT[range]}</span>
-              </h3>
-              <OutcomeDonut
-                outcomes={data.outcomes ?? { resolved: 0, transferred: 0, missed: 0, open: 0 }}
-              />
+              <CardHead title="Chat outcomes" hint={RANGE_HINT[range]} />
+              <OutcomeDonut outcomes={data.outcomes ?? { resolved: 0, transferred: 0, missed: 0, open: 0 }} />
             </div>
             <div className="card report-card">
-              <h3>
-                Chats by hour <span className="report-hint">— {RANGE_HINT[range]}</span>
-              </h3>
+              <CardHead title="Chats by hour" hint={RANGE_HINT[range]} />
               {byHour.some((n) => n > 0) ? (
                 <>
                   {peak && (
@@ -301,10 +379,7 @@ export default function Reports() {
                     {byHour.map((n, h) => (
                       <div
                         key={h}
-                        className={classNames(
-                          'rp-hour-col',
-                          peak && h >= peak.start && h < peak.start + 2 && 'peak',
-                        )}
+                        className={classNames('rp-hour-col', peak && h >= peak.start && h < peak.start + 2 && 'peak')}
                         title={`${hourLabel(h)} — ${n} chat${n === 1 ? '' : 's'}`}
                       >
                         <div className="rp-hour-bar" style={{ height: `${Math.max(4, (n / maxHour) * 100)}%` }} />
@@ -320,17 +395,16 @@ export default function Reports() {
                   </div>
                 </>
               ) : (
-                <p className="rp-empty">No chats today yet.</p>
+                <p className="rp-empty">No chats in this period yet.</p>
               )}
             </div>
           </div>
 
-          {/* ── Leaderboard + website performance ── */}
-          <div className="rp-cards2">
+          {/* ── Team & websites ── */}
+          <SectionLabel>Team &amp; websites</SectionLabel>
+          <div className="rp-cards2 db-stretch">
             <div className="card report-card">
-              <h3>
-                Agent leaderboard <span className="report-hint">— {RANGE_HINT[range]}</span>
-              </h3>
+              <CardHead title="Agent leaderboard" hint={RANGE_HINT[range]} />
               <div className="rp-scroll-x">
                 <table className="table lb-table">
                   <thead>
@@ -350,18 +424,11 @@ export default function Reports() {
                         <td className="lb-rank">{i === 0 && row.handled > 0 ? '🏆' : i + 1}</td>
                         <td>
                           <span className="cell-user">
-                            <Avatar
-                              name={row.user.name}
-                              color={row.user.avatarColor}
-                              url={row.user.avatarUrl}
-                              size="sm"
-                            />
+                            <Avatar name={row.user.name} color={row.user.avatarColor} url={row.user.avatarUrl} size="sm" />
                             <span className="lb-user-meta">
                               <span className="lb-user-name">
                                 {row.user.name}
-                                <span
-                                  className={classNames('dot', online[row.user.id] ? 'dot-online' : 'dot-offline')}
-                                />
+                                <span className={classNames('dot', online[row.user.id] ? 'dot-online' : 'dot-offline')} />
                               </span>
                               {row.handled > 0 && (
                                 <span className="lb-bar-track">
@@ -393,9 +460,7 @@ export default function Reports() {
             </div>
 
             <div className="card report-card">
-              <h3>
-                Website performance <span className="report-hint">— {RANGE_HINT[range]}</span>
-              </h3>
+              <CardHead title="Website performance" hint={RANGE_HINT[range]} />
               <div className="rp-scroll-x">
                 <table className="table lb-table">
                   <thead>
@@ -439,18 +504,20 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* ── Topics / CSAT / funnel / countries ── */}
-          <div className="rp-cards4">
+          {/* ── Audience ── */}
+          <SectionLabel>Conversations &amp; audience</SectionLabel>
+          <div className="rp-cards4 db-stretch">
             <div className="card report-card">
-              <h3>
-                Top chat topics <span className="report-hint">— visitor keywords</span>
-              </h3>
+              <CardHead title="Top chat topics" hint="visitor keywords" />
               {topics.length === 0 && <p className="rp-empty">No messages yet.</p>}
               {topics.map((t) => (
                 <div className="rp-topic" key={t.word}>
                   <span className="rp-topic-name">{t.word}</span>
                   <span className="rp-topic-track">
-                    <span className="rp-topic-fill" style={{ width: `${Math.max(3, t.pct)}%` }} />
+                    <span
+                      className="rp-topic-fill"
+                      style={{ width: `${Math.max(6, (t.pct / Math.max(1, topics[0]?.pct ?? 1)) * 88)}%` }}
+                    />
                   </span>
                   <span className="rp-topic-val">{t.pct}%</span>
                 </div>
@@ -458,7 +525,7 @@ export default function Reports() {
             </div>
 
             <div className="card report-card">
-              <h3>Customer satisfaction</h3>
+              <CardHead title="Customer satisfaction" />
               {csatTotal === 0 ? (
                 <p className="rp-empty">No ratings yet.</p>
               ) : (
@@ -491,34 +558,27 @@ export default function Reports() {
             </div>
 
             <div className="card report-card">
-              <h3>
-                Visitor → chat funnel <span className="report-hint">— {RANGE_HINT[range]}</span>
-              </h3>
+              <CardHead title="Visitor → chat funnel" hint={RANGE_HINT[range]} />
               {funnel && funnel.visitors + funnel.chats > 0 ? (
-                <div className="rp-funnel">
+                <div className="db-funnel">
                   {(
                     [
-                      ['Visitors', funnel.visitors, '#c4b5fd'],
-                      ['Started chat', funnel.chats, '#a78bfa'],
-                      ['Answered', funnel.answered, '#8b5cf6'],
-                      ['Resolved', funnel.resolved, '#7c3aed'],
+                      ['Visitors', funnel.visitors, '#a78bfa'],
+                      ['Started chat', funnel.chats, '#7dd3fc'],
+                      ['Answered', funnel.answered, '#5eead4'],
+                      ['Resolved', funnel.resolved, '#6ee7b7'],
                     ] as const
                   ).map(([label, n, color], i, arr) => {
-                    const top = arr[0][1] || 1;
+                    const TAPER = [100, 82, 66, 52];
                     const prev = i > 0 ? arr[i - 1][1] : null;
                     return (
-                      <div className="rp-funnel-row" key={label}>
-                        <div
-                          className="rp-funnel-bar"
-                          style={{ width: `${Math.max(14, (n / top) * 100)}%`, background: color }}
-                        >
+                      <div className="db-funnel-row" key={label}>
+                        <div className="db-funnel-bar" style={{ width: `${TAPER[i]}%`, background: color }}>
                           {n.toLocaleString()}
                         </div>
-                        <span className="rp-funnel-label">
-                          {label}
-                          {prev != null && prev > 0 && (
-                            <em> {Math.round((n / prev) * 100)}%</em>
-                          )}
+                        <span className="db-funnel-side">
+                          <b>{label}</b>
+                          {prev != null && prev > 0 && <em>{Math.round((n / prev) * 100)}%</em>}
                         </span>
                       </div>
                     );
@@ -530,9 +590,7 @@ export default function Reports() {
             </div>
 
             <div className="card report-card">
-              <h3>
-                Visitors by country <span className="report-hint">— {RANGE_HINT[range]}</span>
-              </h3>
+              <CardHead title="Visitors by country" hint={RANGE_HINT[range]} />
               {countries.length === 0 && <p className="rp-empty">No location data yet.</p>}
               {countries.map((c) => (
                 <div className="rp-topic" key={c.country}>
@@ -540,7 +598,10 @@ export default function Reports() {
                     {flagEmoji(c.cc)} {c.country}
                   </span>
                   <span className="rp-topic-track">
-                    <span className="rp-topic-fill" style={{ width: `${Math.max(3, c.pct)}%` }} />
+                    <span
+                      className="rp-topic-fill"
+                      style={{ width: `${Math.max(6, (c.pct / Math.max(1, countries[0]?.pct ?? 1)) * 88)}%` }}
+                    />
                   </span>
                   <span className="rp-topic-val">{c.pct}%</span>
                 </div>
