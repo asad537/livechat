@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { Visitor } from '@livechat/shared';
 import { EV } from '@livechat/shared';
 import { useApp } from '../state';
@@ -20,7 +19,6 @@ import { IconUsers, IconX } from '../icons';
 
 export default function Visitors() {
   const { websites, visitorsByWebsite, pushToast, openDockedChat, connected } = useApp();
-  const navigate = useNavigate();
   const [restVisitors, setRestVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
   const [drawerId, setDrawerId] = useState<string | null>(null);
@@ -98,15 +96,18 @@ export default function Visitors() {
   const startChat = () => {
     const body = firstMessage.trim();
     if (!body || !startTarget) return;
-    getSocket()?.emit(EV.AgentStartChat, {
-      websiteId: startTarget.websiteId,
-      visitorId: startTarget.id,
-      body,
-    });
-    pushToast('Chat started', `Your message was sent to ${startTarget.name || 'the visitor'}.`, 'success');
+    const target = startTarget;
+    getSocket()?.emit(
+      EV.AgentStartChat,
+      { websiteId: target.websiteId, visitorId: target.id, body },
+      (ack: { conversationId?: string } | undefined) => {
+        // Chat opens right here in the docked window — no jump to the Inbox.
+        if (ack?.conversationId) openDockedChat(ack.conversationId);
+      },
+    );
+    pushToast('Chat started', `Your message was sent to ${target.name || 'the visitor'}.`, 'success');
     setStartTarget(null);
     setFirstMessage('');
-    navigate('/');
   };
 
   const row = (v: Visitor) => {

@@ -813,7 +813,9 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     // ── CSR-initiated chat → OFFERED ──
     socket.on(
       EV.AgentStartChat,
-      safe(socket, async (payload: unknown) => {
+      safe(socket, async (payload: unknown, ack?: unknown) => {
+        const reply =
+          typeof ack === 'function' ? (ack as (r: { conversationId: string }) => void) : null;
         const p = (payload ?? {}) as Record<string, unknown>;
         const websiteId = asString(p.websiteId);
         const visitorId = asString(p.visitorId);
@@ -837,7 +839,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           [visitorId],
         );
         if (open) {
-          socket.emit(EV.AppError, { message: 'Visitor already has an open conversation' });
+          // Already an open conversation — hand its id back so the client
+          // opens that chat instead of erroring.
+          await socket.join(convRoom(open.id));
+          reply?.({ conversationId: open.id });
           return;
         }
 
@@ -870,6 +875,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
 
         // Visitor not around? Start the 10-minute missed countdown right away.
         if (!deps.presence.isVisitorOnline(visitorId)) scheduleMissedTimer(deps, conversationId);
+        reply?.({ conversationId });
       }),
     );
 
