@@ -261,7 +261,7 @@ export default function Dashboard() {
           </div>
 
           {/* ── Trend / hours / topics / funnel ── */}
-          <div className="rp-cards4 db-stretch">
+          <div className="rp-cards4 db-stretch db-row3">
             <div className="card report-card">
               <div className="db-card-head">
                 <h3>Response Time Trend</h3>
@@ -313,30 +313,6 @@ export default function Dashboard() {
                 </>
               ) : (
                 <p className="rp-empty">No chats today yet.</p>
-              )}
-            </div>
-            <div className="card report-card">
-              <h3>Top Chat Topics</h3>
-              <p className="db-card-sub">
-                {range === 'today' ? 'Since midnight' : RANGE_HINT[range]}
-              </p>
-              {topics.length === 0 && <p className="rp-empty">No messages yet.</p>}
-              {topics.map((t) => (
-                <div className="rp-topic" key={t.word}>
-                  <span className="rp-topic-name">{t.word}</span>
-                  <span className="rp-topic-track">
-                    <span
-                      className="rp-topic-fill"
-                      style={{ width: `${Math.max(6, (t.pct / Math.max(1, topics[0]?.pct ?? 1)) * 88)}%` }}
-                    />
-                  </span>
-                  <span className="rp-topic-val">{t.pct}%</span>
-                </div>
-              ))}
-              {topics.length > 0 && (
-                <button className="btn btn-ghost btn-sm db-view-all" onClick={() => navigate('/reports')}>
-                  View all topics
-                </button>
               )}
             </div>
             <div className="card report-card">

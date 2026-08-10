@@ -22,18 +22,26 @@ export const OUTCOME_META = [
   { key: 'missed', label: 'Missed', color: '#ef4444' },
 ] as const;
 
-/** Two-series line chart (SVG) for the 14-day response trend. */
+/** Two-series line chart (SVG) for the 14-day response trend — Figma style. */
 export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['trendDetail']> }) {
   const W = 320;
-  const H = 130;
-  const PAD = 8;
+  const H = 150;
+  const PAD = 10;
+  const [hover, setHover] = React.useState<number | null>(null);
+  const bodyRef = React.useRef<HTMLDivElement>(null);
+
   const frt = detail.map((d) => d.frtSeconds ?? null);
-  const dur = detail.map((d) => d.replySeconds ?? null);
-  const max = Math.max(
+  const rep = detail.map((d) => d.replySeconds ?? null);
+  const rawMax = Math.max(
     60,
     ...frt.filter((v): v is number => v != null),
-    ...dur.filter((v): v is number => v != null),
+    ...rep.filter((v): v is number => v != null),
   );
+  // Nice scale: round up to a clean step so ticks read 1m / 2m / 3m.
+  const step = rawMax <= 180 ? 60 : Math.ceil(rawMax / 3 / 60) * 60;
+  const max = step * 3 >= rawMax ? step * 3 : step * 4;
+  const ticks = [3, 2, 1].map((k) => k * step);
+
   const x = (i: number) => PAD + (i * (W - PAD * 2)) / Math.max(1, detail.length - 1);
   const y = (v: number) => H - PAD - (v / max) * (H - PAD * 2);
   const path = (vals: (number | null)[]) =>
@@ -41,61 +49,111 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
       .map((v, i) => (v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`))
       .filter(Boolean)
       .join(' ');
-  const hasAny = frt.some((v) => v != null) || dur.some((v) => v != null);
+  const hasAny = frt.some((v) => v != null) || rep.some((v) => v != null);
   if (!hasAny) return <p className="rp-empty">No response data yet.</p>;
+
+  const onMove = (e: React.MouseEvent) => {
+    const rect = bodyRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const frac = (e.clientX - rect.left) / rect.width;
+    const i = Math.round(frac * (detail.length - 1));
+    setHover(Math.max(0, Math.min(detail.length - 1, i)));
+  };
+
+  const xTicks = detail.length > 5 ? [0, 3, 6, 9, 12].filter((i) => i < detail.length) : detail.map((_, i) => i);
+  const hoverLeft = hover != null ? (hover / Math.max(1, detail.length - 1)) * 100 : 0;
+  const fullDate = (day: string) =>
+    new Date(`${day}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+
   return (
     <>
       <div className="rp-legend">
         <span>
-          <i className="rp-swatch" style={{ background: '#7c3aed' }} /> Avg. First Response
+          <i className="rp-dot" style={{ background: '#7c3aed' }} /> Avg. First Response
         </span>
         <span>
-          <i className="rp-swatch" style={{ background: '#0ea5e9' }} /> Avg. Response Time
+          <i className="rp-dot" style={{ background: '#2563eb' }} /> Avg. Response Time
         </span>
       </div>
       <div className="chart-with-y">
-      <div className="chart-y">
-        <span>{formatSeconds(max)}</span>
-        <span>{formatSeconds(Math.round(max / 2))}</span>
-        <span>0</span>
-      </div>
-      <div className="chart-body">
-      <svg viewBox={`0 0 ${W} ${H}`} className="rp-lines" preserveAspectRatio="none">
-        {[0.25, 0.5, 0.75].map((f) => (
-          <line
-            key={f}
-            x1={PAD}
-            x2={W - PAD}
-            y1={PAD + f * (H - PAD * 2)}
-            y2={PAD + f * (H - PAD * 2)}
-            stroke="#e2e8f0"
-            strokeWidth="1"
-            strokeDasharray="3 4"
-          />
-        ))}
-        <polyline points={path(frt)} fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinejoin="round" />
-        <polyline points={path(dur)} fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinejoin="round" />
-        {detail.map((d, i) =>
-          d.frtSeconds != null ? (
-            <circle key={`f${i}`} cx={x(i)} cy={y(d.frtSeconds)} r="2.6" fill="#7c3aed">
-              <title>{`${dayFull(d.day)} — first response ${formatSeconds(d.frtSeconds)}`}</title>
-            </circle>
-          ) : null,
-        )}
-        {detail.map((d, i) =>
-          d.replySeconds != null ? (
-            <circle key={`d${i}`} cx={x(i)} cy={y(d.replySeconds)} r="2.6" fill="#0ea5e9">
-              <title>{`${dayFull(d.day)} — response ${formatSeconds(d.replySeconds ?? 0)}`}</title>
-            </circle>
-          ) : null,
-        )}
-      </svg>
-      <div className="rp-lines-x">
-        <span>{dayFull(detail[0].day)}</span>
-        <span>{dayFull(detail[Math.floor(detail.length / 2)].day)}</span>
-        <span>{dayFull(detail[detail.length - 1].day)}</span>
-      </div>
-      </div>
+        <div className="chart-y">
+          {ticks.map((t) => (
+            <span key={t}>{t % 60 === 0 ? `${t / 60}m` : formatSeconds(t)}</span>
+          ))}
+          <span>0</span>
+        </div>
+        <div className="chart-body tl-body" ref={bodyRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+          <svg viewBox={`0 0 ${W} ${H}`} className="rp-lines" preserveAspectRatio="none">
+            {ticks.map((t) => (
+              <line
+                key={t}
+                x1={PAD}
+                x2={W - PAD}
+                y1={y(t)}
+                y2={y(t)}
+                stroke="#e2e8f0"
+                strokeWidth="1"
+                strokeDasharray="3 4"
+              />
+            ))}
+            {hover != null && (
+              <line x1={x(hover)} x2={x(hover)} y1={PAD} y2={H - PAD} stroke="#cbd5e1" strokeWidth="1" />
+            )}
+            <polyline points={path(frt)} fill="none" stroke="#7c3aed" strokeWidth="2.4" strokeLinejoin="round" />
+            <polyline points={path(rep)} fill="none" stroke="#2563eb" strokeWidth="2.4" strokeLinejoin="round" />
+            {detail.map((d, i) =>
+              d.frtSeconds != null ? (
+                <circle
+                  key={`f${i}`}
+                  cx={x(i)}
+                  cy={y(d.frtSeconds)}
+                  r={hover === i ? 5 : 3.6}
+                  fill="#7c3aed"
+                  stroke="#fff"
+                  strokeWidth="1.4"
+                />
+              ) : null,
+            )}
+            {detail.map((d, i) =>
+              d.replySeconds != null ? (
+                <circle
+                  key={`r${i}`}
+                  cx={x(i)}
+                  cy={y(d.replySeconds)}
+                  r={hover === i ? 5 : 3.6}
+                  fill="#2563eb"
+                  stroke="#fff"
+                  strokeWidth="1.4"
+                />
+              ) : null,
+            )}
+          </svg>
+          {hover != null && (detail[hover].frtSeconds != null || detail[hover].replySeconds != null) && (
+            <div
+              className="tl-tip"
+              style={{ left: `${hoverLeft}%`, transform: `translateX(${hoverLeft > 65 ? '-100%' : hoverLeft < 20 ? '0' : '-50%'})` }}
+            >
+              <div className="tl-tip-date">{fullDate(detail[hover].day)}</div>
+              <div className="tl-tip-row">
+                <i className="rp-dot" style={{ background: '#7c3aed' }} />
+                <span>First Response</span>
+                <b>{detail[hover].frtSeconds != null ? formatSeconds(detail[hover].frtSeconds) : '—'}</b>
+              </div>
+              <div className="tl-tip-row">
+                <i className="rp-dot" style={{ background: '#2563eb' }} />
+                <span>Response Time</span>
+                <b>{detail[hover].replySeconds != null ? formatSeconds(detail[hover].replySeconds ?? 0) : '—'}</b>
+              </div>
+            </div>
+          )}
+          <div className="tl-xticks">
+            {xTicks.map((i) => (
+              <span key={i} style={{ left: `${(i / Math.max(1, detail.length - 1)) * 100}%` }}>
+                {dayFull(detail[i].day)}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </>
   );

@@ -4766,3 +4766,101 @@ img.avatar {
   margin: 0;
   min-width: 0;
 }
+
+/* Figma-style trend tooltip + ticks */
+.rp-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.tl-body {
+  position: relative;
+  padding-bottom: 22px;
+}
+
+.tl-tip {
+  position: absolute;
+  top: -6px;
+  z-index: 5;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 9px 12px;
+  min-width: 185px;
+  pointer-events: none;
+}
+
+.tl-tip-date {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.tl-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-soft);
+  padding: 1.5px 0;
+}
+
+.tl-tip-row b {
+  margin-left: auto;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-xticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 16px;
+}
+
+.tl-xticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tl-xticks span:first-child {
+  transform: translateX(-20%);
+}
+
+.tl-xticks span:last-child {
+  transform: translateX(-80%);
+}
+
+.rp-cards4 .report-card .tl-body > svg {
+  min-height: 130px;
+}
+
+.db-chip-select::after {
+  content: ' ⌄';
+  color: var(--text-muted);
+}
+
+/* Row 3: trend gets the extra width (topics card removed) */
+.db-row3 {
+  grid-template-columns: 1.7fr 1.1fr 1fr;
+}
+
+@media (max-width: 1100px) {
+  .db-row3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .db-row3 {
+    grid-template-columns: 1fr;
+  }
+}
