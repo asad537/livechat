@@ -117,7 +117,7 @@ export interface ReportsOverview {
   };
   outcomes?: { resolved: number; transferred: number; missed: number; open: number };
   byHour?: number[];
-  trendDetail?: { day: string; count: number; frtSeconds: number | null; durationSeconds: number | null }[];
+  trendDetail?: { day: string; count: number; frtSeconds: number | null; durationSeconds: number | null; replySeconds?: number | null }[];
   csatDist?: number[];
   funnel?: { visitors: number; chats: number; answered: number; resolved: number };
   countries?: { country: string; cc: string | null; n: number; pct: number }[];

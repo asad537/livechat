@@ -28,7 +28,7 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
   const H = 130;
   const PAD = 8;
   const frt = detail.map((d) => d.frtSeconds ?? null);
-  const dur = detail.map((d) => d.durationSeconds ?? null);
+  const dur = detail.map((d) => d.replySeconds ?? null);
   const max = Math.max(
     60,
     ...frt.filter((v): v is number => v != null),
@@ -47,10 +47,10 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
     <>
       <div className="rp-legend">
         <span>
-          <i className="rp-swatch" style={{ background: '#7c3aed' }} /> Avg first response
+          <i className="rp-swatch" style={{ background: '#7c3aed' }} /> Avg. First Response
         </span>
         <span>
-          <i className="rp-swatch" style={{ background: '#0ea5e9' }} /> Avg chat duration
+          <i className="rp-swatch" style={{ background: '#0ea5e9' }} /> Avg. Response Time
         </span>
       </div>
       <div className="chart-with-y">
@@ -83,9 +83,9 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
           ) : null,
         )}
         {detail.map((d, i) =>
-          d.durationSeconds != null ? (
-            <circle key={`d${i}`} cx={x(i)} cy={y(d.durationSeconds)} r="2.6" fill="#0ea5e9">
-              <title>{`${dayFull(d.day)} — duration ${formatSeconds(d.durationSeconds)}`}</title>
+          d.replySeconds != null ? (
+            <circle key={`d${i}`} cx={x(i)} cy={y(d.replySeconds)} r="2.6" fill="#0ea5e9">
+              <title>{`${dayFull(d.day)} — response ${formatSeconds(d.replySeconds ?? 0)}`}</title>
             </circle>
           ) : null,
         )}

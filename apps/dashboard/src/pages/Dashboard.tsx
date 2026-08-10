@@ -1,10 +1,29 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, type ReportsOverview } from '../api';
+import { api, type ReportRange, type ReportsOverview } from '../api';
 import { useApp } from '../state';
 import Avatar from '../components/Avatar';
 import { AreaChart, Donut, OutcomeDonut, TrendLines, hourLabel } from '../components/charts';
+import {
+  IconAlert,
+  IconCalendar,
+  IconChart,
+  IconCheckCircle,
+  IconClock,
+  IconMessage,
+  IconPhoneOff,
+  IconStar,
+  IconUser,
+  IconUsers,
+} from '../icons';
 import { classNames, formatSeconds } from '../util';
+
+const RANGE_HINT: Record<ReportRange, string> = {
+  today: 'today',
+  '7d': 'last 7 days',
+  '30d': 'last 30 days',
+  all: 'all time',
+};
 
 function Delta({ now, before, invert }: { now: number; before: number; invert?: boolean }) {
   if (before <= 0 && now <= 0) return <span className="db-delta db-delta-flat">— vs yesterday</span>;
@@ -24,12 +43,14 @@ function Tile({
   value,
   icon,
   tint,
+  color,
   delta,
 }: {
   label: string;
   value: React.ReactNode;
-  icon: string;
+  icon: React.ReactNode;
   tint: string;
+  color: string;
   delta?: React.ReactNode;
 }) {
   return (
@@ -39,7 +60,7 @@ function Tile({
           <span className="db-tile-label">{label}</span>
           <span className="db-tile-value">{value}</span>
         </div>
-        <span className="db-tile-icon" style={{ background: tint }}>
+        <span className="db-tile-icon" style={{ background: tint, color }}>
           {icon}
         </span>
       </div>
@@ -52,19 +73,20 @@ export default function Dashboard() {
   const { websites, me } = useApp();
   const navigate = useNavigate();
   const [websiteId, setWebsiteId] = useState('');
+  const [range, setRange] = useState<ReportRange>('today');
   const [data, setData] = useState<ReportsOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await api.reports(websiteId || undefined, 'today'));
+      setData(await api.reports(websiteId || undefined, range));
     } catch {
       /* toast-free dashboard; Reports page surfaces errors */
     } finally {
       setLoading(false);
     }
-  }, [websiteId]);
+  }, [websiteId, range]);
 
   useEffect(() => {
     void load();
@@ -76,7 +98,7 @@ export default function Dashboard() {
   const peak = tiles?.peakHour ?? null;
   const byHour = data?.byHour ?? [];
   const maxHour = Math.max(1, ...byHour);
-  const topics = (data?.topics ?? []).slice(0, 5);
+  const topics = (data?.topics ?? []).slice(0, 6);
   const funnel = data?.funnel;
   const perAgent = [...(data?.perAgent ?? [])].sort((a, b) => b.handled - a.handled).slice(0, 5);
   const sites = data?.websitePerf ?? [];
@@ -84,33 +106,33 @@ export default function Dashboard() {
 
   const SITE_COLORS = ['#7c3aed', '#0ea5e9', '#f59e0b', '#db2777', '#10b981', '#6366f1'];
 
-  const insights: { icon: string; title: string; sub: string }[] = [];
+  const insights: { icon: React.ReactNode; title: string; sub: string }[] = [];
   if (data) {
     if (peak && todayChats > 0) {
       insights.push({
-        icon: '📊',
+        icon: <IconChart size={18} />,
         title: `${hourLabel(peak.start)} – ${hourLabel(peak.start + 2)}`,
         sub: `Peak traffic · ${peak.share}% of chats`,
       });
     }
     const best = perAgent.find((a) => a.handled > 0);
     if (best) {
-      insights.push({ icon: '🏆', title: best.user.name, sub: `Best performer · ${best.handled} chats` });
+      insights.push({ icon: <IconUser size={18} />, title: best.user.name, sub: `Best performer · ${best.handled} chats` });
     }
     if (data.avgFirstResponseSeconds != null && y?.frtSeconds != null && y.frtSeconds > 0) {
       const diff = Math.round(((y.frtSeconds - data.avgFirstResponseSeconds) / y.frtSeconds) * 100);
       insights.push({
-        icon: '⚡',
+        icon: <IconClock size={18} />,
         title: `${Math.abs(diff)}% ${diff >= 0 ? 'faster' : 'slower'}`,
         sub: 'First response vs yesterday',
       });
     }
     const worst = [...sites].filter((w) => w.missed > 0).sort((a, b) => b.missed - a.missed)[0];
     if (worst) {
-      insights.push({ icon: '⚠️', title: worst.name, sub: `Attention needed · ${worst.missed} missed` });
+      insights.push({ icon: <IconAlert size={18} />, title: worst.name, sub: `Attention needed · ${worst.missed} missed` });
     }
     if (topics[0]) {
-      insights.push({ icon: '💬', title: topics[0].word, sub: `Most common topic · ${topics[0].pct}%` });
+      insights.push({ icon: <IconMessage size={18} />, title: topics[0].word, sub: `Most common topic · ${topics[0].pct}%` });
     }
   }
 
@@ -124,7 +146,19 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="filters">
-          <span className="db-date">📅 Today ({today})</span>
+          <span className="db-date">
+            <IconCalendar size={15} />
+            <select
+              className="db-date-select"
+              value={range}
+              onChange={(e) => setRange(e.target.value as ReportRange)}
+            >
+              <option value="today">Today ({today})</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All time</option>
+            </select>
+          </span>
           <select value={websiteId} onChange={(e) => setWebsiteId(e.target.value)}>
             <option value="">All websites</option>
             {websites.map((w) => (
@@ -145,27 +179,30 @@ export default function Dashboard() {
         <>
           {/* ── Tiles ── */}
           <div className="db-tiles">
-            <Tile label="Active chats" value={data.totals.active} icon="💬" tint="#dcfce7" />
-            <Tile label="In queue" value={data.totals.waiting} icon="🧑‍🤝‍🧑" tint="#ffedd5" />
+            <Tile label="Active chats" value={data.totals.active} icon={<IconMessage size={17} />} tint="#dcfce7" color="#16a34a" />
+            <Tile label="In queue" value={data.totals.waiting} icon={<IconUsers size={17} />} tint="#ffedd5" color="#ea580c" />
             <Tile
               label="Closed chats"
               value={data.totals.closed}
-              icon="✅"
+              icon={<IconCheckCircle size={17} />}
               tint="#dbeafe"
+              color="#2563eb"
               delta={y ? <Delta now={data.totals.closed} before={y.closed} /> : undefined}
             />
             <Tile
               label="Missed chats"
               value={data.totals.missed}
-              icon="📵"
+              icon={<IconPhoneOff size={17} />}
               tint="#fee2e2"
+              color="#dc2626"
               delta={y ? <Delta now={data.totals.missed} before={y.missed} invert /> : undefined}
             />
             <Tile
               label="Avg first response"
               value={formatSeconds(data.avgFirstResponseSeconds)}
-              icon="⏱️"
+              icon={<IconClock size={17} />}
               tint="#ede9fe"
+              color="#7c3aed"
               delta={
                 data.avgFirstResponseSeconds != null && y?.frtSeconds != null ? (
                   <Delta now={data.avgFirstResponseSeconds} before={y.frtSeconds} invert />
@@ -173,7 +210,7 @@ export default function Dashboard() {
               }
             />
             <Tile
-              label={`CSAT (today)`}
+              label={`CSAT (${RANGE_HINT[range]})`}
               value={
                 data.csat.average != null ? (
                   <>
@@ -184,8 +221,9 @@ export default function Dashboard() {
                   '—'
                 )
               }
-              icon="⭐"
+              icon={<IconStar size={17} />}
               tint="#fef3c7"
+              color="#d97706"
               delta={
                 <span className="db-delta db-delta-flat">
                   {data.csat.count} rating{data.csat.count === 1 ? '' : 's'}
@@ -195,7 +233,7 @@ export default function Dashboard() {
           </div>
 
           {/* ── Chats over time + donuts ── */}
-          <div className="db-row-main">
+          <div className="db-row-main db-stretch">
             <div className="card report-card db-span2">
               <h3>
                 Chats over time <span className="report-hint">— last 14 days</span>
@@ -204,7 +242,7 @@ export default function Dashboard() {
             </div>
             <div className="card report-card">
               <h3>
-                Chats by website <span className="report-hint">— today</span>
+                Chats by website <span className="report-hint">— {RANGE_HINT[range]}</span>
               </h3>
               <Donut
                 segments={sites
@@ -216,46 +254,61 @@ export default function Dashboard() {
             </div>
             <div className="card report-card">
               <h3>
-                Chats by status <span className="report-hint">— today</span>
+                Chats by status <span className="report-hint">— {RANGE_HINT[range]}</span>
               </h3>
               <OutcomeDonut outcomes={data.outcomes ?? { resolved: 0, transferred: 0, missed: 0, open: 0 }} />
             </div>
           </div>
 
           {/* ── Trend / hours / topics / funnel ── */}
-          <div className="rp-cards4">
+          <div className="rp-cards4 db-stretch">
             <div className="card report-card">
-              <h3>
-                Response time trend <span className="report-hint">— 14 days</span>
-              </h3>
+              <div className="db-card-head">
+                <h3>Response Time Trend</h3>
+                <span className="db-chip-select">Last 14 days</span>
+              </div>
               <TrendLines detail={data.trendDetail ?? []} />
             </div>
             <div className="card report-card">
               <h3>
-                Chats by hour <span className="report-hint">— today</span>
+                Chats by Hour <span className="report-hint">(Today)</span>
               </h3>
               {byHour.some((n) => n > 0) ? (
                 <>
                   {peak && (
-                    <div className="rp-peak-chip">
-                      {hourLabel(peak.start)} – {hourLabel(peak.start + 2)} · peak
+                    <div className="rp-peak-chip db-peak-float">
+                      {hourLabel(peak.start)} – {hourLabel(peak.start + 2)}
+                      <b>{byHour[peak.start] + (byHour[peak.start + 1] ?? 0)} Chats (Peak)</b>
                     </div>
                   )}
-                  <div className="rp-hours">
-                    {byHour.map((n, h) => (
-                      <div
-                        key={h}
-                        className={classNames('rp-hour-col', peak && h >= peak.start && h < peak.start + 2 && 'peak')}
-                        title={`${hourLabel(h)} — ${n} chat${n === 1 ? '' : 's'}`}
-                      >
-                        <div className="rp-hour-bar" style={{ height: `${Math.max(4, (n / maxHour) * 100)}%` }} />
+                  <div className="chart-with-y">
+                    <div className="chart-y db-hours-y">
+                      <span>{maxHour}</span>
+                      <span>{Math.round(maxHour / 2)}</span>
+                      <span>0</span>
+                    </div>
+                    <div className="chart-body">
+                      <div className="rp-hours">
+                        {byHour.map((n, h) => (
+                          <div
+                            key={h}
+                            className={classNames('rp-hour-col', peak && h >= peak.start && h < peak.start + 2 && 'peak')}
+                            title={`${hourLabel(h)} — ${n} chat${n === 1 ? '' : 's'}`}
+                          >
+                            <div className="rp-hour-bar" style={{ height: `${Math.max(4, (n / maxHour) * 100)}%` }} />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div className="rp-hours-x">
-                    <span>12 AM</span>
-                    <span>12 PM</span>
-                    <span>12 AM</span>
+                      <div className="rp-hours-x">
+                        <span>12 AM</span>
+                        <span>4 AM</span>
+                        <span>8 AM</span>
+                        <span>12 PM</span>
+                        <span>4 PM</span>
+                        <span>8 PM</span>
+                        <span>12 AM</span>
+                      </div>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -263,9 +316,10 @@ export default function Dashboard() {
               )}
             </div>
             <div className="card report-card">
-              <h3>
-                Top chat topics <span className="report-hint">— today</span>
-              </h3>
+              <h3>Top Chat Topics</h3>
+              <p className="db-card-sub">
+                {range === 'today' ? 'Since midnight' : RANGE_HINT[range]}
+              </p>
               {topics.length === 0 && <p className="rp-empty">No messages yet.</p>}
               {topics.map((t) => (
                 <div className="rp-topic" key={t.word}>
@@ -276,11 +330,17 @@ export default function Dashboard() {
                   <span className="rp-topic-val">{t.pct}%</span>
                 </div>
               ))}
+              {topics.length > 0 && (
+                <button className="btn btn-ghost btn-sm db-view-all" onClick={() => navigate('/reports')}>
+                  View all topics
+                </button>
+              )}
             </div>
             <div className="card report-card">
-              <h3>
-                Visitor → chat funnel <span className="report-hint">— today</span>
-              </h3>
+              <h3>Visitor to Chat Funnel</h3>
+              <p className="db-card-sub">
+                {range === 'today' ? 'Since midnight' : RANGE_HINT[range]}
+              </p>
               {funnel && funnel.visitors + funnel.chats > 0 ? (
                 <div className="db-funnel">
                   {(
@@ -316,11 +376,11 @@ export default function Dashboard() {
           </div>
 
           {/* ── Performance + insights ── */}
-          <div className="db-row-bottom">
+          <div className="db-row-bottom db-stretch">
             <div className="card report-card">
               <div className="db-card-head">
                 <h3>
-                  Agent performance <span className="report-hint">— today</span>
+                  Agent performance <span className="report-hint">— {RANGE_HINT[range]}</span>
                 </h3>
                 <button className="btn btn-ghost btn-sm" onClick={() => navigate('/reports')}>
                   View all
@@ -362,7 +422,7 @@ export default function Dashboard() {
             <div className="card report-card">
               <div className="db-card-head">
                 <h3>
-                  Website performance <span className="report-hint">— today</span>
+                  Website performance <span className="report-hint">— {RANGE_HINT[range]}</span>
                 </h3>
                 <button className="btn btn-ghost btn-sm" onClick={() => navigate('/reports')}>
                   View all
@@ -408,7 +468,7 @@ export default function Dashboard() {
 
             {insights.length > 0 && (
               <div className="rp-insights card db-insights">
-                <h3>✨ Today&apos;s insights</h3>
+                <h3>✨ {range === 'today' ? "Today's" : 'Period'} insights</h3>
                 <div className="db-insights-col">
                   {insights.map((ins) => (
                     <div className="rp-insight" key={ins.sub}>

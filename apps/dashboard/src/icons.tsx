@@ -369,3 +369,43 @@ export const IconHome = ({ size, className }: IconProps) =>
       <path d="M10 21v-6h4v6" />
     </>
   ));
+
+export const IconStar = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z" />
+  ));
+
+export const IconCheckCircle = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M8 12.5l2.6 2.6L16 9.5" />
+    </>
+  ));
+
+export const IconAlert = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <path d="M12 3 2.5 20h19z" />
+      <line x1="12" y1="9.5" x2="12" y2="14" />
+      <circle cx="12" cy="17" r="0.6" />
+    </>
+  ));
+
+export const IconUser = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+    </>
+  ));
+
+export const IconCalendar = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="3" x2="8" y2="7" />
+      <line x1="16" y1="3" x2="16" y2="7" />
+    </>
+  ));

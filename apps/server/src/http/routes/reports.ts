@@ -208,6 +208,38 @@ export function buildReportsRouter(deps: AppDeps): Router {
         ),
       ]);
 
+      // 14-day message stream for the per-day response-time line (bounded).
+      const msgs14 = await deps.db.all<{ cid: string; st: string; at: string }>(
+        `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at
+           FROM messages m JOIN conversations c ON c.id = m.conversation_id
+          WHERE ${cSiteFilter} AND c.created_at >= ?
+          ORDER BY m.conversation_id, m.created_at LIMIT 30000`,
+        [...siteIds, trendSince],
+      );
+      const replyByDay = new Map<string, number[]>();
+      {
+        let lastV: string | null = null;
+        let lastC = '';
+        for (const m of msgs14) {
+          if (m.cid !== lastC) {
+            lastC = m.cid;
+            lastV = null;
+          }
+          if (m.st === 'VISITOR') {
+            if (lastV == null) lastV = m.at;
+          } else if (m.st === 'AGENT' && lastV != null) {
+            const s = secondsBetween(lastV, m.at);
+            if (s != null && s < 4 * 3600) {
+              const k = dayKey(m.at);
+              const arr = replyByDay.get(k) ?? [];
+              arr.push(s);
+              replyByDay.set(k, arr);
+            }
+            lastV = null;
+          }
+        }
+      }
+
       const inRange = (iso: string | null) => iso != null && (!since || iso >= since);
 
       // ── Totals + open pipeline ──
@@ -425,7 +457,13 @@ export function buildReportsRouter(deps: AppDeps): Router {
         byDay.set(key, e);
       }
       const trend: { day: string; count: number }[] = [];
-      const trendDetail: { day: string; count: number; frtSeconds: number | null; durationSeconds: number | null }[] = [];
+      const trendDetail: {
+        day: string;
+        count: number;
+        frtSeconds: number | null;
+        durationSeconds: number | null;
+        replySeconds: number | null;
+      }[] = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -437,6 +475,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
           count: e?.count ?? 0,
           frtSeconds: e ? avg(e.frt) : null,
           durationSeconds: e ? avg(e.dur) : null,
+          replySeconds: avg(replyByDay.get(key) ?? []),
         });
       }
 
