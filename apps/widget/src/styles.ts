@@ -469,7 +469,7 @@ export const WIDGET_CSS = `
 }
 
 /* ── End-chat header button ───────────────────────────────── */
-/* Plain icon — no circle, no hover chrome */
+/* Plain icon — no circle, no hover effect at all */
 .lc-endbtn,
 .lc-endbtn:hover {
   background: transparent;
@@ -477,8 +477,8 @@ export const WIDGET_CSS = `
   box-shadow: none;
   transform: none;
   opacity: 1;
+  color: inherit;
 }
-.lc-endbtn:hover { color: #fecaca; }
 
 /* ── Mobile: full-screen panel ────────────────────────────── */
 @media (max-width: 480px) {
