@@ -126,6 +126,7 @@ export interface ReportsOverview {
   yesterdayFrtSeconds?: number | null;
   yesterday?: { chats: number; closed: number; missed: number; frtSeconds: number | null };
   trendWindow?: number;
+  trendMode?: 'day' | 'hour';
 }
 
 export interface CreateWebsiteInput {

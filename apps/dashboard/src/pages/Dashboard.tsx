@@ -266,9 +266,9 @@ export default function Dashboard() {
             <div className="card report-card">
               <div className="db-card-head">
                 <h3>Response Time Trend</h3>
-                <span className="db-chip-select">Last {tw} days</span>
+                <span className="db-chip-select">{range === 'today' ? 'Today · hourly' : `Last ${tw} days`}</span>
               </div>
-              <TrendLines detail={data.trendDetail ?? []} />
+              <TrendLines detail={data.trendDetail ?? []} mode={data.trendMode ?? 'day'} />
             </div>
             <div className="card report-card">
               <h3>

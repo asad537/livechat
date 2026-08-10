@@ -247,9 +247,9 @@ export default function Reports() {
           <div className="rp-cards3">
             <div className="card report-card">
               <h3>
-                Response time trend <span className="report-hint">— last {data.trendWindow ?? 14} days</span>
+                Response time trend <span className="report-hint">— {range === 'today' ? 'today, hourly' : `last ${data.trendWindow ?? 14} days`}</span>
               </h3>
-              <TrendLines detail={data.trendDetail ?? []} />
+              <TrendLines detail={data.trendDetail ?? []} mode={data.trendMode ?? 'day'} />
             </div>
             <div className="card report-card">
               <h3>

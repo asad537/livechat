@@ -309,6 +309,48 @@ export function buildReportsRouter(deps: AppDeps): Router {
           lastVisitorAt = null;
         }
       }
+      // ── Hourly response trend for the Today view ──
+      const trendMode: 'day' | 'hour' = range === 'today' ? 'hour' : 'day';
+      let hourTrend: {
+        day: string;
+        count: number;
+        frtSeconds: number | null;
+        durationSeconds: number | null;
+        replySeconds: number | null;
+      }[] = [];
+      if (trendMode === 'hour') {
+        const frtByHour: number[][] = Array.from({ length: 24 }, () => []);
+        for (const r of startedRows) {
+          const sec = secondsBetween(r.created_at, r.activated_at);
+          if (sec != null) frtByHour[new Date(r.created_at).getHours()].push(sec);
+        }
+        const repByHour: number[][] = Array.from({ length: 24 }, () => []);
+        {
+          let lv: string | null = null;
+          let lc = '';
+          for (const m of msgRows) {
+            if (m.cid !== lc) {
+              lc = m.cid;
+              lv = null;
+            }
+            if (m.st === 'VISITOR') {
+              if (lv == null) lv = m.at;
+            } else if (m.st === 'AGENT' && lv != null) {
+              const sec = secondsBetween(lv, m.at);
+              if (sec != null && sec < 4 * 3600) repByHour[new Date(m.at).getHours()].push(sec);
+              lv = null;
+            }
+          }
+        }
+        hourTrend = Array.from({ length: 24 }, (_, hh) => ({
+          day: String(hh),
+          count: 0,
+          frtSeconds: avg(frtByHour[hh]),
+          durationSeconds: null,
+          replySeconds: avg(repByHour[hh]),
+        }));
+      }
+
       const topicTotal = [...wordCounts.values()].reduce((a, b) => a + b, 0);
       const topics = [...wordCounts.entries()]
         .sort((a, b) => b[1] - a[1])
@@ -503,7 +545,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         tiles,
         outcomes,
         byHour,
-        trendDetail,
+        trendDetail: trendMode === 'hour' ? hourTrend : trendDetail,
         csatDist,
         funnel,
         countries: countryRows.map((c) => ({
@@ -517,6 +559,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         yesterdayFrtSeconds: avg(yFrt),
         yesterday: { chats: yChats, closed: yClosed, missed: yMissed, frtSeconds: avg(yFrt) },
         trendWindow,
+        trendMode,
       });
     }),
   );

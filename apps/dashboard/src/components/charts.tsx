@@ -23,7 +23,7 @@ export const OUTCOME_META = [
 ] as const;
 
 /** Two-series line chart (SVG) for the 14-day response trend — Figma style. */
-export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['trendDetail']> }) {
+export function TrendLines({ detail, mode = 'day' }: { detail: NonNullable<ReportsOverview['trendDetail']>; mode?: 'day' | 'hour' }) {
   const W = 320;
   const H = 150;
   const PAD = 10;
@@ -60,10 +60,18 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
     setHover(Math.max(0, Math.min(detail.length - 1, i)));
   };
 
-  const xTicks = detail.length > 5 ? [0, 3, 6, 9, 12].filter((i) => i < detail.length) : detail.map((_, i) => i);
+  const xTicks =
+    mode === 'hour'
+      ? [0, 4, 8, 12, 16, 20]
+      : detail.length > 5
+        ? [0, 3, 6, 9, 12].filter((i) => i < detail.length)
+        : detail.map((_, i) => i);
+  const tickLabel = (i: number) => (mode === 'hour' ? hourLabel(i) : dayFull(detail[i].day));
   const hoverLeft = hover != null ? (hover / Math.max(1, detail.length - 1)) * 100 : 0;
   const fullDate = (day: string) =>
-    new Date(`${day}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    mode === 'hour'
+      ? `${hourLabel(Number(day))} — today`
+      : new Date(`${day}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <>
@@ -149,7 +157,7 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
           <div className="tl-xticks">
             {xTicks.map((i) => (
               <span key={i} style={{ left: `${(i / Math.max(1, detail.length - 1)) * 100}%` }}>
-                {dayFull(detail[i].day)}
+                {tickLabel(i)}
               </span>
             ))}
           </div>
