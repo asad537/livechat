@@ -105,16 +105,12 @@ p {
   width: 244px;
   flex-shrink: 0;
   position: relative;
-  background:
-    radial-gradient(460px 300px at -25% -12%, rgba(124, 58, 237, 0.4), transparent 62%),
-    radial-gradient(380px 260px at 130% 40%, rgba(219, 39, 119, 0.2), transparent 60%),
-    radial-gradient(340px 240px at -15% 115%, rgba(245, 158, 11, 0.14), transparent 58%),
-    linear-gradient(180deg, #0a0a12 0%, #100d1d 50%, #0a0a12 100%);
+  background: #101422;
   color: var(--sidebar-fg);
   display: flex;
   flex-direction: column;
   padding: 20px 14px 16px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .sidebar-brand {
@@ -132,10 +128,8 @@ p {
   height: 38px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, #8b5cf6 0%, var(--aurora-pink) 55%, var(--aurora-orange) 120%);
-  box-shadow:
-    0 8px 22px rgba(219, 39, 119, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  background: var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .sidebar-brand-text {
@@ -216,12 +210,10 @@ p {
 }
 
 .nav-item.active {
-  background: linear-gradient(100deg, rgba(124, 58, 237, 0.95) 0%, rgba(190, 24, 93, 0.88) 100%);
+  background: var(--accent);
   color: #fff;
   font-weight: 600;
-  box-shadow:
-    0 6px 20px rgba(160, 40, 160, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transform: none;
 }
 
@@ -234,7 +226,7 @@ p {
   width: 3px;
   height: 22px;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, #8b5cf6, var(--aurora-pink), var(--aurora-orange));
+  background: var(--accent);
 }
 
 .nav-item.active .nav-icon {
