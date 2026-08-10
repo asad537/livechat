@@ -40,38 +40,50 @@ function Sidebar() {
 
   const isLeadUp = me.role === 'LEAD' || me.role === 'ADMIN';
 
+  const navItem = (icon: React.ReactNode, label: string, badge?: React.ReactNode) => (
+    <>
+      <span className="nav-icon">{icon}</span>
+      <span>{label}</span>
+      {badge}
+    </>
+  );
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <LogoMark size={30} />
-        <span className="sidebar-brand-name">LiveChat</span>
+        <span className="sidebar-logo">
+          <LogoMark size={22} />
+        </span>
+        <span className="sidebar-brand-text">
+          <span className="sidebar-brand-name">LiveChat</span>
+          <span className="sidebar-brand-sub">Agency workspace</span>
+        </span>
       </div>
+      <div className="nav-section-label">Workspace</div>
       <nav className="sidebar-nav">
         <NavLink to="/" end className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-          <IconInbox size={18} />
-          <span>Inbox</span>
-          {unread > 0 && <span className="badge nav-badge">{unread}</span>}
+          {navItem(
+            <IconInbox size={17} />,
+            'Inbox',
+            unread > 0 ? <span className="badge nav-badge">{unread}</span> : undefined,
+          )}
         </NavLink>
         <NavLink to="/visitors" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-          <IconUsers size={18} />
-          <span>Visitors</span>
+          {navItem(<IconUsers size={17} />, 'Visitors')}
         </NavLink>
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            <IconEye size={18} />
-            <span>Monitoring</span>
+            {navItem(<IconEye size={17} />, 'Monitoring')}
           </NavLink>
         )}
         {isLeadUp && (
           <NavLink to="/reports" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            <IconChart size={18} />
-            <span>Reports</span>
+            {navItem(<IconChart size={17} />, 'Reports')}
           </NavLink>
         )}
         {me.role === 'ADMIN' && (
           <NavLink to="/admin" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            <IconSettings size={18} />
-            <span>Admin</span>
+            {navItem(<IconSettings size={17} />, 'Admin')}
           </NavLink>
         )}
       </nav>
