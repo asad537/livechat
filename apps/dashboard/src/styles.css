@@ -4949,3 +4949,112 @@ img.avatar {
   font-weight: 500;
   color: #94a3b8;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Reports — clean premium redesign (overrides the old tile look)
+   ══════════════════════════════════════════════════════════════ */
+.page .stat-grid {
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+}
+
+/* Kill the rainbow top-borders; calm, uniform cards */
+.rp-tile.stat-card,
+.rp-tile.stat-card.stat-active,
+.rp-tile.stat-card.stat-waiting,
+.rp-tile.stat-card.stat-closed,
+.rp-tile.stat-card.stat-missed,
+.rp-tile.stat-card.stat-csat {
+  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  gap: 10px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.rp-tile.stat-card:hover {
+  box-shadow: 0 8px 22px rgba(100, 80, 180, 0.1);
+  border-color: #d9d2f0;
+  transform: translateY(-2px);
+}
+
+.rp-tile .rp-tile-top {
+  align-items: center;
+}
+
+.rp-tile .stat-value,
+.rp-tile.stat-csat .stat-value {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.05;
+}
+
+.rp-tile .stat-value-sm {
+  font-size: 20px;
+}
+
+.rp-tile .rp-tile-suffix {
+  font-size: 15px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.rp-tile .stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+.rp-tile .rp-tile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 0;
+}
+
+.rp-tile .rp-tile-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Report cards: softer, roomier */
+.page .report-card {
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 20px 22px;
+}
+
+.page .report-card h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.report-hint {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Range pills — cleaner segmented control */
+.range-pills {
+  background: #eef0f6;
+  border-radius: 11px;
+  padding: 3px;
+}
+
+.range-pill {
+  padding: 7px 14px;
+  border-radius: 8px;
+}
+
+.range-pill.active {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
