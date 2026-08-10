@@ -55,6 +55,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
   const [open, setOpen] = useState(false);
   const [connected, setConnected] = useState(false);
+  // "Reconnecting…" only after a real outage — short blips (tab wake,
+  // server restart, network switch) reconnect silently.
+  const [showOffline, setShowOffline] = useState(false);
+  useEffect(() => {
+    if (connected) {
+      setShowOffline(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowOffline(true), 3000);
+    return () => window.clearTimeout(t);
+  }, [connected]);
   const [website, setWebsite] = useState<WebsiteBranding | null>(null);
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [visitorToken, setVisitorToken] = useState('');
@@ -526,7 +537,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
           )}
 
           {/* Status strips */}
-          {!connected ? (
+          {showOffline ? (
             <div class="lc-strip lc-strip-warn">
               <span class="lc-spin" /> Reconnecting…
             </div>
