@@ -3301,3 +3301,143 @@ th.vt-num {
 .vd-chat-starter-emoji {
   font-size: 34px;
 }
+
+/* ── Premium reports ── */
+.range-pills {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-sunken, #eef1f6);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.range-pill {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.range-pill:hover {
+  color: var(--text);
+}
+
+.range-pill.active {
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-hint {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* 14-day trend — single-hue columns, hover tooltip via title */
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 150px;
+  padding-top: 18px;
+}
+
+.trend-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  height: 100%;
+  min-width: 0;
+  cursor: default;
+}
+
+.trend-bar {
+  width: 100%;
+  max-width: 34px;
+  background: var(--accent);
+  opacity: 0.55;
+  border-radius: 4px 4px 0 0;
+  transition: opacity 0.12s;
+}
+
+.trend-col:hover .trend-bar {
+  opacity: 1;
+}
+
+.trend-col.today .trend-bar {
+  opacity: 1;
+  background: var(--accent-strong);
+}
+
+.trend-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-day {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Agent leaderboard */
+.lb-table .lb-rank {
+  width: 34px;
+  text-align: center;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-table tr.lb-top td {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.lb-user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.lb-user-name {
+  font-weight: 600;
+}
+
+.lb-bar-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-sunken, #eef1f6);
+  overflow: hidden;
+}
+
+.lb-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+.lb-strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.lb-rating {
+  color: #b45309;
+  font-weight: 600;
+}

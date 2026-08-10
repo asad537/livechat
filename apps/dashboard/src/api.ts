@@ -76,11 +76,25 @@ function unwrapList<T>(data: unknown, key: string): T[] {
 }
 
 // ─── Typed endpoints ─────────────────────────────────────────
+export interface AgentReportRow {
+  user: UserPublic;
+  closed: number;
+  active: number;
+  handled: number;
+  avgFirstResponseSeconds: number | null;
+  avgDurationSeconds: number | null;
+  rating: { average: number | null; count: number };
+}
+
+export type ReportRange = 'today' | '7d' | '30d' | 'all';
+
 export interface ReportsOverview {
+  range?: string;
   totals: { active: number; waiting: number; closed: number; missed: number };
   avgFirstResponseSeconds: number | null;
   csat: { average: number | null; count: number };
-  perAgent: { user: UserPublic; closed: number; active: number }[];
+  perAgent: AgentReportRow[];
+  trend?: { day: string; count: number }[];
 }
 
 export interface CreateWebsiteInput {
@@ -169,10 +183,13 @@ export const api = {
       'history',
     ),
 
-  reports: (websiteId?: string) =>
-    request<ReportsOverview>(
-      websiteId ? `${API.reports}?websiteId=${encodeURIComponent(websiteId)}` : API.reports,
-    ),
+  reports: (websiteId?: string, range?: ReportRange) => {
+    const qs = new URLSearchParams();
+    if (websiteId) qs.set('websiteId', websiteId);
+    if (range) qs.set('range', range);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<ReportsOverview>(`${API.reports}${suffix}`);
+  },
 
   websiteStats: () =>
     request<Record<string, { chats: number; open: number; aiPages: number; aiUrls: number; aiLastScan: string | null }>>(
