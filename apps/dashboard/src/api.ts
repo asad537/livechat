@@ -137,6 +137,7 @@ export interface CreateWebsiteInput {
   logoUrl: string | null;
   teamId: string;
   aiEnabled?: boolean;
+  headerColor?: string | null;
 }
 
 export const api = {

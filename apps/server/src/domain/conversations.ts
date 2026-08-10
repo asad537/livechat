@@ -58,6 +58,7 @@ export interface WebsiteRow {
   primary_color: string;
   greeting: string;
   ai_enabled?: number | null;
+  header_color?: string | null;
   created_at: string;
 }
 
@@ -89,6 +90,7 @@ export function toBranding(row: WebsiteRow): WebsiteBranding {
     name: row.name,
     logoUrl: row.logo_url,
     primaryColor: row.primary_color,
+    headerColor: row.header_color ?? null,
     greeting: row.greeting,
   };
 }

@@ -149,8 +149,8 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
 
       const id = newId();
       await deps.db.run(
-        `INSERT INTO websites (id, name, widget_key, domains, team_id, logo_url, primary_color, greeting, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO websites (id, name, widget_key, domains, team_id, logo_url, primary_color, header_color, greeting, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           name,
@@ -159,6 +159,7 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
           teamId,
           asString(req.body?.logoUrl) || null,
           asString(req.body?.primaryColor)?.trim() || '#6366f1',
+          asString(req.body?.headerColor)?.trim() || null,
           asString(req.body?.greeting)?.trim() || 'Hi there! How can we help?',
           nowIso(),
         ],
@@ -194,6 +195,10 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
       if (body.primaryColor !== undefined) {
         sets.push('primary_color = ?');
         params.push(requireString(body.primaryColor, 'primaryColor', 16));
+      }
+      if (body.headerColor !== undefined) {
+        sets.push('header_color = ?');
+        params.push(asString(body.headerColor)?.trim() || null);
       }
       if (body.greeting !== undefined) {
         sets.push('greeting = ?');

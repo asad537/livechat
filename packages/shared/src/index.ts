@@ -30,6 +30,7 @@ export interface WebsiteBranding {
   name: string;
   logoUrl: string | null;
   primaryColor: string;
+  headerColor?: string | null; // widget header bar; NULL = primaryColor
   greeting: string;
 }
 

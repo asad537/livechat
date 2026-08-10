@@ -79,6 +79,9 @@ ALTER TABLE users ADD COLUMN avatar_url TEXT;
 -- Per-website AI assistant toggle (idempotent)
 ALTER TABLE websites ADD COLUMN ai_enabled INTEGER NOT NULL DEFAULT 1;
 
+-- Separate widget header color (idempotent; NULL = use primary_color)
+ALTER TABLE websites ADD COLUMN header_color VARCHAR(16);
+
 -- Visitor tracking + CRM (idempotent)
 ALTER TABLE visitors ADD COLUMN geo_cc VARCHAR(4);
 ALTER TABLE visitors ADD COLUMN user_agent TEXT;

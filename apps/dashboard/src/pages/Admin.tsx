@@ -35,6 +35,7 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [domains, setDomains] = useState(initial?.domains?.join(', ') ?? '');
   const [primaryColor, setPrimaryColor] = useState(initial?.primaryColor ?? '#6366f1');
+  const [headerColor, setHeaderColor] = useState(initial?.headerColor ?? '');
   const [greeting, setGreeting] = useState(initial?.greeting ?? 'Hi there — how can we help?');
   const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? '');
   const [teamId, setTeamId] = useState(initial?.teamId ?? teams[0]?.id ?? '');
@@ -54,6 +55,7 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
       greeting: greeting.trim(),
       logoUrl: logoUrl.trim() || null,
       teamId,
+      headerColor: headerColor.trim() || null,
     };
     try {
       if (initial) await api.updateWebsite(initial.id, payload);
@@ -90,7 +92,7 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
           <input value={domains} onChange={(e) => setDomains(e.target.value)} placeholder="acme.com, shop.acme.com" />
         </label>
         <label className="field">
-          <span>Brand color</span>
+          <span>Chat color (buttons, bubbles)</span>
           <span className="color-field">
             <input
               type="color"
@@ -98,6 +100,21 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
               onChange={(e) => setPrimaryColor(e.target.value)}
             />
             <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
+          </span>
+        </label>
+        <label className="field">
+          <span>Header color (empty = chat color)</span>
+          <span className="color-field">
+            <input
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(headerColor) ? headerColor : primaryColor}
+              onChange={(e) => setHeaderColor(e.target.value)}
+            />
+            <input
+              value={headerColor}
+              placeholder="same as chat color"
+              onChange={(e) => setHeaderColor(e.target.value)}
+            />
           </span>
         </label>
         <label className="field">

@@ -25,8 +25,8 @@ export const WIDGET_CSS = `
 .lc-launcher {
   position: fixed; right: 20px; bottom: 20px; z-index: 2147483000;
   width: 58px; height: 58px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--lc-primary), var(--lc-primary-dark));
-  color: var(--lc-on-primary);
+  background: var(--lc-header);
+  color: var(--lc-on-header);
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 8px 24px rgba(15, 23, 42, .24), 0 2px 6px rgba(15, 23, 42, .18);
   transition: transform .18s ease, box-shadow .18s ease;
@@ -69,26 +69,13 @@ export const WIDGET_CSS = `
 
 /* ── Header (premium) ─────────────────────────────────────── */
 .lc-header {
-  position: relative; flex-shrink: 0; overflow: hidden;
-  background: linear-gradient(120deg, var(--lc-primary-dark) 0%, var(--lc-primary) 58%, var(--lc-primary-dark) 130%);
-  color: var(--lc-on-primary);
+  position: relative; flex-shrink: 0;
+  background: var(--lc-header);
+  color: var(--lc-on-header);
   padding: 16px 14px 16px 16px;
   display: flex; align-items: center; gap: 12px;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .12), 0 4px 14px rgba(15, 23, 42, .12);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, .1);
 }
-/* soft light bloom top-right + vignette bottom-left for depth */
-.lc-header::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(120px 120px at 85% -20%, rgba(255, 255, 255, .28), transparent 70%),
-    radial-gradient(160px 120px at -10% 130%, rgba(0, 0, 0, .18), transparent 70%);
-}
-/* faint diagonal sheen */
-.lc-header::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, .07) 48%, rgba(255, 255, 255, .12) 52%, rgba(255, 255, 255, .05) 57%, transparent 65%);
-}
-.lc-header > * { position: relative; z-index: 1; }
 .lc-logo {
   width: 42px; height: 42px; border-radius: 14px; flex-shrink: 0;
   background: rgba(255, 255, 255, .16);

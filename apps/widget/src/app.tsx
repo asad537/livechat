@@ -427,14 +427,18 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
   // ── Derived UI state ───────────────────────────────────────
   const primary = website?.primaryColor || DEFAULT_PRIMARY;
+  const header = website?.headerColor || primary;
   const cssVars = useMemo(
     () =>
       `--lc-primary:${primary};` +
       `--lc-primary-dark:${shade(primary, -0.22)};` +
       `--lc-on-primary:${onColor(primary)};` +
+      `--lc-header:${header};` +
+      `--lc-header-dark:${shade(header, -0.18)};` +
+      `--lc-on-header:${onColor(header)};` +
       `--lc-soft:${rgba(primary, 0.1)};` +
-      `--lc-glow:${rgba(primary, 0.38)}`,
-    [primary],
+      `--lc-glow:${rgba(header, 0.38)}`,
+    [primary, header],
   );
 
   if (!website) return null; // nothing renders until the socket handshake succeeds
