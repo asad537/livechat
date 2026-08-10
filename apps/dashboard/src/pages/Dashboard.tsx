@@ -282,28 +282,28 @@ export default function Dashboard() {
                 Visitor → chat funnel <span className="report-hint">— today</span>
               </h3>
               {funnel && funnel.visitors + funnel.chats > 0 ? (
-                <div className="rp-funnel">
+                <div className="db-funnel">
                   {(
                     [
-                      ['Visitors', funnel.visitors, '#c4b5fd'],
-                      ['Started chat', funnel.chats, '#a78bfa'],
-                      ['Answered', funnel.answered, '#8b5cf6'],
-                      ['Resolved', funnel.resolved, '#7c3aed'],
+                      ['Visitors', funnel.visitors, '#a78bfa'],
+                      ['Started chat', funnel.chats, '#7dd3fc'],
+                      ['Answered', funnel.answered, '#5eead4'],
+                      ['Resolved', funnel.resolved, '#6ee7b7'],
                     ] as const
                   ).map(([label, n, color], i, arr) => {
                     const top = arr[0][1] || 1;
                     const prev = i > 0 ? arr[i - 1][1] : null;
                     return (
-                      <div className="rp-funnel-row" key={label}>
+                      <div className="db-funnel-row" key={label}>
                         <div
-                          className="rp-funnel-bar"
-                          style={{ width: `${Math.max(14, (n / top) * 100)}%`, background: color }}
+                          className="db-funnel-bar"
+                          style={{ width: `${Math.max(22, (n / top) * 100)}%`, background: color }}
                         >
                           {n.toLocaleString()}
                         </div>
-                        <span className="rp-funnel-label">
-                          {label}
-                          {prev != null && prev > 0 && <em> {Math.round((n / prev) * 100)}%</em>}
+                        <span className="db-funnel-side">
+                          <b>{label}</b>
+                          {prev != null && prev > 0 && <em>{Math.round((n / prev) * 100)}%</em>}
                         </span>
                       </div>
                     );

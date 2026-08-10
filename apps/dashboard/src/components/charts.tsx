@@ -52,8 +52,14 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
         <span>
           <i className="rp-swatch" style={{ background: '#0ea5e9' }} /> Avg chat duration
         </span>
-        <span className="rp-legend-max">peak {formatSeconds(max)}</span>
       </div>
+      <div className="chart-with-y">
+      <div className="chart-y">
+        <span>{formatSeconds(max)}</span>
+        <span>{formatSeconds(Math.round(max / 2))}</span>
+        <span>0</span>
+      </div>
+      <div className="chart-body">
       <svg viewBox={`0 0 ${W} ${H}`} className="rp-lines" preserveAspectRatio="none">
         {[0.25, 0.5, 0.75].map((f) => (
           <line
@@ -88,6 +94,8 @@ export function TrendLines({ detail }: { detail: NonNullable<ReportsOverview['tr
         <span>{dayFull(detail[0].day)}</span>
         <span>{dayFull(detail[Math.floor(detail.length / 2)].day)}</span>
         <span>{dayFull(detail[detail.length - 1].day)}</span>
+      </div>
+      </div>
       </div>
     </>
   );
@@ -178,7 +186,13 @@ export function AreaChart({ trend }: { trend: { day: string; count: number }[] }
   const pts = trend.map((t, i) => `${x(i).toFixed(1)},${y(t.count).toFixed(1)}`).join(' ');
   const area = `${PAD},${H - PAD} ${pts} ${(W - PAD).toFixed(1)},${H - PAD}`;
   return (
-    <>
+    <div className="chart-with-y">
+      <div className="chart-y">
+        <span>{max}</span>
+        <span>{Math.round(max / 2)}</span>
+        <span>0</span>
+      </div>
+      <div className="chart-body">
       <svg viewBox={`0 0 ${W} ${H}`} className="db-area" preserveAspectRatio="none">
         {[0.25, 0.5, 0.75].map((f) => (
           <line
@@ -205,6 +219,7 @@ export function AreaChart({ trend }: { trend: { day: string; count: number }[] }
         <span>{dayFull(trend[Math.floor(trend.length / 2)].day)}</span>
         <span>{dayFull(trend[trend.length - 1].day)}</span>
       </div>
-    </>
+      </div>
+    </div>
   );
 }
