@@ -456,14 +456,14 @@ export const WIDGET_CSS = `
 }
 
 /* ── End-chat header button ───────────────────────────────── */
-/* Plain icon — no circle, no hover effect at all */
+/* Static outlined circle — no hover effect */
 .lc-endbtn,
 .lc-endbtn:hover {
   background: transparent;
-  border: none;
+  border: 1.5px solid currentColor;
   box-shadow: none;
   transform: none;
-  opacity: 1;
+  opacity: 0.9;
   color: inherit;
 }
 
