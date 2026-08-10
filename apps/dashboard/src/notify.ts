@@ -180,11 +180,7 @@ export const VISITOR_SOUND_OPTIONS: { value: VisitorSound; label: string }[] = [
   { value: 'off', label: 'Off (silent)' },
 ];
 
-// Every alert plays its motif this many times so it can't be missed.
-const REPEAT = 3;
-
-// Each builder plays ONE pass of its motif at `t` and returns the pass
-// length (including the little pause before the next repeat).
+// Each builder plays its motif once at `t` and returns the motif length.
 const BUILDERS: Record<Exclude<VisitorSound, 'custom' | 'off'>, (ac: AudioContext, t: number) => number> = {
   knock: (ac, t) => {
     knock(ac, t);
@@ -277,7 +273,7 @@ export function setCustomSound(dataUrl: string): boolean {
 
 let customAudio: HTMLAudioElement | null = null;
 
-/** Play whatever the agent chose for new-visitor alerts (motif × 3, loud). */
+/** Play whatever the agent chose for new-visitor alerts — once, loud. */
 export function playVisitorSound(pref: VisitorSound = getVisitorSound()): void {
   if (pref === 'off') return;
   if (pref === 'custom') {
@@ -285,18 +281,10 @@ export function playVisitorSound(pref: VisitorSound = getVisitorSound()): void {
     if (!url) return playBuiltIn('knock');
     try {
       if (!customAudio) customAudio = new Audio();
-      const a = customAudio;
-      a.src = url;
-      a.volume = 1; // full volume
-      let left = REPEAT;
-      a.onended = () => {
-        if (--left > 0) {
-          a.currentTime = 0;
-          void a.play();
-        }
-      };
-      a.currentTime = 0;
-      void a.play();
+      customAudio.src = url;
+      customAudio.volume = 1; // full volume
+      customAudio.currentTime = 0;
+      void customAudio.play();
     } catch {
       /* autoplay blocked until a gesture */
     }
@@ -309,8 +297,7 @@ function playBuiltIn(pref: Exclude<VisitorSound, 'custom' | 'off'>): void {
   const ac = audioCtx();
   if (!ac) return;
   const build = BUILDERS[pref] ?? BUILDERS.knock;
-  let t = ac.currentTime + 0.02;
-  for (let i = 0; i < REPEAT; i++) t += build(ac, t);
+  build(ac, ac.currentTime + 0.02);
 }
 
 /** Ask once for permission (call after login, on a user-gesture-adjacent path). */

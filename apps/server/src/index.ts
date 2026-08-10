@@ -71,8 +71,26 @@ async function main(): Promise<void> {
   // Production dashboard (built SPA) at /app — `npm run build -w apps/dashboard`
   const dashboardDist = path.join(config.repoRoot, 'apps', 'dashboard', 'dist');
   if (fs.existsSync(path.join(dashboardDist, 'index.html'))) {
-    app.use('/app', express.static(dashboardDist));
-    app.get('/app/*', (_req, res) => res.sendFile(path.join(dashboardDist, 'index.html')));
+    // index.html must always revalidate (or browsers keep serving a stale
+    // bundle after deploys); hashed /assets/ files are safe to cache hard.
+    app.use(
+      '/app',
+      express.static(dashboardDist, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+          } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+          } else {
+            res.setHeader('Cache-Control', 'public, max-age=300');
+          }
+        },
+      }),
+    );
+    app.get('/app/*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(dashboardDist, 'index.html'));
+    });
   }
 
   app.get('/health', (_req, res) => res.json({ ok: true, db: db.dialect }));
