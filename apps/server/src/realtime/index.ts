@@ -839,9 +839,17 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           [visitorId],
         );
         if (open) {
-          // Already an open conversation — hand its id back so the client
-          // opens that chat instead of erroring.
+          // Already an open conversation — post into it (when allowed) and
+          // hand its id back so the client opens that chat instead of erroring.
           await socket.join(convRoom(open.id));
+          if (canSendAsAgent(open, data.userId, data.role)) {
+            await postMessage(deps, {
+              conversationId: open.id,
+              senderType: 'AGENT',
+              senderUserId: data.userId,
+              body,
+            });
+          }
           reply?.({ conversationId: open.id });
           return;
         }

@@ -16,6 +16,23 @@ export function lsSet(key: string, value: string): void {
   }
 }
 
+/** Session-scoped storage — forgotten when the tab's browsing session ends. */
+export function ssGet(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function ssSet(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    /* non fatal */
+  }
+}
+
 export function hexToRgb(hex: string): [number, number, number] {
   let h = (hex || '').trim().replace(/^#/, '');
   if (h.length === 3) h = h.split('').map((c) => c + c).join('');

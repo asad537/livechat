@@ -26,7 +26,7 @@ import {
   TypingRow,
   type LocalMessage,
 } from './messages';
-import { initials, lsGet, lsSet, newTempId, onColor, rgba, shade } from './util';
+import { initials, lsGet, lsSet, newTempId, onColor, rgba, shade, ssGet, ssSet } from './util';
 
 interface ReadyPayload {
   visitorToken: string;
@@ -74,6 +74,14 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
   const socketRef = useRef<Socket | null>(null);
   const openRef = useRef(open);
+  // Visitor explicitly closed the widget this session → agent messages badge
+  // the launcher instead of popping the panel open again.
+  const dismissKey = `livechat:minimized:${widgetKey}`;
+  const dismissedRef = useRef(ssGet(dismissKey) === '1');
+  const markDismissed = (v: boolean) => {
+    dismissedRef.current = v;
+    ssSet(dismissKey, v ? '1' : '0');
+  };
   const callRef = useRef<ActiveCall | null>(null);
   const inviteRef = useRef<Invite | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -151,7 +159,12 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
         return [...prev, message];
       });
       setConversation((prev) => prev ?? { id: message.conversationId, status: 'WAITING' });
-      if (message.senderType === 'AGENT' && !openRef.current) setUnread((u) => u + 1);
+      if (message.senderType === 'AGENT' && !openRef.current) {
+        // Auto-open on an agent message — unless the visitor closed the
+        // widget themselves, then just keep counting on the launcher badge.
+        if (dismissedRef.current) setUnread((u) => u + 1);
+        else setOpen(true);
+      }
     });
 
     socket.on(
@@ -467,7 +480,15 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 </svg>
               </button>
             )}
-            <button type="button" class="lc-iconbtn" title="Minimize" onClick={() => setOpen(false)}>
+            <button
+              type="button"
+              class="lc-iconbtn"
+              title="Minimize"
+              onClick={() => {
+                markDismissed(true);
+                setOpen(false);
+              }}
+            >
               <IconClose />
             </button>
           </div>
@@ -576,7 +597,11 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
         type="button"
         class={`lc-launcher ${unread > 0 ? 'lc-pulse' : ''}`}
         title={open ? 'Close chat' : `Chat with ${website.name}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          const next = !openRef.current;
+          markDismissed(!next);
+          setOpen(next);
+        }}
       >
         {open ? <IconClose /> : <IconChat />}
         {!open && unread > 0 && <span class="lc-badge">{unread > 9 ? '9+' : unread}</span>}
