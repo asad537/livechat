@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, Visitor } from '@livechat/shared';
 import { EV } from '@livechat/shared';
 import { getSocket } from '../socket';
+import { useApp } from '../state';
 import { api, type VisitorChat, type VisitorProfile } from '../api';
 import ChatPane from './ChatPane';
 import {
@@ -39,6 +40,7 @@ export default function VisitorDrawer({
   onStartChat,
   onOpenConversation,
 }: Props) {
+  const { me } = useApp();
   const [profile, setProfile] = useState<VisitorProfile | null>(null);
   const [chats, setChats] = useState<VisitorChat[] | null>(null);
   const [tab, setTab] = useState<Tab>('chat');
@@ -181,7 +183,16 @@ export default function VisitorDrawer({
 
   // The conversation shown in the Chat tab: an already-open one, or one we just started.
   const openConv = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED');
-  const chatConvId = openConv?.id ?? startedId;
+  // Can the current agent actually open this conversation? (Assigned to me,
+  // unassigned/queued, or I'm a lead/admin.) Otherwise it's someone else's chat.
+  const canOpenConv =
+    !openConv ||
+    openConv.assignedUserId == null ||
+    openConv.assignedUserId === me?.id ||
+    me?.role === 'LEAD' ||
+    me?.role === 'ADMIN';
+  const busyAgent = openConv && !canOpenConv ? openConv.agentName : null;
+  const chatConvId = (canOpenConv ? openConv?.id : undefined) ?? startedId;
 
   const startChatInline = () => {
     const body = starterDraft.trim();
@@ -309,6 +320,18 @@ export default function VisitorDrawer({
             {chatConvId ? (
               // Full live chat right here — reply, type-to-join, calls, everything.
               <ChatPane conversationId={chatConvId} showSidebar={false} />
+            ) : busyAgent ? (
+              // Visitor is already in a live chat with another agent.
+              <div className="vd-chat-starter">
+                <div className="vd-chat-starter-hint">
+                  <span className="vd-chat-starter-emoji">💬</span>
+                  <p>
+                    {name} is already chatting with <strong>{busyAgent}</strong>.
+                    <br />
+                    A visitor can only be in one live chat at a time.
+                  </p>
+                </div>
+              </div>
             ) : chats === null ? (
               <p className="vd-muted vd-chat-loading">Loading…</p>
             ) : (

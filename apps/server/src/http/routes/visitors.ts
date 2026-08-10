@@ -205,11 +205,12 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
         created_at: string;
         closed_at: string | null;
         rating: number | null;
+        assigned_user_id: string | null;
         agent_name: string | null;
         message_count: number;
         preview: string | null;
       }>(
-        `SELECT c.id, c.status, c.created_at, c.closed_at, c.rating,
+        `SELECT c.id, c.status, c.created_at, c.closed_at, c.rating, c.assigned_user_id,
                 u.name AS agent_name,
                 (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count,
                 (SELECT m.body FROM messages m
@@ -229,6 +230,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
           createdAt: c.created_at,
           closedAt: c.closed_at,
           rating: c.rating,
+          assignedUserId: c.assigned_user_id,
           agentName: c.agent_name,
           messageCount: Number(c.message_count),
           preview: c.preview,

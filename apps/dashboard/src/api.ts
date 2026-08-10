@@ -361,6 +361,7 @@ export interface VisitorChat {
   createdAt: string;
   closedAt: string | null;
   rating: number | null;
+  assignedUserId: string | null;
   agentName: string | null;
   messageCount: number;
   preview: string | null;
