@@ -5,6 +5,7 @@ import { useApp } from '../state';
 import { getSocket } from '../socket';
 import { api } from '../api';
 import {
+  avatarGradient,
   classNames,
   durationSince,
   flagEmoji,
@@ -15,7 +16,27 @@ import {
   uaParse,
 } from '../util';
 import VisitorDrawer from '../components/VisitorDrawer';
-import { IconUsers, IconX } from '../icons';
+import {
+  IconAndroid,
+  IconApple,
+  IconChrome,
+  IconClock,
+  IconGlobe,
+  IconSearch,
+  IconUsers,
+  IconWindows,
+  IconX,
+} from '../icons';
+
+const browserIcon = (browser: string) =>
+  browser === 'Chrome' ? <IconChrome size={12} /> : <IconGlobe size={11} />;
+
+const osIcon = (os: string) => {
+  if (os === 'macOS' || os === 'iOS') return <IconApple size={12} />;
+  if (os === 'Windows') return <IconWindows size={11} />;
+  if (os === 'Android') return <IconAndroid size={12} />;
+  return null;
+};
 
 export default function Visitors() {
   const { websites, visitorsByWebsite, pushToast, openDockedChat, connected } = useApp();
@@ -122,7 +143,7 @@ export default function Visitors() {
       >
         <td className="vt-who">
           <div className="vt-who-cell">
-            <span className="avatar" style={{ background: siteColor(v) }}>
+            <span className="avatar" style={{ background: avatarGradient(v.id) }}>
               {initials(name)}
             </span>
             <div className="vt-who-meta">
@@ -162,14 +183,20 @@ export default function Visitors() {
         <td className="vt-tech">
           {v.userAgent ? (
             <>
-              <span className="vd-chip">{ua.browser}</span>
-              <span className="vd-chip">{ua.os}</span>
+              <span className="vt-dev">
+                {browserIcon(ua.browser)} {ua.browser}
+              </span>
+              <span className="vt-dev">
+                {osIcon(ua.os)} {ua.os}
+              </span>
             </>
           ) : (
             <span className="vt-muted">—</span>
           )}
         </td>
-        <td className="vt-num">{v.online ? durationSince(v.sessionStartedAt) : '—'}</td>
+        <td className="vt-num">
+          {v.online ? <span className="vt-onsite">{durationSince(v.sessionStartedAt)}</span> : '—'}
+        </td>
         <td className="vt-num">{v.sessionPages ?? 0}</td>
         <td className="vt-num">{v.totalVisits ?? 0}</td>
         <td className="vt-num">{v.chats ?? 0}</td>
@@ -211,7 +238,7 @@ export default function Visitors() {
   );
 
   return (
-    <div className="page">
+    <div className="page visitors-page">
       <div className="page-head">
         <div>
           <h2>Visitors</h2>
@@ -221,13 +248,16 @@ export default function Visitors() {
           </p>
         </div>
         <div className="vt-head-tools">
-          <input
-            className="vt-search"
-            type="search"
-            placeholder="Search name, email, IP, page, website…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="vt-search-wrap">
+            <IconSearch size={15} className="vt-search-icon" />
+            <input
+              className="vt-search"
+              type="search"
+              placeholder="Search name, email, IP, page, website…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -245,7 +275,7 @@ export default function Visitors() {
       {offlineList.length > 0 && (
         <>
           <h3 className="vt-group-title vt-group-offline">
-            Recently active — last 24h ({offlineList.length})
+            <IconClock size={13} /> Recently active — last 24h ({offlineList.length})
           </h3>
           {table(offlineList)}
         </>
@@ -290,7 +320,7 @@ export default function Visitors() {
               </button>
             </div>
             <div className="modal-visitor">
-              <span className="avatar" style={{ background: siteColor(startTarget) }}>
+              <span className="avatar" style={{ background: avatarGradient(startTarget.id) }}>
                 {initials(startTarget.name || 'V')}
               </span>
               <div>

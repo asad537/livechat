@@ -174,3 +174,22 @@ export function linkify(text: string): React.ReactNode[] {
   if (last < text.length) parts.push(text.slice(last));
   return parts;
 }
+
+// ─── Colorful visitor avatars (deterministic per id) ─────────
+const AVATAR_GRADIENTS: [string, string][] = [
+  ['#34d399', '#0ea5e9'],
+  ['#38bdf8', '#2563eb'],
+  ['#fbbf24', '#f97316'],
+  ['#a78bfa', '#7c3aed'],
+  ['#f472b6', '#db2777'],
+  ['#f87171', '#e11d48'],
+  ['#2dd4bf', '#0d9488'],
+  ['#818cf8', '#4f46e5'],
+];
+
+export function avatarGradient(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  const [a, b] = AVATAR_GRADIENTS[Math.abs(h) % AVATAR_GRADIENTS.length];
+  return `linear-gradient(135deg, ${a}, ${b})`;
+}

@@ -2,12 +2,14 @@
    LiveChat dashboard — premium SaaS design system
    ───────────────────────────────────────────────────────────── */
 :root {
-  --sidebar-bg: #0f172a;
+  --sidebar-bg: #0a0a12;
   --sidebar-fg: #cbd5e1;
   --sidebar-muted: #64748b;
-  --accent: #6366f1;
-  --accent-strong: #4f46e5;
-  --accent-soft: #eef2ff;
+  --accent: #7c3aed;
+  --accent-strong: #6d28d9;
+  --accent-soft: #f3e8ff;
+  --aurora-pink: #db2777;
+  --aurora-orange: #f59e0b;
   --bg: #f8fafc;
   --surface: #ffffff;
   --border: #e2e8f0;
@@ -103,9 +105,10 @@ p {
   flex-shrink: 0;
   position: relative;
   background:
-    radial-gradient(420px 260px at -20% -10%, rgba(99, 102, 241, 0.28), transparent 65%),
-    radial-gradient(360px 240px at 120% 110%, rgba(139, 92, 246, 0.16), transparent 60%),
-    linear-gradient(180deg, #0b1022 0%, #101733 55%, #0b1022 100%);
+    radial-gradient(460px 300px at -25% -12%, rgba(124, 58, 237, 0.4), transparent 62%),
+    radial-gradient(380px 260px at 130% 40%, rgba(219, 39, 119, 0.2), transparent 60%),
+    radial-gradient(340px 240px at -15% 115%, rgba(245, 158, 11, 0.14), transparent 58%),
+    linear-gradient(180deg, #0a0a12 0%, #100d1d 50%, #0a0a12 100%);
   color: var(--sidebar-fg);
   display: flex;
   flex-direction: column;
@@ -128,10 +131,10 @@ p {
   height: 38px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  background: linear-gradient(135deg, #8b5cf6 0%, var(--aurora-pink) 55%, var(--aurora-orange) 120%);
   box-shadow:
-    0 8px 20px rgba(99, 102, 241, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 8px 22px rgba(219, 39, 119, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .sidebar-brand-text {
@@ -212,11 +215,11 @@ p {
 }
 
 .nav-item.active {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.95), rgba(139, 92, 246, 0.85));
+  background: linear-gradient(100deg, rgba(124, 58, 237, 0.95) 0%, rgba(190, 24, 93, 0.88) 100%);
   color: #fff;
   font-weight: 600;
   box-shadow:
-    0 6px 18px rgba(99, 102, 241, 0.4),
+    0 6px 20px rgba(160, 40, 160, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
   transform: none;
 }
@@ -230,7 +233,7 @@ p {
   width: 3px;
   height: 22px;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, var(--accent), #8b5cf6);
+  background: linear-gradient(180deg, #8b5cf6, var(--aurora-pink), var(--aurora-orange));
 }
 
 .nav-item.active .nav-icon {
@@ -281,9 +284,9 @@ p {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.09em;
-  color: #c7d2fe;
-  background: rgba(99, 102, 241, 0.22);
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #fbcfe8;
+  background: rgba(219, 39, 119, 0.2);
+  border: 1px solid rgba(219, 39, 119, 0.38);
   border-radius: 999px;
   padding: 2px 8px;
   align-self: flex-start;
@@ -320,13 +323,14 @@ p {
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--aurora-pink));
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-strong);
+  background: linear-gradient(135deg, var(--accent-strong), #be185d);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.45);
 }
 
 .btn-ghost {
@@ -3545,4 +3549,97 @@ th.vt-num {
 .lb-rating {
   color: #b45309;
   font-weight: 600;
+}
+
+/* ── Visitors page — soft aurora header + polished tables ── */
+.visitors-page {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='240'%3E%3Cpath d='M0 170 C 190 60, 430 235, 640 120 S 880 80, 900 130' fill='none' stroke='%23f0abfc' stroke-width='2' opacity='0.55'/%3E%3C/svg%3E")
+      right -40px top 10px / 900px 240px no-repeat,
+    radial-gradient(700px 260px at 18% -8%, rgba(167, 139, 250, 0.22), transparent 60%),
+    radial-gradient(560px 240px at 85% -6%, rgba(240, 171, 252, 0.2), transparent 60%),
+    linear-gradient(180deg, #f6f3ff 0%, #fdf5fb 24%, var(--bg) 52%);
+}
+
+.vt-search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.vt-search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.visitors-page .vt-search {
+  padding-left: 38px;
+  border-radius: 999px;
+  min-width: 320px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.vt-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vt-group-title svg {
+  color: var(--text-muted);
+}
+
+.visitors-page .vt-table-wrap {
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 6px 24px rgba(100, 80, 180, 0.07);
+}
+
+.visitors-page .vt-table th {
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.visitors-page .vt-table td {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.55);
+  padding: 13px 14px;
+}
+
+.visitors-page .vt-who .avatar {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 3px 8px rgba(15, 23, 42, 0.14);
+}
+
+.vt-dev {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: #eef0fb;
+  color: #3f3f46;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vt-dev svg {
+  flex-shrink: 0;
+}
+
+.vt-onsite {
+  color: #059669;
+  font-weight: 700;
+}
+
+.visitors-page .vt-site-chip {
+  border: none;
+  background: #f1f5f9;
+  padding: 4px 12px;
 }

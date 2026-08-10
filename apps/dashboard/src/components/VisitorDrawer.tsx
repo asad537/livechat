@@ -5,6 +5,7 @@ import { getSocket } from '../socket';
 import { api, type VisitorChat, type VisitorProfile } from '../api';
 import ChatPane from './ChatPane';
 import {
+  avatarGradient,
   classNames,
   durationSince,
   flagEmoji,
@@ -219,7 +220,7 @@ export default function VisitorDrawer({
         {/* ── Header ── */}
         <div className="vd-head" style={{ background: `linear-gradient(135deg, ${accentColor}22, transparent)` }}>
           <div className="vd-head-main">
-            <span className="avatar avatar-lg" style={{ background: accentColor }}>
+            <span className="avatar avatar-lg" style={{ background: avatarGradient(visitorId) }}>
               {initials(name)}
             </span>
             <div className="vd-head-meta">
