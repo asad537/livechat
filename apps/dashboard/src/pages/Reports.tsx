@@ -274,7 +274,7 @@ export default function Reports() {
               value={formatSeconds(data.avgFirstResponseSeconds)}
               icon={<IconClock size={18} />}
               tint="#ede9fe"
-              color="#7c3aed"
+              color="#5865f2"
               foot={
                 data.avgFirstResponseSeconds != null && y?.frtSeconds != null ? (
                   <Delta now={data.avgFirstResponseSeconds} before={y.frtSeconds} invert />
@@ -319,7 +319,7 @@ export default function Reports() {
               value={formatSeconds(tiles?.avgChatDurationSeconds)}
               icon={<IconClock size={18} />}
               tint="#ede9fe"
-              color="#7c3aed"
+              color="#5865f2"
             />
             <Tile
               label="Avg response time"

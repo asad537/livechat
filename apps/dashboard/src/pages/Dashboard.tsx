@@ -105,7 +105,7 @@ export default function Dashboard() {
   const todayChats = data ? data.totals.closed + data.totals.active + data.totals.waiting : 0;
   const tw = data?.trendWindow ?? 14;
 
-  const SITE_COLORS = ['#7c3aed', '#0ea5e9', '#f59e0b', '#db2777', '#10b981', '#6366f1'];
+  const SITE_COLORS = ['#5865f2', '#0ea5e9', '#f59e0b', '#db2777', '#10b981', '#6366f1'];
 
   const insights: { icon: React.ReactNode; title: string; sub: string }[] = [];
   if (data) {
@@ -203,7 +203,7 @@ export default function Dashboard() {
               value={formatSeconds(data.avgFirstResponseSeconds)}
               icon={<IconClock size={17} />}
               tint="#ede9fe"
-              color="#7c3aed"
+              color="#5865f2"
               delta={
                 data.avgFirstResponseSeconds != null && y?.frtSeconds != null ? (
                   <Delta now={data.avgFirstResponseSeconds} before={y.frtSeconds} invert />

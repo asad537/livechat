@@ -16,7 +16,7 @@ export const dayFull = (day: string): string =>
 
 // Outcome donut — fixed categorical order and colors.
 export const OUTCOME_META = [
-  { key: 'resolved', label: 'Resolved', color: '#7c3aed' },
+  { key: 'resolved', label: 'Resolved', color: '#5865f2' },
   { key: 'transferred', label: 'Transferred', color: '#0ea5e9' },
   { key: 'open', label: 'Still open', color: '#f59e0b' },
   { key: 'missed', label: 'Missed', color: '#ef4444' },
@@ -82,7 +82,7 @@ export function TrendLines({ detail, mode = 'day' }: { detail: NonNullable<Repor
     <>
       <div className="rp-legend">
         <span>
-          <i className="rp-dot" style={{ background: '#7c3aed' }} /> Avg. First Response
+          <i className="rp-dot" style={{ background: '#5865f2' }} /> Avg. First Response
         </span>
         <span>
           <i className="rp-dot" style={{ background: '#2563eb' }} /> Avg. Response Time
@@ -112,7 +112,7 @@ export function TrendLines({ detail, mode = 'day' }: { detail: NonNullable<Repor
             {hover != null && (
               <line x1={x(hover)} x2={x(hover)} y1={PAD} y2={H - PAD} stroke="#cbd5e1" strokeWidth="1" />
             )}
-            <polyline points={path(frt)} fill="none" stroke="#7c3aed" strokeWidth="2.4" strokeLinejoin="round" />
+            <polyline points={path(frt)} fill="none" stroke="#5865f2" strokeWidth="2.4" strokeLinejoin="round" />
             <polyline points={path(rep)} fill="none" stroke="#2563eb" strokeWidth="2.4" strokeLinejoin="round" />
             {detail.map((d, i) =>
               d.frtSeconds != null ? (
@@ -121,7 +121,7 @@ export function TrendLines({ detail, mode = 'day' }: { detail: NonNullable<Repor
                   cx={x(i)}
                   cy={y(d.frtSeconds)}
                   r={hover === i ? 5 : 3.6}
-                  fill="#7c3aed"
+                  fill="#5865f2"
                   stroke="#fff"
                   strokeWidth="1.4"
                 />
@@ -148,7 +148,7 @@ export function TrendLines({ detail, mode = 'day' }: { detail: NonNullable<Repor
             >
               <div className="tl-tip-date">{fullDate(detail[hover].day)}</div>
               <div className="tl-tip-row">
-                <i className="rp-dot" style={{ background: '#7c3aed' }} />
+                <i className="rp-dot" style={{ background: '#5865f2' }} />
                 <span>First Response</span>
                 <b>{detail[hover].frtSeconds != null ? formatSeconds(detail[hover].frtSeconds) : '—'}</b>
               </div>
@@ -278,9 +278,9 @@ export function AreaChart({ trend }: { trend: { day: string; count: number }[] }
           />
         ))}
         <polygon points={area} fill="rgba(124, 58, 237, 0.09)" />
-        <polyline points={pts} fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinejoin="round" />
+        <polyline points={pts} fill="none" stroke="#5865f2" strokeWidth="2.2" strokeLinejoin="round" />
         {trend.map((t, i) => (
-          <circle key={t.day} cx={x(i)} cy={y(t.count)} r="3" fill="#7c3aed">
+          <circle key={t.day} cx={x(i)} cy={y(t.count)} r="3" fill="#5865f2">
             <title>{`${dayFull(t.day)} — ${t.count} chat${t.count === 1 ? '' : 's'}`}</title>
           </circle>
         ))}

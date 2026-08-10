@@ -47,7 +47,7 @@ interface ActiveCall {
   meta: CallMeta;
 }
 
-const DEFAULT_PRIMARY = '#6366f1';
+const DEFAULT_PRIMARY = '#5865f2';
 
 export function App({ server, widgetKey }: { server: string; widgetKey: string }): JSX.Element | null {
   const tokenKey = `livechat:token:${widgetKey}`;

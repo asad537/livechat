@@ -264,14 +264,14 @@ export const IconClock = ({ size, className }: IconProps) =>
 /** App logo mark shown in the sidebar. */
 export const LogoMark = ({ size }: { size?: number }) => (
   <svg width={size ?? 28} height={size ?? 28} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-    <rect x="1" y="1" width="30" height="30" rx="9" fill="#6366f1" />
+    <rect x="1" y="1" width="30" height="30" rx="9" fill="#5865f2" />
     <path
       d="M9 11.5A3.5 3.5 0 0 1 12.5 8h7A3.5 3.5 0 0 1 23 11.5v5a3.5 3.5 0 0 1-3.5 3.5H14l-4 4v-4.4A3.5 3.5 0 0 1 9 16.5v-5z"
       fill="#fff"
     />
-    <circle cx="13" cy="14" r="1.3" fill="#6366f1" />
-    <circle cx="16.5" cy="14" r="1.3" fill="#6366f1" />
-    <circle cx="20" cy="14" r="1.3" fill="#6366f1" />
+    <circle cx="13" cy="14" r="1.3" fill="#5865f2" />
+    <circle cx="16.5" cy="14" r="1.3" fill="#5865f2" />
+    <circle cx="20" cy="14" r="1.3" fill="#5865f2" />
   </svg>
 );
 
