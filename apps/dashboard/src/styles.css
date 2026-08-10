@@ -46,6 +46,7 @@ body {
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  zoom: 0.9; /* slightly denser UI — more rows and columns on screen */
 }
 
 button {
@@ -77,7 +78,7 @@ p {
 /* ─── App shell ─────────────────────────────────────────────── */
 .app-shell {
   display: flex;
-  height: 100vh;
+  height: calc(100vh / 0.9);
   overflow: hidden;
 }
 
@@ -90,7 +91,7 @@ p {
 }
 
 .splash {
-  height: 100vh;
+  height: calc(100vh / 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -588,7 +589,7 @@ p {
 
 /* ─── Login ─────────────────────────────────────────────────── */
 .login-page {
-  height: 100vh;
+  height: calc(100vh / 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2039,7 +2040,7 @@ p {
 .modal {
   width: 430px;
   max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 80px);
+  max-height: calc(100vh / 0.9 - 80px);
   overflow-y: auto;
   background: var(--surface);
   border-radius: var(--radius-lg);
@@ -2246,7 +2247,7 @@ p {
   z-index: 90;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 44px);
+  max-height: calc(100vh / 0.9 - 44px);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -3279,7 +3280,7 @@ th.vt-num {
   right: 18px;
   bottom: 42px;
   width: 390px;
-  height: min(560px, calc(100vh - 90px));
+  height: min(560px, calc(100vh / 0.9 - 90px));
   display: flex;
   flex-direction: column;
   background: var(--panel-bg, #fff);
