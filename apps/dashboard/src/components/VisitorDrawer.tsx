@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, Visitor } from '@livechat/shared';
+import { EV } from '@livechat/shared';
+import { getSocket } from '../socket';
 import { api, type VisitorChat, type VisitorProfile } from '../api';
+import ChatPane from './ChatPane';
 import {
   classNames,
   durationSince,
@@ -13,7 +16,7 @@ import {
   referrerLabel,
   uaParse,
 } from '../util';
-import { IconClock, IconDownload, IconEye, IconGlobe, IconMessage, IconX } from '../icons';
+import { IconClock, IconDownload, IconEye, IconGlobe, IconMessage, IconSend, IconX } from '../icons';
 
 interface Props {
   visitorId: string;
@@ -25,7 +28,7 @@ interface Props {
   onOpenConversation(conversationId: string): void;
 }
 
-type Tab = 'profile' | 'chats';
+type Tab = 'chat' | 'profile' | 'chats';
 
 export default function VisitorDrawer({
   visitorId,
@@ -37,9 +40,13 @@ export default function VisitorDrawer({
 }: Props) {
   const [profile, setProfile] = useState<VisitorProfile | null>(null);
   const [chats, setChats] = useState<VisitorChat[] | null>(null);
-  const [tab, setTab] = useState<Tab>('profile');
+  const [tab, setTab] = useState<Tab>('chat');
   const [error, setError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
+
+  // Live chat tab — a conversation started right here in the drawer.
+  const [startedId, setStartedId] = useState<string | null>(null);
+  const [starterDraft, setStarterDraft] = useState('');
 
   // CRM edit state
   const [form, setForm] = useState({ name: '', email: '', phone: '', notes: '' });
@@ -59,6 +66,9 @@ export default function VisitorDrawer({
     setChats(null);
     setError(null);
     setOpenChatId(null);
+    setStartedId(null);
+    setStarterDraft('');
+    setTab('chat');
     void api
       .visitorProfile(visitorId)
       .then((p) => {
@@ -168,6 +178,26 @@ export default function VisitorDrawer({
     URL.revokeObjectURL(url);
   };
 
+  // The conversation shown in the Chat tab: an already-open one, or one we just started.
+  const openConv = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED');
+  const chatConvId = openConv?.id ?? startedId;
+
+  const startChatInline = () => {
+    const body = starterDraft.trim();
+    if (!body || !v) return;
+    getSocket()?.emit(
+      EV.AgentStartChat,
+      { websiteId: v.websiteId, visitorId: v.id, body },
+      (ack: { conversationId?: string } | undefined) => {
+        if (!ack?.conversationId) return;
+        setStartedId(ack.conversationId);
+        // Refresh the past-chats list so counts stay honest.
+        void api.visitorConversations(visitorId).then(setChats).catch(() => undefined);
+      },
+    );
+    setStarterDraft('');
+  };
+
   const stat = (label: string, value: React.ReactNode) => (
     <div className="vd-stat">
       <span className="vd-stat-value">{value}</span>
@@ -251,6 +281,13 @@ export default function VisitorDrawer({
         {/* ── Tabs ── */}
         <div className="vd-tabs">
           <button
+            className={classNames('vd-tab', tab === 'chat' && 'active')}
+            onClick={() => setTab('chat')}
+          >
+            Chat
+            {chatConvId && <span className="vd-tab-live" />}
+          </button>
+          <button
             className={classNames('vd-tab', tab === 'profile' && 'active')}
             onClick={() => setTab('profile')}
           >
@@ -265,6 +302,53 @@ export default function VisitorDrawer({
         </div>
 
         {error && <div className="vd-error">{error}</div>}
+
+        {tab === 'chat' && (
+          <div className="vd-body-chat">
+            {chatConvId ? (
+              // Full live chat right here — reply, type-to-join, calls, everything.
+              <ChatPane conversationId={chatConvId} showSidebar={false} />
+            ) : chats === null ? (
+              <p className="vd-muted vd-chat-loading">Loading…</p>
+            ) : (
+              // No open conversation yet — typing here starts one instantly.
+              <div className="vd-chat-starter">
+                <div className="vd-chat-starter-hint">
+                  <span className="vd-chat-starter-emoji">💬</span>
+                  <p>
+                    No open conversation with {name}.
+                    <br />
+                    <strong>Type below to start the chat right here.</strong>
+                  </p>
+                </div>
+                <div className="composer">
+                  <textarea
+                    className="composer-input"
+                    rows={1}
+                    autoFocus
+                    placeholder="Type a message to start the chat…"
+                    value={starterDraft}
+                    onChange={(e) => setStarterDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        startChatInline();
+                      }
+                    }}
+                  />
+                  <button
+                    className="btn btn-primary btn-send"
+                    onClick={startChatInline}
+                    disabled={!starterDraft.trim()}
+                    title="Send"
+                  >
+                    <IconSend size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {tab === 'profile' && (
           <div className="vd-body">

@@ -3229,3 +3229,55 @@ th.vt-num {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* ── Chat tab inside the visitor drawer ── */
+.vd-body-chat {
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.vd-body-chat .chatpane {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.vd-tab-live {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: vt-pulse 1.6s ease-in-out infinite;
+}
+
+.vd-chat-loading {
+  padding: 24px;
+}
+
+.vd-chat-starter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.vd-chat-starter-hint {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  padding: 24px;
+}
+
+.vd-chat-starter-emoji {
+  font-size: 34px;
+}
