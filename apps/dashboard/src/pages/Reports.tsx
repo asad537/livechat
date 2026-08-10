@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { api, type ReportRange, type ReportsOverview } from '../api';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { UserPublic } from '@livechat/shared';
+import { api, type ReportRange, type ReportRecord, type ReportsOverview } from '../api';
 import { useApp } from '../state';
 import Avatar from '../components/Avatar';
 import {
@@ -90,6 +91,7 @@ function CardHead({ title, hint, right }: { title: string; hint?: string; right?
 
 export default function Reports() {
   const { websites, online } = useApp();
+  const [view, setView] = useState<'overview' | 'records'>('overview');
   const [websiteId, setWebsiteId] = useState('');
   const [range, setRange] = useState<ReportRange>('today');
   const [data, setData] = useState<ReportsOverview | null>(null);
@@ -178,34 +180,57 @@ export default function Reports() {
       <div className="page-head">
         <div>
           <h2>Reports</h2>
-          <p className="page-sub">Team performance — {RANGE_HINT[range]}.</p>
+          <p className="page-sub">
+            {view === 'overview' ? `Team performance — ${RANGE_HINT[range]}.` : 'Filter and export raw chat records.'}
+          </p>
         </div>
         <div className="filters">
           <div className="range-pills">
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                className={classNames('range-pill', range === r.key && 'active')}
-                onClick={() => setRange(r.key)}
-              >
-                {r.label}
-              </button>
-            ))}
+            <button
+              className={classNames('range-pill', view === 'overview' && 'active')}
+              onClick={() => setView('overview')}
+            >
+              Overview
+            </button>
+            <button
+              className={classNames('range-pill', view === 'records' && 'active')}
+              onClick={() => setView('records')}
+            >
+              Records
+            </button>
           </div>
-          <select value={websiteId} onChange={(e) => setWebsiteId(e.target.value)}>
-            <option value="">All websites</option>
-            {websites.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={loading}>
-            {loading ? '…' : 'Refresh'}
-          </button>
+          {view === 'overview' && (
+            <>
+              <div className="range-pills">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    className={classNames('range-pill', range === r.key && 'active')}
+                    onClick={() => setRange(r.key)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <select value={websiteId} onChange={(e) => setWebsiteId(e.target.value)}>
+                <option value="">All websites</option>
+                {websites.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={loading}>
+                {loading ? '…' : 'Refresh'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {view === 'records' && <RecordsView websites={websites} />}
+      {view === 'overview' && (
+        <>
       {error && <div className="form-error">{error}</div>}
       {loading && !data && <div className="empty-hint">Loading reports…</div>}
 
@@ -628,6 +653,230 @@ export default function Reports() {
           )}
         </>
       )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Records view: filter + table + CSV export ───────────────
+function fmtSecs(s: number | null): string {
+  if (s == null) return '';
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+function RecordsView({ websites }: { websites: { id: string; name: string }[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 6 * 24 * 3600_000).toISOString().slice(0, 10);
+  const [from, setFrom] = useState(weekAgo);
+  const [to, setTo] = useState(today);
+  const [agentId, setAgentId] = useState('');
+  const [websiteId, setWebsiteId] = useState('');
+  const [status, setStatus] = useState('');
+  const [agents, setAgents] = useState<UserPublic[]>([]);
+  const [rows, setRows] = useState<ReportRecord[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void api.users().then(setAgents).catch(() => setAgents([]));
+  }, []);
+
+  const run = useCallback(() => {
+    setLoading(true);
+    void api
+      .reportRecords({
+        from,
+        to,
+        agentId: agentId || undefined,
+        websiteId: websiteId || undefined,
+        status: status || undefined,
+      })
+      .then((r) => setRows(r.records))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, [from, to, agentId, websiteId, status]);
+
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  const agentName = useMemo(
+    () => agents.find((a) => a.id === agentId)?.name ?? 'all-agents',
+    [agents, agentId],
+  );
+
+  const exportCsv = () => {
+    if (!rows || rows.length === 0) return;
+    const head = [
+      'Date',
+      'Time',
+      'Website',
+      'Agent',
+      'Visitor',
+      'Email',
+      'Status',
+      'First response',
+      'Duration',
+      'Messages',
+      'Rating',
+      'Comment',
+    ];
+    const esc = (v: string | number | null) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = rows.map((r) => {
+      const d = new Date(r.createdAt);
+      return [
+        d.toLocaleDateString(),
+        d.toLocaleTimeString(),
+        r.website,
+        r.agent ?? '',
+        r.visitor ?? '',
+        r.visitorEmail ?? '',
+        r.status,
+        fmtSecs(r.firstResponseSeconds),
+        fmtSecs(r.durationSeconds),
+        r.messages,
+        r.rating ?? '',
+        r.ratingComment ?? '',
+      ]
+        .map(esc)
+        .join(',');
+    });
+    const csv = [head.join(','), ...lines].join('\n');
+    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-records_${agentName.replace(/\s+/g, '-')}_${from}_to_${to}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="rp-records">
+      <div className="card report-card rec-filters">
+        <label className="rec-field">
+          <span>From</span>
+          <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="rec-field">
+          <span>To</span>
+          <input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <label className="rec-field">
+          <span>Agent</span>
+          <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+            <option value="">All agents</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="rec-field">
+          <span>Website</span>
+          <select value={websiteId} onChange={(e) => setWebsiteId(e.target.value)}>
+            <option value="">All websites</option>
+            {websites.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="rec-field">
+          <span>Status</span>
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">Any</option>
+            <option value="CLOSED">Closed</option>
+            <option value="ACTIVE">Active</option>
+            <option value="WAITING">Waiting</option>
+            <option value="MISSED">Missed</option>
+          </select>
+        </label>
+        <div className="rec-actions">
+          <button className="btn btn-ghost btn-sm" onClick={run} disabled={loading}>
+            {loading ? '…' : 'Apply'}
+          </button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={exportCsv}
+            disabled={!rows || rows.length === 0}
+          >
+            ⭳ Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="card report-card">
+        <CardHead
+          title="Chat records"
+          right={<span className="report-hint">{rows ? `${rows.length} record${rows.length === 1 ? '' : 's'}` : ''}</span>}
+        />
+        <div className="rp-scroll-x">
+          <table className="table lb-table rec-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Website</th>
+                <th>Agent</th>
+                <th>Visitor</th>
+                <th>Status</th>
+                <th className="num">First reply</th>
+                <th className="num">Duration</th>
+                <th className="num">Msgs</th>
+                <th className="num">Rating</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows?.map((r) => {
+                const d = new Date(r.createdAt);
+                return (
+                  <tr key={r.id}>
+                    <td className="rec-date">
+                      {d.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                      <span className="rec-time">{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </td>
+                    <td>{r.website}</td>
+                    <td>{r.agent ?? <span className="vt-muted">—</span>}</td>
+                    <td>{r.visitor ?? <span className="vt-muted">Anonymous</span>}</td>
+                    <td>
+                      <span className={classNames('status-badge', `status-${r.status.toLowerCase()}`)}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="num">{fmtSecs(r.firstResponseSeconds) || '—'}</td>
+                    <td className="num">{fmtSecs(r.durationSeconds) || '—'}</td>
+                    <td className="num">{r.messages}</td>
+                    <td className="num">
+                      {r.rating != null ? <span className="lb-rating">★ {r.rating}</span> : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+              {rows && rows.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="empty-hint">
+                    No records for these filters.
+                  </td>
+                </tr>
+              )}
+              {!rows && (
+                <tr>
+                  <td colSpan={9} className="empty-hint">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

@@ -564,5 +564,96 @@ export function buildReportsRouter(deps: AppDeps): Router {
     }),
   );
 
+  // GET /api/reports/records?from=&to=&agentId=&websiteId=&status= — LEAD/ADMIN
+  // Flat conversation rows for the table view + CSV export.
+  router.get(
+    '/api/reports/records',
+    auth,
+    requireRole('ADMIN', 'LEAD'),
+    h(async (req, res) => {
+      const user = agent(req);
+      const scoped = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      const websiteId = asString(req.query.websiteId);
+      let siteIds = scoped;
+      if (websiteId) {
+        if (!scoped.includes(websiteId)) throw new HttpError(403, 'Forbidden');
+        siteIds = [websiteId];
+      }
+      if (siteIds.length === 0) {
+        res.json({ records: [], total: 0 });
+        return;
+      }
+
+      let where = `c.website_id IN (${placeholders(siteIds.length)})`;
+      const params: unknown[] = [...siteIds];
+
+      const from = asString(req.query.from); // ISO date (yyyy-mm-dd) inclusive
+      const to = asString(req.query.to); // inclusive (end of day)
+      if (from) {
+        where += ' AND c.created_at >= ?';
+        params.push(`${from}T00:00:00.000Z`);
+      }
+      if (to) {
+        where += ' AND c.created_at <= ?';
+        params.push(`${to}T23:59:59.999Z`);
+      }
+      const agentId = asString(req.query.agentId);
+      if (agentId) {
+        where += ' AND c.assigned_user_id = ?';
+        params.push(agentId);
+      }
+      const status = asString(req.query.status);
+      if (status) {
+        where += ' AND c.status = ?';
+        params.push(status);
+      }
+
+      const rows = await deps.db.all<{
+        id: string;
+        created_at: string;
+        activated_at: string | null;
+        closed_at: string | null;
+        status: string;
+        rating: number | null;
+        rating_comment: string | null;
+        website_name: string;
+        agent_name: string | null;
+        visitor_name: string | null;
+        visitor_email: string | null;
+        msgs: number;
+      }>(
+        `SELECT c.id, c.created_at, c.activated_at, c.closed_at, c.status, c.rating, c.rating_comment,
+                w.name AS website_name,
+                u.name AS agent_name,
+                v.name AS visitor_name, v.email AS visitor_email,
+                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msgs
+           FROM conversations c
+           JOIN websites w ON w.id = c.website_id
+           LEFT JOIN users u ON u.id = c.assigned_user_id
+           LEFT JOIN visitors v ON v.id = c.visitor_id
+          WHERE ${where}
+          ORDER BY c.created_at DESC
+          LIMIT 2000`,
+        params,
+      );
+
+      const records = rows.map((r) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        status: r.status,
+        website: r.website_name,
+        agent: r.agent_name,
+        visitor: r.visitor_name || (r.visitor_email ?? null),
+        visitorEmail: r.visitor_email,
+        firstResponseSeconds: secondsBetween(r.created_at, r.activated_at),
+        durationSeconds: secondsBetween(r.activated_at, r.closed_at),
+        messages: Number(r.msgs),
+        rating: r.rating != null ? Number(r.rating) : null,
+        ratingComment: r.rating_comment,
+      }));
+      res.json({ records, total: records.length });
+    }),
+  );
+
   return router;
 }

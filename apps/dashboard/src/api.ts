@@ -129,6 +129,21 @@ export interface ReportsOverview {
   trendMode?: 'day' | 'hour';
 }
 
+export interface ReportRecord {
+  id: string;
+  createdAt: string;
+  status: string;
+  website: string;
+  agent: string | null;
+  visitor: string | null;
+  visitorEmail: string | null;
+  firstResponseSeconds: number | null;
+  durationSeconds: number | null;
+  messages: number;
+  rating: number | null;
+  ratingComment: string | null;
+}
+
 export interface CreateWebsiteInput {
   name: string;
   domains: string[];
@@ -265,6 +280,24 @@ export const api = {
     if (range) qs.set('range', range);
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return request<ReportsOverview>(`${API.reports}${suffix}`);
+  },
+
+  reportRecords: (params: {
+    from?: string;
+    to?: string;
+    agentId?: string;
+    websiteId?: string;
+    status?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params.from) qs.set('from', params.from);
+    if (params.to) qs.set('to', params.to);
+    if (params.agentId) qs.set('agentId', params.agentId);
+    if (params.websiteId) qs.set('websiteId', params.websiteId);
+    if (params.status) qs.set('status', params.status);
+    return request<{ records: ReportRecord[]; total: number }>(
+      `/api/reports/records?${qs.toString()}`,
+    );
   },
 
   websiteStats: () =>
