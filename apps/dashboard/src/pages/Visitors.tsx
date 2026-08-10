@@ -19,9 +19,8 @@ import VisitorDrawer from '../components/VisitorDrawer';
 import { IconUsers, IconX } from '../icons';
 
 export default function Visitors() {
-  const { websites, visitorsByWebsite, pushToast } = useApp();
+  const { websites, visitorsByWebsite, pushToast, openDockedChat, connected } = useApp();
   const navigate = useNavigate();
-  const [websiteId, setWebsiteId] = useState<string | null>(null);
   const [restVisitors, setRestVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
   const [drawerId, setDrawerId] = useState<string | null>(null);
@@ -29,24 +28,25 @@ export default function Visitors() {
   const [firstMessage, setFirstMessage] = useState('');
   const [, forceTick] = useState(0);
 
-  const activeWebsiteId = websiteId ?? websites[0]?.id ?? null;
-  const activeWebsite = websites.find((w) => w.id === activeWebsiteId) ?? null;
-  const accent = activeWebsite?.primaryColor || 'var(--accent)';
+  const siteById = useMemo(() => new Map(websites.map((w) => [w.id, w])), [websites]);
+  const siteColor = (v: Visitor | null | undefined) =>
+    (v && siteById.get(v.websiteId)?.primaryColor) || 'var(--accent)';
 
-  // (Re)subscribe to the live visitor stream of the selected website.
+  // Live visitor streams of ALL websites — the table shows every site at once
+  // and tags each row with its website (Zendesk-style).
   useEffect(() => {
-    if (!activeWebsiteId) return;
-    getSocket()?.emit(EV.AgentWatchWebsite, { websiteId: activeWebsiteId });
-  }, [activeWebsiteId]);
+    const socket = getSocket();
+    if (!socket) return;
+    for (const w of websites) socket.emit(EV.AgentWatchWebsite, { websiteId: w.id });
+  }, [websites, connected]);
 
-  // REST list brings the recently-offline visitors (last 24h) too.
+  // REST list brings the recently-offline visitors (last 24h) of every site.
   const refresh = useCallback(() => {
-    if (!activeWebsiteId) return;
-    void api
-      .websiteVisitors(activeWebsiteId)
-      .then(setRestVisitors)
-      .catch(() => setRestVisitors([]));
-  }, [activeWebsiteId]);
+    if (websites.length === 0) return;
+    void Promise.all(
+      websites.map((w) => api.websiteVisitors(w.id).catch(() => [] as Visitor[])),
+    ).then((lists) => setRestVisitors(lists.flat()));
+  }, [websites]);
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 60_000);
@@ -61,7 +61,7 @@ export default function Visitors() {
 
   // Merge: socket stream wins for online rows, REST fills in offline history.
   const visitors = useMemo(() => {
-    const liveList = activeWebsiteId ? visitorsByWebsite[activeWebsiteId] ?? [] : [];
+    const liveList = websites.flatMap((w) => visitorsByWebsite[w.id] ?? []);
     const byId = new Map<string, Visitor>();
     for (const v of restVisitors) byId.set(v.id, v);
     for (const v of liveList) byId.set(v.id, { ...byId.get(v.id), ...v });
@@ -69,7 +69,17 @@ export default function Visitors() {
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((v) =>
-        [v.name, v.email, v.phone, v.ip, v.country, v.city, v.currentPage, v.referrer]
+        [
+          v.name,
+          v.email,
+          v.phone,
+          v.ip,
+          v.country,
+          v.city,
+          v.currentPage,
+          v.referrer,
+          siteById.get(v.websiteId)?.name,
+        ]
           .filter(Boolean)
           .some((s) => String(s).toLowerCase().includes(q)),
       );
@@ -79,7 +89,7 @@ export default function Visitors() {
       return a.lastSeenAt < b.lastSeenAt ? 1 : -1;
     });
     return list;
-  }, [visitorsByWebsite, restVisitors, activeWebsiteId, query]);
+  }, [visitorsByWebsite, restVisitors, websites, query, siteById]);
 
   const onlineList = visitors.filter((v) => v.online);
   const offlineList = visitors.filter((v) => !v.online);
@@ -87,9 +97,9 @@ export default function Visitors() {
 
   const startChat = () => {
     const body = firstMessage.trim();
-    if (!body || !startTarget || !activeWebsiteId) return;
+    if (!body || !startTarget) return;
     getSocket()?.emit(EV.AgentStartChat, {
-      websiteId: activeWebsiteId,
+      websiteId: startTarget.websiteId,
       visitorId: startTarget.id,
       body,
     });
@@ -102,6 +112,7 @@ export default function Visitors() {
   const row = (v: Visitor) => {
     const name = v.name || `Visitor ${v.id.slice(0, 6)}`;
     const ua = uaParse(v.userAgent);
+    const site = siteById.get(v.websiteId);
     return (
       <tr
         key={v.id}
@@ -109,7 +120,7 @@ export default function Visitors() {
         onClick={() => setDrawerId(v.id)}
       >
         <td className="vt-who">
-          <span className="avatar" style={{ background: accent }}>
+          <span className="avatar" style={{ background: siteColor(v) }}>
             {initials(name)}
           </span>
           <div className="vt-who-meta">
@@ -124,6 +135,16 @@ export default function Visitors() {
               {v.email || (v.city || v.country ? [v.city, v.country].filter(Boolean).join(', ') : 'No email')}
             </span>
           </div>
+        </td>
+        <td className="vt-site">
+          {site ? (
+            <span className="vt-site-chip">
+              <span className="chip-dot" style={{ background: site.primaryColor }} />
+              {site.name}
+            </span>
+          ) : (
+            <span className="vt-muted">—</span>
+          )}
         </td>
         <td className="vt-page">
           {v.online && v.currentPage ? (
@@ -170,6 +191,7 @@ export default function Visitors() {
         <thead>
           <tr>
             <th>Visitor</th>
+            <th>Website</th>
             <th>Viewing</th>
             <th>Came from</th>
             <th>Device</th>
@@ -191,33 +213,18 @@ export default function Visitors() {
         <div>
           <h2>Visitors</h2>
           <p className="page-sub">
-            <span className="vt-live-dot" /> {onlineList.length} online now
-            {activeWebsite ? ` on ${activeWebsite.name}` : ''}
+            <span className="vt-live-dot" /> {onlineList.length} online now across{' '}
+            {websites.length} website{websites.length === 1 ? '' : 's'}
           </p>
         </div>
         <div className="vt-head-tools">
           <input
             className="vt-search"
             type="search"
-            placeholder="Search name, email, IP, page…"
+            placeholder="Search name, email, IP, page, website…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <div className="site-switcher">
-            {websites.map((w) => (
-              <button
-                key={w.id}
-                className={classNames('site-pill', w.id === activeWebsiteId && 'active')}
-                onClick={() => {
-                  setWebsiteId(w.id);
-                  setDrawerId(null);
-                }}
-              >
-                <span className="chip-dot" style={{ background: w.primaryColor }} />
-                {w.name}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -241,14 +248,14 @@ export default function Visitors() {
         </>
       )}
 
-      {activeWebsiteId && visitors.length === 0 && (
+      {websites.length > 0 && visitors.length === 0 && (
         <div className="empty-state card">
           <IconUsers size={32} className="empty-state-icon" />
           <p>{query ? 'No visitors match your search' : 'No visitors right now'}</p>
           <p className="chat-empty-sub">
             {query
-              ? 'Try a different name, email or IP.'
-              : `Visitors appear here live as they browse ${activeWebsite?.name}.`}
+              ? 'Try a different name, email, IP or website.'
+              : 'Visitors appear here live as they browse your websites.'}
           </p>
         </div>
       )}
@@ -256,14 +263,17 @@ export default function Visitors() {
       {drawerId && (
         <VisitorDrawer
           visitorId={drawerId}
-          accentColor={accent}
+          accentColor={siteColor(drawerLive)}
           live={drawerLive}
           onClose={() => setDrawerId(null)}
           onStartChat={(v) => {
             setDrawerId(null);
             setStartTarget(v);
           }}
-          onOpenConversation={(conversationId) => navigate('/', { state: { conversationId } })}
+          onOpenConversation={(conversationId) => {
+            setDrawerId(null);
+            openDockedChat(conversationId);
+          }}
         />
       )}
 
@@ -277,7 +287,7 @@ export default function Visitors() {
               </button>
             </div>
             <div className="modal-visitor">
-              <span className="avatar" style={{ background: accent }}>
+              <span className="avatar" style={{ background: siteColor(startTarget) }}>
                 {initials(startTarget.name || 'V')}
               </span>
               <div>
@@ -285,7 +295,12 @@ export default function Visitors() {
                   {flagEmoji(startTarget.countryCode)}{' '}
                   {startTarget.name || `Visitor ${startTarget.id.slice(0, 6)}`}
                 </div>
-                <div className="modal-row-sub">{startTarget.email || 'No email'}</div>
+                <div className="modal-row-sub">
+                  {startTarget.email || 'No email'}
+                  {siteById.get(startTarget.websiteId) && (
+                    <> · {siteById.get(startTarget.websiteId)?.name}</>
+                  )}
+                </div>
               </div>
             </div>
             <label className="field">

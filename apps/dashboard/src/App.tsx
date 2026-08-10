@@ -12,6 +12,7 @@ import Admin from './pages/Admin';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
 import ChatDock from './components/ChatDock';
+import DockedChatWindow from './components/DockedChatWindow';
 import {
   IconChart,
   IconEye,
@@ -154,6 +155,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <DockedChatWindow />
       <ChatDock />
       <Toasts />
       {activeCall && <CallOverlay call={activeCall} />}

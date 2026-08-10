@@ -211,11 +211,25 @@ export default function VisitorDrawer({
             </div>
           </div>
           <div className="vd-head-actions">
-            {v && (
-              <button className="btn btn-primary btn-sm" onClick={() => onStartChat(v)}>
-                <IconMessage size={14} /> Start chat
-              </button>
-            )}
+            {(() => {
+              // An open conversation? "Message" jumps straight into it (docked window).
+              const open = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED');
+              if (open) {
+                return (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => onOpenConversation(open.id)}
+                  >
+                    <IconMessage size={14} /> Message
+                  </button>
+                );
+              }
+              return v ? (
+                <button className="btn btn-primary btn-sm" onClick={() => onStartChat(v)}>
+                  <IconMessage size={14} /> Start chat
+                </button>
+              ) : null;
+            })()}
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <IconX size={16} />
             </button>

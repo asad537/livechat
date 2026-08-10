@@ -51,6 +51,9 @@ interface AppContextValue {
   openChats: string[];
   openChatTab(id: string): void;
   closeChatTab(id: string): void;
+  dockedChatId: string | null;
+  openDockedChat(id: string): void;
+  closeDockedChat(): void;
   login(email: string, password: string): Promise<void>;
   logout(): void;
   pushToast(title: string, body?: string, kind?: Toast['kind']): void;
@@ -395,8 +398,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const openChatTab = useCallback((id: string) => {
     setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-7), id]));
   }, []);
+  // Floating docked chat window (opened from the dock or the visitor drawer).
+  const [dockedChatId, setDockedChatId] = useState<string | null>(null);
+  const openDockedChat = useCallback(
+    (id: string) => {
+      openChatTab(id);
+      setDockedChatId(id);
+    },
+    [openChatTab],
+  );
+  const closeDockedChat = useCallback(() => setDockedChatId(null), []);
+
   const closeChatTab = useCallback((id: string) => {
     setOpenChats((prev) => prev.filter((c) => c !== id));
+    setDockedChatId((prev) => (prev === id ? null : prev));
   }, []);
 
   const value: AppContextValue = {
@@ -415,6 +430,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     openChats,
     openChatTab,
     closeChatTab,
+    dockedChatId,
+    openDockedChat,
+    closeDockedChat,
     login,
     logout,
     pushToast,

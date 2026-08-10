@@ -3143,3 +3143,89 @@ th.vt-num {
     left: 70px;
   }
 }
+
+/* ── Floating docked chat window (Zendesk-style) ── */
+.docked-chat {
+  position: fixed;
+  right: 18px;
+  bottom: 42px;
+  width: 390px;
+  height: min(560px, calc(100vh - 90px));
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg, #fff);
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  z-index: 120; /* above the visitor drawer + modals */
+  animation: docked-pop 0.18s ease;
+}
+
+@keyframes docked-pop {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.docked-chat-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--sidebar-bg);
+  color: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.docked-chat-title {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docked-chat-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.docked-chat-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.docked-chat-body .chatpane {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  .docked-chat {
+    right: 8px;
+    width: calc(100vw - 86px);
+  }
+}
+
+/* Website chip inside the visitors table (all sites in one view) */
+.vt-site-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface, #f8fafc);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
