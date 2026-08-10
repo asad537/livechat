@@ -2,6 +2,16 @@ import React, { useRef, useState } from 'react';
 import { api } from '../api';
 import { useApp } from '../state';
 import Avatar from '../components/Avatar';
+import { classNames } from '../util';
+import {
+  VISITOR_SOUND_OPTIONS,
+  getCustomSound,
+  getVisitorSound,
+  playVisitorSound,
+  setCustomSound,
+  setVisitorSound,
+  type VisitorSound,
+} from '../notify';
 
 const COLORS = [
   '#7c3aed',
@@ -211,6 +221,94 @@ export default function Profile() {
             </button>
           </div>
         </div>
+
+        {/* ── Notification sound ── */}
+        <SoundCard />
+      </div>
+    </div>
+  );
+}
+
+// ─── New-visitor notification sound ──────────────────────────
+function SoundCard() {
+  const { pushToast } = useApp();
+  const soundFileRef = useRef<HTMLInputElement>(null);
+  const [sound, setSound] = useState<VisitorSound>(getVisitorSound());
+  const [hasCustom, setHasCustom] = useState(!!getCustomSound());
+
+  const choose = (v: VisitorSound) => {
+    setSound(v);
+    setVisitorSound(v);
+    if (v !== 'off') playVisitorSound(v);
+  };
+
+  const uploadSound = (file: File) => {
+    if (!file.type.startsWith('audio/')) {
+      pushToast('Not an audio file', 'Pick an MP3, WAV or OGG sound.', 'error');
+      return;
+    }
+    if (file.size > 900 * 1024) {
+      pushToast('File too large', 'Keep the sound under ~900 KB.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result);
+      if (!setCustomSound(url)) {
+        pushToast('Could not save', 'Browser storage is full — try a smaller file.', 'error');
+        return;
+      }
+      setHasCustom(true);
+      setSound('custom');
+      setVisitorSound('custom');
+      playVisitorSound('custom');
+      pushToast('Sound saved', 'This plays when a new visitor arrives. 🔔', 'success');
+    };
+    reader.readAsDataURL(file);
+    if (soundFileRef.current) soundFileRef.current.value = '';
+  };
+
+  return (
+    <div className="card report-card">
+      <h3>New-visitor sound</h3>
+      <p className="profile-hint" style={{ marginTop: 0 }}>
+        Plays instantly when a new visitor lands on any of your websites.
+      </p>
+      <div className="sound-opts">
+        {VISITOR_SOUND_OPTIONS.map((o) => {
+          const disabled = o.value === 'custom' && !hasCustom;
+          return (
+            <button
+              key={o.value}
+              className={classNames('sound-opt', sound === o.value && 'active')}
+              disabled={disabled}
+              onClick={() => choose(o.value)}
+            >
+              {o.label}
+              {sound === o.value && <span className="sound-opt-check">✓</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="vd-form-actions" style={{ justifyContent: 'flex-start', gap: 8 }}>
+        <input
+          ref={soundFileRef}
+          type="file"
+          accept="audio/*"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) uploadSound(f);
+          }}
+        />
+        <button className="btn btn-primary btn-sm" onClick={() => soundFileRef.current?.click()}>
+          ⭱ Upload my sound
+        </button>
+        {sound !== 'off' && (
+          <button className="btn btn-ghost btn-sm" onClick={() => playVisitorSound(sound)}>
+            ▶ Preview
+          </button>
+        )}
       </div>
     </div>
   );

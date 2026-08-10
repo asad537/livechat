@@ -18,7 +18,7 @@ import type {
   Website,
 } from '@livechat/shared';
 import { EV } from '@livechat/shared';
-import { desktopNotify, ensureNotifyPermission, playChime } from './notify';
+import { desktopNotify, ensureNotifyPermission, playChime, playVisitorSound } from './notify';
 import { api, clearToken, getToken, setToken } from './api';
 import { connectSocket, disconnectSocket, getSocket } from './socket';
 
@@ -260,7 +260,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (prevSeen) {
         // Not the first snapshot for this site → any id we haven't seen is new.
         const hasNew = onlineIds.some((id) => !prevSeen.has(id));
-        if (hasNew) playChime('visitor');
+        if (hasNew) playVisitorSound();
       }
       seenVisitorsRef.current[payload.websiteId] = new Set(onlineIds);
       setVisitorsByWebsite((prev) => ({ ...prev, [payload.websiteId]: list }));

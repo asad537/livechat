@@ -5384,3 +5384,47 @@ img.avatar {
   background: rgba(255, 255, 255, 0.24);
   color: #fff;
 }
+
+/* Profile — new-visitor sound picker */
+.sound-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+.sound-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.sound-opt:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.sound-opt.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sound-opt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sound-opt-check {
+  font-size: 11px;
+}

@@ -73,6 +73,96 @@ export function playChime(kind: 'new-chat' | 'message' | 'visitor' = 'new-chat')
   }
 }
 
+// ─── Visitor-arrival sound preference (per browser) ──────────
+export type VisitorSound = 'knock' | 'chime' | 'ping' | 'bell' | 'custom' | 'off';
+
+const SOUND_PREF_KEY = 'livechat.visitorSound';
+const SOUND_DATA_KEY = 'livechat.visitorSound.custom'; // uploaded audio data URL
+
+export const VISITOR_SOUND_OPTIONS: { value: VisitorSound; label: string }[] = [
+  { value: 'knock', label: 'Door knock' },
+  { value: 'chime', label: 'Chime' },
+  { value: 'ping', label: 'Ping' },
+  { value: 'bell', label: 'Bell' },
+  { value: 'custom', label: 'My uploaded sound' },
+  { value: 'off', label: 'Off (silent)' },
+];
+
+export function getVisitorSound(): VisitorSound {
+  try {
+    return (localStorage.getItem(SOUND_PREF_KEY) as VisitorSound) || 'knock';
+  } catch {
+    return 'knock';
+  }
+}
+
+export function setVisitorSound(v: VisitorSound): void {
+  try {
+    localStorage.setItem(SOUND_PREF_KEY, v);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getCustomSound(): string | null {
+  try {
+    return localStorage.getItem(SOUND_DATA_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Store an uploaded sound (data URL). Returns false if too large for storage. */
+export function setCustomSound(dataUrl: string): boolean {
+  try {
+    localStorage.setItem(SOUND_DATA_KEY, dataUrl);
+    return true;
+  } catch {
+    return false; // quota exceeded
+  }
+}
+
+let customAudio: HTMLAudioElement | null = null;
+
+/** Play whatever the agent chose for new-visitor alerts. */
+export function playVisitorSound(pref: VisitorSound = getVisitorSound()): void {
+  if (pref === 'off') return;
+  if (pref === 'custom') {
+    const url = getCustomSound();
+    if (!url) return playBuiltIn('knock');
+    try {
+      if (!customAudio) customAudio = new Audio();
+      customAudio.src = url;
+      customAudio.currentTime = 0;
+      void customAudio.play();
+    } catch {
+      /* autoplay blocked until a gesture */
+    }
+    return;
+  }
+  playBuiltIn(pref);
+}
+
+function playBuiltIn(pref: Exclude<VisitorSound, 'custom' | 'off'>): void {
+  const ac = audioCtx();
+  if (!ac) return;
+  const t = ac.currentTime;
+  if (pref === 'knock') {
+    knock(ac, t);
+    knock(ac, t + 0.24);
+    knock(ac, t + 0.9);
+    knock(ac, t + 1.14);
+  } else if (pref === 'chime') {
+    tone(ac, 880, t, 0.35, 0.12);
+    tone(ac, 1318.5, t + 0.14, 0.45, 0.1);
+  } else if (pref === 'ping') {
+    tone(ac, 1046.5, t, 0.5, 0.14);
+  } else if (pref === 'bell') {
+    tone(ac, 660, t, 0.6, 0.12);
+    tone(ac, 990, t + 0.02, 0.7, 0.08);
+  }
+}
+
 /** Ask once for permission (call after login, on a user-gesture-adjacent path). */
 export function ensureNotifyPermission(): void {
   if ('Notification' in window && Notification.permission === 'default') {
