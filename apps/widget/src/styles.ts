@@ -460,10 +460,11 @@ export const WIDGET_CSS = `
 .lc-endbtn,
 .lc-endbtn:hover {
   background: transparent;
-  border: 1.5px solid currentColor;
+  border: 2px solid currentColor;
+  border-radius: 50%;
   box-shadow: none;
   transform: none;
-  opacity: 0.9;
+  opacity: 1;
   color: inherit;
 }
 
