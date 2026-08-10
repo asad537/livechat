@@ -159,9 +159,13 @@ export function toTeam(row: TeamRow): Team {
   return { id: row.id, name: row.name };
 }
 
-/** UserPublic decorated with the live presence flag. */
+/** UserPublic decorated with the live presence flags. */
 export function toUserWithPresence(deps: AppDeps, row: UserRow): UserPublic {
-  return { ...toUserPublic(row), online: deps.presence.isAgentOnline(row.id) };
+  return {
+    ...toUserPublic(row),
+    online: deps.presence.isAgentOnline(row.id),
+    away: deps.presence.isAgentAway(row.id),
+  };
 }
 
 // ─── Scoping helpers ─────────────────────────────────────────

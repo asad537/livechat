@@ -145,6 +145,7 @@ function Sidebar() {
         </>
       )}
       <div className="sidebar-foot">
+        <AvailabilityToggle />
         <div
           className="sidebar-user sidebar-user-link"
           role="button"
@@ -153,13 +154,7 @@ function Sidebar() {
         >
           <Avatar name={me.name} color={me.avatarColor} url={me.avatarUrl} />
           <div className="sidebar-user-meta">
-            <span className="sidebar-user-name">
-              {me.name}
-              <span
-                className={classNames('dot', connected ? 'dot-online' : 'dot-offline')}
-                title={connected ? 'Connected' : 'Reconnecting…'}
-              />
-            </span>
+            <span className="sidebar-user-name">{me.name}</span>
             <span className="sidebar-user-role">{me.role}</span>
           </div>
           <button
@@ -175,6 +170,49 @@ function Sidebar() {
         </div>
       </div>
     </aside>
+  );
+}
+
+/** Agent availability: Online / Away — Away stops new auto-assigned chats. */
+function AvailabilityToggle() {
+  const { me, setAway, connected } = useApp();
+  const [openMenu, setOpenMenu] = React.useState(false);
+  if (!me) return null;
+  const away = !!me.away;
+  const state = !connected ? 'offline' : away ? 'away' : 'online';
+  const label = state === 'offline' ? 'Reconnecting…' : state === 'away' ? 'Away' : 'Online';
+  return (
+    <div className="avail">
+      <button className="avail-current" onClick={() => setOpenMenu((v) => !v)} disabled={!connected}>
+        <span className={classNames('avail-dot', `avail-${state}`)} />
+        <span className="avail-label">{label}</span>
+        <span className="avail-caret">⌄</span>
+      </button>
+      {openMenu && connected && (
+        <div className="avail-menu">
+          <button
+            className="avail-opt"
+            onClick={() => {
+              setAway(false);
+              setOpenMenu(false);
+            }}
+          >
+            <span className="avail-dot avail-online" /> Online
+            <span className="avail-opt-sub">Receive new chats</span>
+          </button>
+          <button
+            className="avail-opt"
+            onClick={() => {
+              setAway(true);
+              setOpenMenu(false);
+            }}
+          >
+            <span className="avail-dot avail-away" /> Away
+            <span className="avail-opt-sub">Pause new chats</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

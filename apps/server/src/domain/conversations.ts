@@ -201,7 +201,8 @@ async function countActiveChats(deps: AppDeps, userId: string): Promise<number> 
 
 /** True when the user is online AND has spare capacity (ACTIVE chats < max_chats). */
 export async function hasCapacity(deps: AppDeps, user: UserRow): Promise<boolean> {
-  if (!deps.presence.isAgentOnline(user.id)) return false;
+  // Away agents stay signed in but receive no auto-assigned chats.
+  if (!deps.presence.isAgentAvailable(user.id)) return false;
   return (await countActiveChats(deps, user.id)) < Number(user.max_chats);
 }
 
@@ -232,7 +233,7 @@ export async function findEligibleCsr(
     .filter(
       (m) =>
         m.id !== excludeUserId &&
-        deps.presence.isAgentOnline(m.id) &&
+        deps.presence.isAgentAvailable(m.id) &&
         Number(m.active) < Number(m.max_chats),
     )
     .sort((a, b) => Number(a.active) - Number(b.active));

@@ -44,6 +44,8 @@ interface AppContextValue {
   conversations: Record<string, ConversationSummary>;
   visitorsByWebsite: Record<string, Visitor[]>;
   online: Record<string, boolean>;
+  awayMap: Record<string, boolean>;
+  setAway(away: boolean): void;
   connected: boolean;
   toasts: Toast[];
   incomingCall: IncomingCall | null;
@@ -87,6 +89,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [conversations, setConversations] = useState<Record<string, ConversationSummary>>({});
   const [visitorsByWebsite, setVisitorsByWebsite] = useState<Record<string, Visitor[]>>({});
   const [online, setOnline] = useState<Record<string, boolean>>({});
+  const [awayMap, setAwayMap] = useState<Record<string, boolean>>({});
+  const setAway = useCallback((away: boolean) => {
+    getSocket()?.emit(EV.AgentSetAway, { away });
+    setMe((m) => (m ? { ...m, away } : m));
+  }, []);
   const [connected, setConnected] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
@@ -247,8 +254,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setVisitorsByWebsite((prev) => ({ ...prev, [payload.websiteId]: payload.visitors ?? [] }));
     };
 
-    const onPresence = (payload: { userId: string; online: boolean }) => {
+    const onPresence = (payload: { userId: string; online: boolean; away?: boolean }) => {
       setOnline((prev) => ({ ...prev, [payload.userId]: payload.online }));
+      setAwayMap((prev) => ({ ...prev, [payload.userId]: !!payload.away }));
     };
 
     const onChatMessage = (payload: { message: ChatMessage }) => {
@@ -424,6 +432,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     conversations,
     visitorsByWebsite,
     online,
+    awayMap,
+    setAway,
     connected,
     toasts,
     incomingCall,

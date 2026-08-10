@@ -2,6 +2,16 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api, type ReportRange, type ReportsOverview } from '../api';
 import { useApp } from '../state';
 import Avatar from '../components/Avatar';
+import {
+  IconAlert,
+  IconChart,
+  IconCheckCircle,
+  IconClock,
+  IconMessage,
+  IconPhoneOff,
+  IconStar,
+  IconUsers,
+} from '../icons';
 import { OutcomeDonut, TrendLines, dayFull, dayLabel, hourLabel } from '../components/charts';
 import { classNames, flagEmoji, formatSeconds } from '../util';
 
@@ -24,18 +34,26 @@ function StatTile({
   value,
   tone,
   icon,
+  tint,
+  color,
 }: {
   label: string;
   value: React.ReactNode;
   tone?: string;
-  icon?: string;
+  icon?: React.ReactNode;
+  tint?: string;
+  color?: string;
 }) {
   const long = typeof value === 'string' && value.length > 8;
   return (
     <div className={classNames('card stat-card rp-tile', tone && `stat-${tone}`)}>
       <div className="rp-tile-top">
         <span className={classNames('stat-value', long && 'stat-value-sm')}>{value}</span>
-        {icon && <span className="rp-tile-icon">{icon}</span>}
+        {icon && (
+          <span className="rp-tile-icon" style={tint ? { background: tint, color } : undefined}>
+            {icon}
+          </span>
+        )}
       </div>
       <span className="stat-label">{label}</span>
     </div>
@@ -82,11 +100,11 @@ export default function Reports() {
   const csatTotal = csatDist.reduce((a, b) => a + b, 0);
 
   // ── Insights strip (computed from real data) ──
-  const insights: { icon: string; title: string; sub: string }[] = [];
+  const insights: { icon: React.ReactNode; title: string; sub: string }[] = [];
   if (data) {
     if (peak && data.totals.closed + data.totals.active + data.totals.waiting > 0) {
       insights.push({
-        icon: '📊',
+        icon: <IconChart size={18} />,
         title: `${hourLabel(peak.start)} – ${hourLabel(peak.start + 2)}`,
         sub: `Peak traffic · ${peak.share}% of chats`,
       });
@@ -94,7 +112,7 @@ export default function Reports() {
     const best = perAgent.find((a) => a.handled > 0);
     if (best) {
       insights.push({
-        icon: '🏆',
+        icon: <IconStar size={18} />,
         title: best.user.name,
         sub: `Best performer · ${best.handled} chats${best.resolutionRate != null ? ` · ${best.resolutionRate}% resolved` : ''}`,
       });
@@ -104,7 +122,7 @@ export default function Reports() {
         ((data.yesterdayFrtSeconds - data.avgFirstResponseSeconds) / data.yesterdayFrtSeconds) * 100,
       );
       insights.push({
-        icon: '⚡',
+        icon: <IconClock size={18} />,
         title: `${Math.abs(diff)}% ${diff >= 0 ? 'faster' : 'slower'}`,
         sub: 'First response vs yesterday',
       });
@@ -114,14 +132,14 @@ export default function Reports() {
       .sort((a, b) => b.missed / (b.chats + b.missed) - a.missed / (a.chats + a.missed))[0];
     if (worstSite) {
       insights.push({
-        icon: '⚠️',
+        icon: <IconAlert size={18} />,
         title: worstSite.name,
         sub: `Attention needed · ${worstSite.missed} missed chat${worstSite.missed === 1 ? '' : 's'}`,
       });
     }
     if (topics[0]) {
       insights.push({
-        icon: '💬',
+        icon: <IconMessage size={18} />,
         title: topics[0].word,
         sub: `Most common topic · ${topics[0].pct}% of words`,
       });
@@ -168,11 +186,11 @@ export default function Reports() {
         <>
           {/* ── Tiles row 1 ── */}
           <div className="stat-grid">
-            <StatTile label="Active now" value={data.totals.active} tone="active" icon="📈" />
-            <StatTile label="In queue" value={data.totals.waiting} tone="waiting" icon="🕐" />
-            <StatTile label="Closed" value={data.totals.closed} tone="closed" icon="✅" />
-            <StatTile label="Missed" value={data.totals.missed} tone="missed" icon="📉" />
-            <StatTile label="Avg first response" value={formatSeconds(data.avgFirstResponseSeconds)} icon="⏱️" />
+            <StatTile label="Active now" value={data.totals.active} icon={<IconMessage size={17} />} tint="#dcfce7" color="#16a34a" />
+            <StatTile label="In queue" value={data.totals.waiting} icon={<IconUsers size={17} />} tint="#ffedd5" color="#ea580c" />
+            <StatTile label="Closed" value={data.totals.closed} icon={<IconCheckCircle size={17} />} tint="#dbeafe" color="#2563eb" />
+            <StatTile label="Missed" value={data.totals.missed} icon={<IconPhoneOff size={17} />} tint="#fee2e2" color="#dc2626" />
+            <StatTile label="Avg first response" value={formatSeconds(data.avgFirstResponseSeconds)} icon={<IconClock size={17} />} tint="#ede9fe" color="#7c3aed" />
             <StatTile
               label={`CSAT (${data.csat?.count ?? 0} rating${(data.csat?.count ?? 0) === 1 ? '' : 's'})`}
               value={
@@ -185,8 +203,9 @@ export default function Reports() {
                   '—'
                 )
               }
-              tone="csat"
-              icon="⭐"
+              icon={<IconStar size={17} />}
+              tint="#fef3c7"
+              color="#d97706"
             />
           </div>
 
@@ -195,24 +214,32 @@ export default function Reports() {
             <StatTile
               label="Resolution rate"
               value={tiles?.resolutionRate != null ? `${tiles.resolutionRate}%` : '—'}
-              icon="🎯"
+              icon={<IconChart size={17} />}
+              tint="#f3e8ff"
+              color="#9333ea"
             />
-            <StatTile label="Avg chat duration" value={formatSeconds(tiles?.avgChatDurationSeconds)} icon="⏳" />
-            <StatTile label="Avg response time" value={formatSeconds(tiles?.avgReplySeconds)} icon="💨" />
+            <StatTile label="Avg chat duration" value={formatSeconds(tiles?.avgChatDurationSeconds)} icon={<IconClock size={17} />} tint="#ede9fe" color="#7c3aed" />
+            <StatTile label="Avg response time" value={formatSeconds(tiles?.avgReplySeconds)} icon={<IconClock size={17} />} tint="#dbeafe" color="#2563eb" />
             <StatTile
               label="Peak hours"
               value={peak ? `${hourLabel(peak.start)} – ${hourLabel(peak.start + 2)}` : '—'}
-              icon="🕑"
+              icon={<IconClock size={17} />}
+              tint="#f3e8ff"
+              color="#9333ea"
             />
             <StatTile
               label="Returning visitors"
               value={tiles?.returningRate != null ? `${tiles.returningRate}%` : '—'}
-              icon="🔁"
+              icon={<IconUsers size={17} />}
+              tint="#dcfce7"
+              color="#16a34a"
             />
             <StatTile
               label="Visitor → chat rate"
               value={tiles?.conversionRate != null ? `${tiles.conversionRate}%` : '—'}
-              icon="📬"
+              icon={<IconAlert size={17} />}
+              tint="#ffedd5"
+              color="#ea580c"
             />
           </div>
 

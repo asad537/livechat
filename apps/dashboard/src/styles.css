@@ -4864,3 +4864,88 @@ img.avatar {
     grid-template-columns: 1fr;
   }
 }
+
+/* Reports insight icons in tinted circles */
+.rp-insight-icon svg { display: block; }
+.rp-insights .rp-insight:nth-child(1) .rp-insight-icon { color: #7c3aed; }
+.rp-insights .rp-insight:nth-child(2) .rp-insight-icon { color: #16a34a; }
+.rp-insights .rp-insight:nth-child(3) .rp-insight-icon { color: #2563eb; }
+.rp-insights .rp-insight:nth-child(4) .rp-insight-icon { color: #ea580c; }
+.rp-insights .rp-insight:nth-child(5) .rp-insight-icon { color: #db2777; }
+
+/* ── Agent availability toggle (sidebar) ── */
+.avail {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.avail-current {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.avail-current:hover { background: rgba(255, 255, 255, 0.08); }
+
+.avail-label { flex: 1; text-align: left; }
+.avail-caret { color: #94a3b8; }
+
+.avail-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avail-online { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
+.avail-away { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+.avail-offline { background: #94a3b8; }
+
+.avail-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #1a1730;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.avail-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+
+.avail-opt:hover { background: rgba(255, 255, 255, 0.07); }
+
+.avail-opt-sub {
+  width: 100%;
+  padding-left: 17px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #94a3b8;
+}

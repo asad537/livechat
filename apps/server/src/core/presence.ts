@@ -14,6 +14,9 @@ export interface PresenceStore {
   removeAgent(userId: string, socketId: string): boolean;         // true = went offline
   isAgentOnline(userId: string): boolean;
   onlineAgentIds(): string[];
+  setAgentAway(userId: string, away: boolean): void;              // manual availability
+  isAgentAway(userId: string): boolean;
+  isAgentAvailable(userId: string): boolean;                      // online AND not away
 
   addVisitor(websiteId: string, visitorId: string, socketId: string, page?: string | null): boolean;
   removeVisitor(websiteId: string, visitorId: string, socketId: string): boolean;
@@ -23,6 +26,7 @@ export interface PresenceStore {
 
 export function createPresence(): PresenceStore {
   const agents = new Map<string, Set<string>>();
+  const away = new Set<string>(); // userIds who set themselves Away
   const visitors = new Map<string, Map<string, { sockets: Set<string>; page: string | null }>>();
   const visitorIndex = new Map<string, string>(); // visitorId → websiteId
 
@@ -49,6 +53,16 @@ export function createPresence(): PresenceStore {
     },
     onlineAgentIds() {
       return [...agents.keys()];
+    },
+    setAgentAway(userId, isAway) {
+      if (isAway) away.add(userId);
+      else away.delete(userId);
+    },
+    isAgentAway(userId) {
+      return away.has(userId);
+    },
+    isAgentAvailable(userId) {
+      return (agents.get(userId)?.size ?? 0) > 0 && !away.has(userId);
     },
 
     addVisitor(websiteId, visitorId, socketId, page = null) {

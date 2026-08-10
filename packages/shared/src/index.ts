@@ -22,6 +22,7 @@ export interface UserPublic {
   avatarColor: string;
   avatarUrl?: string | null; // server path, e.g. /api/users/:id/avatar?v=...
   online?: boolean;
+  away?: boolean;
   activeChats?: number;
 }
 
@@ -186,6 +187,7 @@ export const EV = {
   AgentTyping: 'agent:typing',               // { conversationId, typing: boolean }
   AgentRead: 'agent:read',                   // { conversationId, messageIds: string[] }
   AgentWatchWebsite: 'agent:watch-website',  // { websiteId } subscribe to visitor list + inbox of a website
+  AgentSetAway: 'agent:set-away',            // { away: boolean } manual availability
   AgentCallStart: 'agent:call:start',        // { conversationId, kind: CallKind }
   AgentCallInvite: 'agent:call:invite-participant', // { callId, userId }
 
@@ -193,7 +195,7 @@ export const EV = {
   AgentReady: 'agent:ready',                 // { me: UserPublic, websites: Website[], teams: Team[] }
   InboxUpdate: 'inbox:update',               // { conversation: ConversationSummary }
   VisitorsUpdate: 'visitors:update',         // { websiteId, visitors: Visitor[] }
-  PresenceUpdate: 'presence:update',         // { userId, online: boolean }
+  PresenceUpdate: 'presence:update',         // { userId, online: boolean, away?: boolean }
 
   // errors (both namespaces)
   AppError: 'app:error',                     // { message: string }

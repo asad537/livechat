@@ -1046,6 +1046,27 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       }),
     );
 
+    // ── Manual availability (Online / Away) ──
+    socket.on(
+      EV.AgentSetAway,
+      safe(socket, async (payload: unknown) => {
+        const p = (payload ?? {}) as Record<string, unknown>;
+        const away = p.away === true;
+        deps.presence.setAgentAway(data.userId, away);
+        deps.io
+          .of(AGENT_NAMESPACE)
+          .emit(EV.PresenceUpdate, { userId: data.userId, online: true, away });
+        // Coming back available may pick up queued chats.
+        if (!away) {
+          const sites = await deps.db.all<{ website_id: string }>(
+            'SELECT DISTINCT website_id FROM conversations WHERE status = ?',
+            ['WAITING'],
+          );
+          for (const s of sites) await drainQueue(deps, s.website_id);
+        }
+      }),
+    );
+
     // ── Calls (contract implemented by the features agent) ──
     registerAgentCallHandlers(deps, socket);
 
