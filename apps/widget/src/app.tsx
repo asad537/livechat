@@ -530,7 +530,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
             <div class="lc-strip lc-strip-queue">
               <span class="lc-radar"><span /><span /><span /></span>
               <span>
-                Finding an agent
+                You are in queue
                 <span class="lc-dots"><i>.</i><i>.</i><i>.</i></span>
               </span>
             </div>
