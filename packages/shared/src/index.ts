@@ -37,6 +37,7 @@ export interface Website extends WebsiteBranding {
   widgetKey: string;
   domains: string[];
   teamId: string;
+  aiEnabled?: boolean; // AI assistant greets queued visitors on this site
 }
 
 export interface Team {

@@ -61,6 +61,7 @@ export interface WebsiteRow {
   logo_url: string | null;
   primary_color: string;
   greeting: string;
+  ai_enabled?: number | null;
   created_at: string;
 }
 
@@ -128,6 +129,7 @@ export function toWebsite(row: WebsiteRow): Website {
       .map((d) => d.trim())
       .filter((d) => d.length > 0),
     teamId: row.team_id,
+    aiEnabled: row.ai_enabled == null || Number(row.ai_enabled) !== 0,
   };
 }
 

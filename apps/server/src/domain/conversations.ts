@@ -57,6 +57,7 @@ export interface WebsiteRow {
   logo_url: string | null;
   primary_color: string;
   greeting: string;
+  ai_enabled?: number | null;
   created_at: string;
 }
 

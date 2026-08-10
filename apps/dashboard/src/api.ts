@@ -124,6 +124,7 @@ export interface ReportsOverview {
   topics?: { word: string; n: number; pct: number }[];
   websitePerf?: WebsitePerfRow[];
   yesterdayFrtSeconds?: number | null;
+  yesterday?: { chats: number; closed: number; missed: number; frtSeconds: number | null };
 }
 
 export interface CreateWebsiteInput {
@@ -133,6 +134,7 @@ export interface CreateWebsiteInput {
   greeting: string;
   logoUrl: string | null;
   teamId: string;
+  aiEnabled?: boolean;
 }
 
 export const api = {

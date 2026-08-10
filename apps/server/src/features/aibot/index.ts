@@ -27,6 +27,7 @@ interface WebsiteRow {
   name: string;
   greeting: string;
   primary_color: string;
+  ai_enabled?: number | null;
 }
 
 interface VisitorRow {
@@ -68,7 +69,7 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
 
       const [website, visitor, history] = await Promise.all([
         deps.db.get<WebsiteRow>(
-          'SELECT id, name, greeting, primary_color FROM websites WHERE id = ?',
+          'SELECT id, name, greeting, primary_color, ai_enabled FROM websites WHERE id = ?',
           [conv.website_id],
         ),
         deps.db.get<VisitorRow>('SELECT id, name, email FROM visitors WHERE id = ?', [

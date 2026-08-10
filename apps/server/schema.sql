@@ -76,6 +76,9 @@ ALTER TABLE visitors ADD COLUMN geo_city VARCHAR(64);
 -- Profile pictures (idempotent)
 ALTER TABLE users ADD COLUMN avatar_url TEXT;
 
+-- Per-website AI assistant toggle (idempotent)
+ALTER TABLE websites ADD COLUMN ai_enabled INTEGER NOT NULL DEFAULT 1;
+
 -- Visitor tracking + CRM (idempotent)
 ALTER TABLE visitors ADD COLUMN geo_cc VARCHAR(4);
 ALTER TABLE visitors ADD COLUMN user_agent TEXT;

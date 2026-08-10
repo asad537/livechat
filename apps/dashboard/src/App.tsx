@@ -10,19 +10,23 @@ import Monitoring from './pages/Monitoring';
 import Reports from './pages/Reports';
 import Admin from './pages/Admin';
 import Profile from './pages/Profile';
+import Dashboard from './pages/Dashboard';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
 import ChatDock from './components/ChatDock';
 import DockedChatWindow from './components/DockedChatWindow';
 import {
+  IconBriefcase,
   IconChart,
   IconClock,
   IconEye,
+  IconHome,
   IconInbox,
   IconLogout,
-  IconSettings,
+  IconPlug,
   IconUsers,
+  IconWorkflow,
   LogoMark,
 } from './icons';
 
@@ -30,6 +34,21 @@ function RequireRole({ roles, children }: { roles: Role[]; children: React.React
   const { me } = useApp();
   if (!me || !roles.includes(me.role)) return <Navigate to="/" replace />;
   return children;
+}
+
+/** "/" — leads/admins land on the Dashboard once per session, then it's the Inbox. */
+function Landing() {
+  const { me } = useApp();
+  const first = !sessionStorage.getItem('lc.landed');
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem('lc.landed', '1');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  if (first && me && me.role !== 'CSR') return <Navigate to="/dashboard" replace />;
+  return <Inbox />;
 }
 
 function Sidebar() {
@@ -65,6 +84,11 @@ function Sidebar() {
       </div>
       <div className="nav-section-label">Workspace</div>
       <nav className="sidebar-nav">
+        {isLeadUp && (
+          <NavLink to="/dashboard" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+            {navItem(<IconHome size={17} />, 'Dashboard')}
+          </NavLink>
+        )}
         <NavLink to="/" end className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(
             <IconInbox size={17} />,
@@ -88,12 +112,38 @@ function Sidebar() {
             {navItem(<IconChart size={17} />, 'Reports')}
           </NavLink>
         )}
-        {me.role === 'ADMIN' && (
-          <NavLink to="/admin" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            {navItem(<IconSettings size={17} />, 'Admin')}
-          </NavLink>
-        )}
       </nav>
+      {me.role === 'ADMIN' && (
+        <>
+          <div className="nav-section-label nav-section-admin">Admin</div>
+          <nav className="sidebar-nav sidebar-nav-admin">
+            <NavLink
+              to="/admin/agents"
+              className={({ isActive }) => classNames('nav-item', isActive && 'active')}
+            >
+              {navItem(<IconUsers size={17} />, 'Agents')}
+            </NavLink>
+            <NavLink
+              to="/admin/departments"
+              className={({ isActive }) => classNames('nav-item', isActive && 'active')}
+            >
+              {navItem(<IconBriefcase size={17} />, 'Departments')}
+            </NavLink>
+            <NavLink
+              to="/admin/workflows"
+              className={({ isActive }) => classNames('nav-item', isActive && 'active')}
+            >
+              {navItem(<IconWorkflow size={17} />, 'Workflows')}
+            </NavLink>
+            <NavLink
+              to="/admin/integrations"
+              className={({ isActive }) => classNames('nav-item', isActive && 'active')}
+            >
+              {navItem(<IconPlug size={17} />, 'Integrations')}
+            </NavLink>
+          </nav>
+        </>
+      )}
       <div className="sidebar-foot">
         <div
           className="sidebar-user sidebar-user-link"
@@ -154,7 +204,7 @@ export default function App() {
       <Sidebar />
       <main className="content">
         <Routes>
-          <Route path="/" element={<Inbox />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/visitors" element={<Visitors key="live" />} />
           <Route path="/history" element={<Visitors key="history" initialView="history" />} />
           <Route path="/profile" element={<Profile />} />
@@ -175,7 +225,16 @@ export default function App() {
             }
           />
           <Route
-            path="/admin"
+            path="/dashboard"
+            element={
+              <RequireRole roles={['LEAD', 'ADMIN']}>
+                <Dashboard />
+              </RequireRole>
+            }
+          />
+          <Route path="/admin" element={<Navigate to="/admin/agents" replace />} />
+          <Route
+            path="/admin/:section"
             element={
               <RequireRole roles={['ADMIN']}>
                 <Admin />

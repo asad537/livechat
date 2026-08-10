@@ -1,12 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import type { Role, Team, UserPublic, Website } from '@livechat/shared';
 import { DEFAULT_MAX_CHATS } from '@livechat/shared';
 import { api, type CreateWebsiteInput } from '../api';
 import { useApp } from '../state';
+import Avatar from '../components/Avatar';
 import { classNames, initials } from '../util';
 import { IconCheck, IconCopy, IconPlus, IconUserPlus, IconX } from '../icons';
 
-type Tab = 'websites' | 'teams' | 'users';
+type Section = 'agents' | 'departments' | 'workflows' | 'integrations';
+
+const SECTION_META: Record<Section, { title: string; sub: string }> = {
+  agents: { title: 'Agents', sub: 'Create agents and manage roles & capacity.' },
+  departments: { title: 'Departments', sub: 'Group agents into departments and assign leads.' },
+  workflows: { title: 'Workflows', sub: 'How chats get routed, and the AI assistant per website.' },
+  integrations: { title: 'Integrations', sub: 'Websites, widget embed codes and AI knowledge.' },
+};
 
 function embedSnippet(widgetKey: string): string {
   // Same origin as the dashboard — on production that's https://your-domain/widget.js
@@ -386,10 +395,10 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="New team name"
+          placeholder="New department name"
         />
         <button className="btn btn-primary btn-sm" type="submit" disabled={!newName.trim() || busy}>
-          <IconPlus size={15} /> Create team
+          <IconPlus size={15} /> Create department
         </button>
       </form>
       <div className="admin-list">
@@ -441,9 +450,7 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
               <div className="team-members">
                 {(team.members ?? []).map((m) => (
                   <div key={m.id} className="team-member-row">
-                    <span className="avatar avatar-sm" style={{ background: m.avatarColor }}>
-                      {initials(m.name)}
-                    </span>
+                    <Avatar name={m.name} color={m.avatarColor} url={m.avatarUrl} size="sm" />
                     <span className="team-member-name">
                       {m.name}
                       <span className={classNames('dot', online[m.id] ? 'dot-online' : 'dot-offline')} />
@@ -600,9 +607,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
               <tr key={u.id}>
                 <td>
                   <span className="cell-user">
-                    <span className="avatar avatar-sm" style={{ background: u.avatarColor }}>
-                      {initials(u.name)}
-                    </span>
+                    <Avatar name={u.name} color={u.avatarColor} url={u.avatarUrl} size="sm" />
                     {u.name}
                   </span>
                 </td>
@@ -631,9 +636,104 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   );
 }
 
+// ─── Workflows tab ───────────────────────────────────────────
+function WorkflowsTab() {
+  const { pushToast, refreshDirectory } = useApp();
+  const [websites, setWebsites] = useState<Website[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setWebsites(await api.websites());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const toggleAi = async (site: Website) => {
+    setBusyId(site.id);
+    try {
+      await api.updateWebsite(site.id, { aiEnabled: !(site.aiEnabled ?? true) });
+      await load();
+      void refreshDirectory();
+      pushToast(
+        'Workflow updated',
+        `AI assistant ${site.aiEnabled ?? true ? 'turned off' : 'turned on'} for ${site.name}.`,
+        'success',
+      );
+    } catch (err) {
+      pushToast('Update failed', err instanceof Error ? err.message : undefined, 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const steps = [
+    { icon: '💬', title: 'Visitor starts a chat', sub: 'From the widget on any of your websites' },
+    { icon: '⚡', title: 'Auto-assigned to an agent', sub: 'Least-busy online agent with spare capacity (per-agent max chats)' },
+    { icon: '🤖', title: 'Queue + AI assistant', sub: 'No agent free? The AI answers from the scanned website while the visitor waits' },
+    { icon: '👋', title: 'Type-to-join', sub: 'Any allowed agent can just start typing to take a queued chat' },
+    { icon: '⏰', title: 'Missed after 10 minutes', sub: 'Unanswered queued chats are marked missed; a transcript email goes out on close' },
+  ];
+
+  return (
+    <div className="admin-tab">
+      <div className="card admin-form">
+        <h3>Chat routing pipeline</h3>
+        <div className="wf-steps">
+          {steps.map((s, i) => (
+            <div className="wf-step" key={s.title}>
+              <span className="wf-step-icon">{s.icon}</span>
+              <div className="wf-step-meta">
+                <span className="wf-step-title">{s.title}</span>
+                <span className="wf-step-sub">{s.sub}</span>
+              </div>
+              {i < steps.length - 1 && <span className="wf-step-arrow">→</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card admin-form">
+        <h3>AI assistant per website</h3>
+        <p className="wf-hint">
+          When on, the AI greets and answers queued visitors using that website&apos;s scanned
+          content (run “Scan website for AI” under Integrations).
+        </p>
+        {websites.map((site) => (
+          <div className="wf-site-row" key={site.id}>
+            <span className="chip-dot" style={{ background: site.primaryColor }} />
+            <span className="wf-site-name">{site.name}</span>
+            <button
+              className={classNames('switch', (site.aiEnabled ?? true) && 'on')}
+              disabled={busyId === site.id}
+              onClick={() => void toggleAi(site)}
+              aria-label={`AI assistant for ${site.name}`}
+            >
+              <span className="switch-knob" />
+            </button>
+            <span className="wf-site-state">{(site.aiEnabled ?? true) ? 'AI on' : 'AI off'}</span>
+          </div>
+        ))}
+        {websites.length === 0 && <div className="empty-hint">No websites yet.</div>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────
 export default function Admin() {
-  const [tab, setTab] = useState<Tab>('websites');
+  const params = useParams<{ section?: string }>();
+  const section: Section = (
+    ['agents', 'departments', 'workflows', 'integrations'] as Section[]
+  ).includes(params.section as Section)
+    ? (params.section as Section)
+    : 'agents';
+
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
 
@@ -658,39 +758,21 @@ export default function Admin() {
     void loadTeams();
   }, [loadUsers, loadTeams]);
 
-  const tabs = useMemo(
-    () =>
-      [
-        { id: 'websites' as Tab, label: 'Websites' },
-        { id: 'teams' as Tab, label: 'Teams' },
-        { id: 'users' as Tab, label: 'Users' },
-      ] as const,
-    [],
-  );
+  const meta = SECTION_META[section];
 
   return (
     <div className="page">
       <div className="page-head">
         <div>
-          <h2>Admin</h2>
-          <p className="page-sub">Manage websites, teams and users.</p>
-        </div>
-        <div className="seg-tabs">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              className={classNames('seg-tab', tab === t.id && 'active')}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+          <h2>{meta.title}</h2>
+          <p className="page-sub">{meta.sub}</p>
         </div>
       </div>
 
-      {tab === 'websites' && <WebsitesTab teams={teams} />}
-      {tab === 'teams' && <TeamsTab users={users} />}
-      {tab === 'users' && <UsersTab users={users} reload={() => void loadUsers()} />}
+      {section === 'integrations' && <WebsitesTab teams={teams} />}
+      {section === 'departments' && <TeamsTab users={users} />}
+      {section === 'agents' && <UsersTab users={users} reload={() => void loadUsers()} />}
+      {section === 'workflows' && <WorkflowsTab />}
     </div>
   );
 }

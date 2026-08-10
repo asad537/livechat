@@ -333,3 +333,39 @@ export const IconAndroid = ({ size = 13 }: IconProps) => (
     <circle cx="16.3" cy="12.6" r="1" fill="#fff" />
   </svg>
 );
+
+export const IconBriefcase = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </>
+  ));
+
+export const IconWorkflow = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <circle cx="5" cy="5" r="2.5" />
+      <circle cx="19" cy="12" r="2.5" />
+      <circle cx="7" cy="19" r="2.5" />
+      <path d="M7.4 6.8 16.7 11M16.6 13.4 9.2 17.6" />
+    </>
+  ));
+
+export const IconPlug = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <path d="M9 7V2M15 7V2" />
+      <path d="M6 7h12v4a6 6 0 0 1-6 6 6 6 0 0 1-6-6z" />
+      <path d="M12 17v5" />
+    </>
+  ));
+
+export const IconHome = ({ size, className }: IconProps) =>
+  base(size, className, (
+    <>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
+      <path d="M10 21v-6h4v6" />
+    </>
+  ));

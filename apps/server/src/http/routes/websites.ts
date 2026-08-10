@@ -210,6 +210,10 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
         sets.push('team_id = ?');
         params.push(teamId);
       }
+      if (body.aiEnabled !== undefined) {
+        sets.push('ai_enabled = ?');
+        params.push(body.aiEnabled ? 1 : 0);
+      }
 
       if (sets.length > 0) {
         params.push(id);

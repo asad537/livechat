@@ -201,10 +201,10 @@ export function buildReportsRouter(deps: AppDeps): Router {
           `SELECT created_at FROM conversations WHERE ${siteFilter} AND created_at >= ?`,
           [...siteIds, todayStart],
         ),
-        deps.db.all<{ created_at: string; activated_at: string | null }>(
-          `SELECT created_at, activated_at FROM conversations
-            WHERE ${siteFilter} AND created_at >= ? AND created_at < ? AND activated_at IS NOT NULL`,
-          [...siteIds, yesterdayStart, todayStart],
+        deps.db.all<{ status: string; created_at: string; activated_at: string | null; closed_at: string | null }>(
+          `SELECT status, created_at, activated_at, closed_at FROM conversations
+            WHERE ${siteFilter} AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))`,
+          [...siteIds, yesterdayStart, todayStart, yesterdayStart, todayStart],
         ),
       ]);
 
@@ -440,11 +440,22 @@ export function buildReportsRouter(deps: AppDeps): Router {
         });
       }
 
-      // ── Yesterday's first-response (for the insights strip) ──
+      // ── Yesterday (for vs-yesterday deltas + insights) ──
       const yFrt: number[] = [];
+      let yChats = 0;
+      let yClosed = 0;
+      let yMissed = 0;
       for (const r of yesterdayRows) {
-        const s = secondsBetween(r.created_at, r.activated_at);
-        if (s != null) yFrt.push(s);
+        const startedY = r.created_at >= yesterdayStart && r.created_at < todayStart;
+        if (startedY) {
+          yChats += 1;
+          if (r.status === 'MISSED') yMissed += 1;
+          const s = secondsBetween(r.created_at, r.activated_at);
+          if (s != null) yFrt.push(s);
+        }
+        if (r.status === 'CLOSED' && r.closed_at && r.closed_at >= yesterdayStart && r.closed_at < todayStart) {
+          yClosed += 1;
+        }
       }
 
       const countryTotal = countryRows.reduce((a, b) => a + Number(b.n), 0);
@@ -470,6 +481,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         topics,
         websitePerf,
         yesterdayFrtSeconds: avg(yFrt),
+        yesterday: { chats: yChats, closed: yClosed, missed: yMissed, frtSeconds: avg(yFrt) },
       });
     }),
   );
