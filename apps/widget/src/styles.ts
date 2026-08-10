@@ -469,7 +469,7 @@ export const WIDGET_CSS = `
 }
 
 /* ── End-chat header button ───────────────────────────────── */
-.lc-endbtn:hover { color: #fecaca; }
+.lc-endbtn:hover { color: #fecaca; background: transparent; box-shadow: none; }
 
 /* ── Mobile: full-screen panel ────────────────────────────── */
 @media (max-width: 480px) {
@@ -480,4 +480,65 @@ export const WIDGET_CSS = `
   }
   .lc-invite { right: 10px; left: 10px; width: auto; bottom: 14px; }
 }
+
+/* Custom tooltips (replace native title) */
+:where(.lc-root) [data-tip] { position: relative; }
+:where(.lc-root) [data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 6;
+}
+:where(.lc-root) [data-tip]:hover::after { opacity: 1; transform: translateY(0); }
+
+/* Inline end-chat confirmation */
+:where(.lc-root) .lc-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  animation: lc-fade 0.15s ease;
+}
+:where(.lc-root) .lc-confirm span { flex: 1; }
+:where(.lc-root) .lc-confirm-yes {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+:where(.lc-root) .lc-confirm-yes:hover { background: #b91c1c; }
+:where(.lc-root) .lc-confirm-no {
+  background: transparent;
+  color: #6b7280;
+  border: none;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+:where(.lc-root) .lc-confirm-no:hover { color: #111827; }
+@keyframes lc-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 `;

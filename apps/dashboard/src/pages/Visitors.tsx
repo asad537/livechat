@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Visitor } from '@livechat/shared';
 import { EV } from '@livechat/shared';
 import { useApp } from '../state';
@@ -31,6 +32,20 @@ import {
 const browserIcon = (browser: string) =>
   browser === 'Chrome' ? <IconChrome size={12} /> : <IconGlobe size={11} />;
 
+/** Page indices with ellipses: first, last, and current±1. */
+function pageNumbers(total: number, current: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i);
+  const wanted = [...new Set([0, total - 1, current - 1, current, current + 1])]
+    .filter((p) => p >= 0 && p < total)
+    .sort((a, b) => a - b);
+  const out: (number | '…')[] = [];
+  for (let i = 0; i < wanted.length; i++) {
+    if (i > 0 && wanted[i] - wanted[i - 1] > 1) out.push('…');
+    out.push(wanted[i]);
+  }
+  return out;
+}
+
 const osIcon = (os: string) => {
   if (os === 'macOS' || os === 'iOS') return <IconApple size={12} />;
   if (os === 'Windows') return <IconWindows size={11} />;
@@ -38,7 +53,7 @@ const osIcon = (os: string) => {
   return null;
 };
 
-export default function Visitors() {
+export default function Visitors({ initialView = 'live' }: { initialView?: 'live' | 'history' }) {
   const { websites, visitorsByWebsite, pushToast, openDockedChat, connected } = useApp();
   const [restVisitors, setRestVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
@@ -48,10 +63,13 @@ export default function Visitors() {
   const [, forceTick] = useState(0);
 
   // Live shows online + the 10 freshest; the full archive lives in History (paginated).
-  const [view, setView] = useState<'live' | 'history'>('live');
+  // The view is route-driven (/visitors ↔ /history) so the sidebar stays in sync.
+  const navigate = useNavigate();
+  const view = initialView;
   const [history, setHistory] = useState<Visitor[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [page, setPage] = useState(0);
   const HISTORY_PAGE = 25;
 
   const siteById = useMemo(() => new Map(websites.map((w) => [w.id, w])), [websites]);
@@ -85,15 +103,16 @@ export default function Visitors() {
     return () => clearInterval(t);
   }, []);
 
-  // History tab: server-side search + pagination (debounced).
+  // History tab: server-side search + numbered pagination (debounced).
   const loadHistory = useCallback(
-    (offset: number, append: boolean) => {
+    (p: number) => {
       setHistoryLoading(true);
       void api
-        .visitorHistory({ limit: HISTORY_PAGE, offset, q: query.trim() || undefined })
+        .visitorHistory({ limit: HISTORY_PAGE, offset: p * HISTORY_PAGE, q: query.trim() || undefined })
         .then((r) => {
           setHistoryTotal(r.total);
-          setHistory((prev) => (append ? [...prev, ...r.visitors] : r.visitors));
+          setHistory(r.visitors);
+          setPage(p);
         })
         .catch(() => undefined)
         .finally(() => setHistoryLoading(false));
@@ -102,7 +121,7 @@ export default function Visitors() {
   );
   useEffect(() => {
     if (view !== 'history') return;
-    const t = setTimeout(() => loadHistory(0, false), 300);
+    const t = setTimeout(() => loadHistory(0), 300);
     return () => clearTimeout(t);
   }, [view, loadHistory]);
 
@@ -279,13 +298,13 @@ export default function Visitors() {
           <div className="range-pills">
             <button
               className={classNames('range-pill', view === 'live' && 'active')}
-              onClick={() => setView('live')}
+              onClick={() => navigate('/visitors')}
             >
               Live
             </button>
             <button
               className={classNames('range-pill', view === 'history' && 'active')}
-              onClick={() => setView('history')}
+              onClick={() => navigate('/history')}
             >
               History
             </button>
@@ -323,7 +342,7 @@ export default function Visitors() {
               </h3>
               {table(offlineList.slice(0, 10))}
               {offlineList.length > 10 && (
-                <button className="vt-more-link" onClick={() => setView('history')}>
+                <button className="vt-more-link" onClick={() => navigate('/history')}>
                   View all older visitors in History →
                 </button>
               )}
@@ -357,14 +376,45 @@ export default function Visitors() {
               <p>{query ? 'No visitors match your search' : 'No visitors yet'}</p>
             </div>
           )}
-          {history.length < historyTotal && (
-            <button
-              className="btn btn-ghost vt-load-more"
-              disabled={historyLoading}
-              onClick={() => loadHistory(history.length, true)}
-            >
-              {historyLoading ? 'Loading…' : `Load more (${historyTotal - history.length} left)`}
-            </button>
+          {historyTotal > HISTORY_PAGE && (
+            <div className="vt-pager">
+              <span className="vt-pager-info">
+                Showing {page * HISTORY_PAGE + 1}–{Math.min((page + 1) * HISTORY_PAGE, historyTotal)}{' '}
+                of {historyTotal}
+              </span>
+              <div className="vt-pager-btns">
+                <button
+                  className="vt-pager-btn"
+                  disabled={page === 0 || historyLoading}
+                  onClick={() => loadHistory(page - 1)}
+                >
+                  ‹
+                </button>
+                {pageNumbers(Math.ceil(historyTotal / HISTORY_PAGE), page).map((p, i) =>
+                  p === '…' ? (
+                    <span key={`e${i}`} className="vt-pager-ellipsis">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      className={classNames('vt-pager-btn', p === page && 'active')}
+                      disabled={historyLoading}
+                      onClick={() => loadHistory(p)}
+                    >
+                      {p + 1}
+                    </button>
+                  ),
+                )}
+                <button
+                  className="vt-pager-btn"
+                  disabled={page >= Math.ceil(historyTotal / HISTORY_PAGE) - 1 || historyLoading}
+                  onClick={() => loadHistory(page + 1)}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
           )}
         </>
       )}

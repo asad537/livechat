@@ -3665,3 +3665,61 @@ th.vt-num {
   align-self: center;
   min-width: 220px;
 }
+
+/* Numbered pagination (History tab) */
+.vt-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 2px 4px;
+}
+
+.vt-pager-info {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vt-pager-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vt-pager-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.vt-pager-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.vt-pager-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--aurora-pink));
+  border-color: transparent;
+  color: #fff;
+}
+
+.vt-pager-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.vt-pager-ellipsis {
+  padding: 0 4px;
+  color: var(--text-muted);
+}

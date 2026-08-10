@@ -15,6 +15,7 @@ import ChatDock from './components/ChatDock';
 import DockedChatWindow from './components/DockedChatWindow';
 import {
   IconChart,
+  IconClock,
   IconEye,
   IconInbox,
   IconLogout,
@@ -70,6 +71,9 @@ function Sidebar() {
         </NavLink>
         <NavLink to="/visitors" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconUsers size={17} />, 'Visitors')}
+        </NavLink>
+        <NavLink to="/history" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(<IconClock size={17} />, 'History')}
         </NavLink>
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
@@ -138,7 +142,8 @@ export default function App() {
       <main className="content">
         <Routes>
           <Route path="/" element={<Inbox />} />
-          <Route path="/visitors" element={<Visitors />} />
+          <Route path="/visitors" element={<Visitors key="live" />} />
+          <Route path="/history" element={<Visitors key="history" initialView="history" />} />
           <Route
             path="/monitoring"
             element={

@@ -69,6 +69,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [infoDismissed, setInfoDismissed] = useState(() => lsGet(infoDismissKey) === '1');
   const [invite, setInvite] = useState<Invite | null>(null);
   const [rated, setRated] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const [call, setCall] = useState<ActiveCall | null>(null);
   const [, setCallTick] = useState(0);
 
@@ -467,12 +468,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
               <button
                 type="button"
                 class="lc-iconbtn lc-endbtn"
-                title="End chat"
-                onClick={() => {
-                  if (window.confirm('End this conversation?')) {
-                    socketRef.current?.emit(EV.WidgetEndChat, {});
-                  }
-                }}
+                onClick={() => setConfirmEnd(true)}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
                   <path d="M18.36 6.64a9 9 0 1 1-12.72 0" />
@@ -483,7 +479,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
             <button
               type="button"
               class="lc-iconbtn"
-              title="Minimize"
+              data-tip="Minimize"
               onClick={() => {
                 markDismissed(true);
                 setOpen(false);
@@ -492,6 +488,26 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
               <IconClose />
             </button>
           </div>
+
+          {/* End-chat confirmation (inline, no browser dialog) */}
+          {confirmEnd && (
+            <div class="lc-confirm">
+              <span>End this chat?</span>
+              <button
+                type="button"
+                class="lc-confirm-yes"
+                onClick={() => {
+                  socketRef.current?.emit(EV.WidgetEndChat, {});
+                  setConfirmEnd(false);
+                }}
+              >
+                End chat
+              </button>
+              <button type="button" class="lc-confirm-no" onClick={() => setConfirmEnd(false)}>
+                Cancel
+              </button>
+            </div>
+          )}
 
           {/* Status strips */}
           {!connected ? (
