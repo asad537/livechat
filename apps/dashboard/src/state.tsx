@@ -100,6 +100,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeCall, setActiveCall] = useState<CallMeta | null>(null);
 
   const meRef = useRef<UserPublic | null>(null);
+  // Known online-visitor ids per website — to knock only for genuinely new ones.
+  const seenVisitorsRef = useRef<Record<string, Set<string>>>({});
   meRef.current = me;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
@@ -251,7 +253,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onVisitorsUpdate = (payload: { websiteId: string; visitors: Visitor[] }) => {
-      setVisitorsByWebsite((prev) => ({ ...prev, [payload.websiteId]: payload.visitors ?? [] }));
+      const list = payload.visitors ?? [];
+      // Knock (door sound) when a brand-new online visitor lands on a site.
+      const onlineIds = list.filter((v) => v.online).map((v) => v.id);
+      const prevSeen = seenVisitorsRef.current[payload.websiteId];
+      if (prevSeen) {
+        // Not the first snapshot for this site → any id we haven't seen is new.
+        const hasNew = onlineIds.some((id) => !prevSeen.has(id));
+        if (hasNew) playChime('visitor');
+      }
+      seenVisitorsRef.current[payload.websiteId] = new Set(onlineIds);
+      setVisitorsByWebsite((prev) => ({ ...prev, [payload.websiteId]: list }));
     };
 
     const onPresence = (payload: { userId: string; online: boolean; away?: boolean }) => {

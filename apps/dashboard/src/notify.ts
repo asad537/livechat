@@ -33,14 +33,41 @@ function tone(ac: AudioContext, freq: number, start: number, duration: number, p
   osc.stop(start + duration + 0.05);
 }
 
-/** Pleasant two-note chime for a new chat; single soft note for a message. */
-export function playChime(kind: 'new-chat' | 'message' = 'new-chat'): void {
+/** One short, dull knock: a low burst with a fast decay (wood-ish thud). */
+function knock(ac: AudioContext, start: number): void {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'triangle';
+  // Quick downward pitch drop gives the "tok" of a knuckle on a door.
+  osc.frequency.setValueAtTime(200, start);
+  osc.frequency.exponentialRampToValueAtTime(90, start + 0.06);
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.28, start + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.13);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(start);
+  osc.stop(start + 0.16);
+}
+
+/**
+ * Sounds:
+ *  - 'new-chat'  → pleasant two-note chime
+ *  - 'message'   → single soft note
+ *  - 'visitor'   → two door knocks (a visitor just landed on a site)
+ */
+export function playChime(kind: 'new-chat' | 'message' | 'visitor' = 'new-chat'): void {
   const ac = audioCtx();
   if (!ac) return;
   const t = ac.currentTime;
   if (kind === 'new-chat') {
     tone(ac, 880, t, 0.35, 0.12);
     tone(ac, 1318.5, t + 0.14, 0.45, 0.1);
+  } else if (kind === 'visitor') {
+    // Door knock: knock-knock … knock-knock (~1.4s, unmistakable alert).
+    knock(ac, t);
+    knock(ac, t + 0.24);
+    knock(ac, t + 0.9);
+    knock(ac, t + 1.14);
   } else {
     tone(ac, 740, t, 0.28, 0.08);
   }

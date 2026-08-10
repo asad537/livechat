@@ -5336,3 +5336,51 @@ img.avatar {
 .nav-badge, .badge.nav-badge {
   color: #fff;
 }
+
+/* ── Light-theme fixes for chat dock + docked window (drop black) ── */
+.chat-dock-tab {
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.chat-dock-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.chat-dock-close {
+  color: #94a3b8;
+}
+
+.chat-dock-close:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--text);
+}
+
+.chat-dock-tab.active .chat-dock-close {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chat-dock-tab.active .chat-dock-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.docked-chat-bar {
+  background: var(--accent);
+  color: #fff;
+}
+
+.docked-chat-bar .icon-btn-dark {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.docked-chat-bar .icon-btn-dark:hover {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
