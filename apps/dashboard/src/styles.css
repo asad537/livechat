@@ -5242,3 +5242,97 @@ img.avatar {
 }
 
 .rec-time { font-size: 11px; color: var(--text-muted); }
+
+/* ══════════════════════════════════════════════════════════════
+   Light sidebar (professional, clean) — overrides the dark theme
+   ══════════════════════════════════════════════════════════════ */
+.sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e7eaf0;
+  color: #475569;
+}
+
+.sidebar-brand-name { color: #0f172a; }
+.sidebar-brand-sub { color: #94a3b8; }
+
+.nav-section-label { color: #94a3b8; }
+.nav-section-admin { border-top: 1px solid #eceef3; }
+
+.nav-item {
+  color: #475569;
+}
+
+.nav-icon {
+  background: #f1f4f9;
+  border: 1px solid #e7eaf0;
+  color: #64748b;
+}
+
+.nav-item:hover {
+  background: #f4f6fa;
+  color: #0f172a;
+}
+
+.nav-item:hover .nav-icon {
+  background: #e9edf4;
+}
+
+.nav-item.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.28);
+}
+
+.nav-item.active .nav-icon {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+/* User card */
+.sidebar-user {
+  background: #f6f8fb;
+  border: 1px solid #e7eaf0;
+  box-shadow: none;
+}
+
+.sidebar-user-link:hover { background: #eef1f6; }
+.sidebar-user-name { color: #0f172a; }
+
+.sidebar-user-role {
+  color: #6d28d9;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.icon-btn-dark {
+  color: #64748b;
+  background: #eef1f6;
+  border: 1px solid #e7eaf0;
+}
+
+.icon-btn-dark:hover { background: #e2e6ee; color: #0f172a; }
+
+/* Availability toggle */
+.avail-current {
+  background: #f6f8fb;
+  border: 1px solid #e7eaf0;
+  color: #334155;
+}
+
+.avail-current:hover { background: #eef1f6; }
+.avail-caret { color: #94a3b8; }
+
+.avail-menu {
+  background: #ffffff;
+  border: 1px solid #e7eaf0;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+
+.avail-opt { color: #334155; }
+.avail-opt:hover { background: #f4f6fa; }
+.avail-opt-sub { color: #94a3b8; }
+
+.nav-badge, .badge.nav-badge {
+  color: #fff;
+}
