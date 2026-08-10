@@ -176,7 +176,7 @@ export const WIDGET_CSS = `
   box-shadow: 0 1px 2px rgba(15, 23, 42, .07);
 }
 .lc-bubble-v {
-  background: linear-gradient(135deg, var(--lc-primary), var(--lc-primary-dark));
+  background: var(--lc-primary);
   color: var(--lc-on-primary); border-bottom-right-radius: 5px;
 }
 .lc-bubble-a { background: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 5px; }
