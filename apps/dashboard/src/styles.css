@@ -3644,3 +3644,24 @@ th.vt-num {
   background: #f1f5f9;
   padding: 4px 12px;
 }
+
+.vt-more-link {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.vt-more-link:hover {
+  text-decoration: underline;
+}
+
+.vt-load-more {
+  align-self: center;
+  min-width: 220px;
+}

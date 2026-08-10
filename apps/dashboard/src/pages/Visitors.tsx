@@ -47,6 +47,13 @@ export default function Visitors() {
   const [firstMessage, setFirstMessage] = useState('');
   const [, forceTick] = useState(0);
 
+  // Live shows online + the 10 freshest; the full archive lives in History (paginated).
+  const [view, setView] = useState<'live' | 'history'>('live');
+  const [history, setHistory] = useState<Visitor[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const HISTORY_PAGE = 25;
+
   const siteById = useMemo(() => new Map(websites.map((w) => [w.id, w])), [websites]);
   const siteColor = (v: Visitor | null | undefined) =>
     (v && siteById.get(v.websiteId)?.primaryColor) || 'var(--accent)';
@@ -77,6 +84,27 @@ export default function Visitors() {
     const t = setInterval(() => forceTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // History tab: server-side search + pagination (debounced).
+  const loadHistory = useCallback(
+    (offset: number, append: boolean) => {
+      setHistoryLoading(true);
+      void api
+        .visitorHistory({ limit: HISTORY_PAGE, offset, q: query.trim() || undefined })
+        .then((r) => {
+          setHistoryTotal(r.total);
+          setHistory((prev) => (append ? [...prev, ...r.visitors] : r.visitors));
+        })
+        .catch(() => undefined)
+        .finally(() => setHistoryLoading(false));
+    },
+    [query],
+  );
+  useEffect(() => {
+    if (view !== 'history') return;
+    const t = setTimeout(() => loadHistory(0, false), 300);
+    return () => clearTimeout(t);
+  }, [view, loadHistory]);
 
   // Merge: socket stream wins for online rows, REST fills in offline history.
   const visitors = useMemo(() => {
@@ -248,6 +276,20 @@ export default function Visitors() {
           </p>
         </div>
         <div className="vt-head-tools">
+          <div className="range-pills">
+            <button
+              className={classNames('range-pill', view === 'live' && 'active')}
+              onClick={() => setView('live')}
+            >
+              Live
+            </button>
+            <button
+              className={classNames('range-pill', view === 'history' && 'active')}
+              onClick={() => setView('history')}
+            >
+              History
+            </button>
+          </div>
           <div className="vt-search-wrap">
             <IconSearch size={15} className="vt-search-icon" />
             <input
@@ -263,34 +305,68 @@ export default function Visitors() {
 
       {websites.length === 0 && <div className="empty-hint">No websites are assigned to you yet.</div>}
 
-      {onlineList.length > 0 && (
+      {view === 'live' && (
         <>
-          <h3 className="vt-group-title">
-            <span className="dot dot-online" /> Online now ({onlineList.length})
-          </h3>
-          {table(onlineList)}
+          {onlineList.length > 0 && (
+            <>
+              <h3 className="vt-group-title">
+                <span className="dot dot-online" /> Online now ({onlineList.length})
+              </h3>
+              {table(onlineList)}
+            </>
+          )}
+
+          {offlineList.length > 0 && (
+            <>
+              <h3 className="vt-group-title vt-group-offline">
+                <IconClock size={13} /> Recently active ({Math.min(offlineList.length, 10)})
+              </h3>
+              {table(offlineList.slice(0, 10))}
+              {offlineList.length > 10 && (
+                <button className="vt-more-link" onClick={() => setView('history')}>
+                  View all older visitors in History →
+                </button>
+              )}
+            </>
+          )}
+
+          {websites.length > 0 && visitors.length === 0 && (
+            <div className="empty-state card">
+              <IconUsers size={32} className="empty-state-icon" />
+              <p>{query ? 'No visitors match your search' : 'No visitors right now'}</p>
+              <p className="chat-empty-sub">
+                {query
+                  ? 'Try a different name, email, IP or website.'
+                  : 'Visitors appear here live as they browse your websites.'}
+              </p>
+            </div>
+          )}
         </>
       )}
 
-      {offlineList.length > 0 && (
+      {view === 'history' && (
         <>
           <h3 className="vt-group-title vt-group-offline">
-            <IconClock size={13} /> Recently active — last 24h ({offlineList.length})
+            <IconClock size={13} /> All visitors ({historyTotal})
           </h3>
-          {table(offlineList)}
+          {history.length > 0 && table(history)}
+          {historyLoading && history.length === 0 && <div className="empty-hint">Loading history…</div>}
+          {!historyLoading && history.length === 0 && (
+            <div className="empty-state card">
+              <IconUsers size={32} className="empty-state-icon" />
+              <p>{query ? 'No visitors match your search' : 'No visitors yet'}</p>
+            </div>
+          )}
+          {history.length < historyTotal && (
+            <button
+              className="btn btn-ghost vt-load-more"
+              disabled={historyLoading}
+              onClick={() => loadHistory(history.length, true)}
+            >
+              {historyLoading ? 'Loading…' : `Load more (${historyTotal - history.length} left)`}
+            </button>
+          )}
         </>
-      )}
-
-      {websites.length > 0 && visitors.length === 0 && (
-        <div className="empty-state card">
-          <IconUsers size={32} className="empty-state-icon" />
-          <p>{query ? 'No visitors match your search' : 'No visitors right now'}</p>
-          <p className="chat-empty-sub">
-            {query
-              ? 'Try a different name, email, IP or website.'
-              : 'Visitors appear here live as they browse your websites.'}
-          </p>
-        </div>
       )}
 
       {drawerId && (

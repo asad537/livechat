@@ -149,6 +149,17 @@ export const api = {
       body: patch,
     }),
 
+  visitorHistory: (params: { limit?: number; offset?: number; q?: string; websiteId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set('limit', String(params.limit));
+    if (params.offset) qs.set('offset', String(params.offset));
+    if (params.q) qs.set('q', params.q);
+    if (params.websiteId) qs.set('websiteId', params.websiteId);
+    return request<{ visitors: Visitor[]; total: number; limit: number; offset: number }>(
+      `/api/visitors/history?${qs.toString()}`,
+    );
+  },
+
   websiteVisitors: async (websiteId: string): Promise<Visitor[]> =>
     unwrapList<Visitor>(
       await request<unknown>(`${API.websites}/${encodeURIComponent(websiteId)}/visitors`),

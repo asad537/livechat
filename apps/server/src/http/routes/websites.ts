@@ -246,7 +246,7 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
         : '';
       const rows = await deps.db.all<VisitorRow>(
         `SELECT * FROM visitors WHERE website_id = ? AND (last_seen_at >= ? ${idFilter})
-          ORDER BY last_seen_at DESC LIMIT 200`,
+          ORDER BY last_seen_at DESC LIMIT 30`,
         [websiteId, dayAgo, ...online.map((v) => v.visitorId)],
       );
       const rowIds = rows.map((r) => r.id);

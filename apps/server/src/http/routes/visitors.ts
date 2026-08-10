@@ -11,9 +11,11 @@ import { requireAgent } from '../../core/auth.js';
 import { userCanAccessWebsite } from '../../domain/conversations.js';
 import {
   HttpError,
+  accessibleWebsiteRows,
   agent,
   asString,
   h,
+  placeholders,
   toVisitor,
   type VisitorRow,
 } from '../helpers.js';
@@ -38,6 +40,71 @@ async function loadScopedVisitor(
 export function buildVisitorsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAgent(deps.db, deps.config);
+
+  // GET /api/visitors/history?limit=&offset=&q=&websiteId= — paginated archive.
+  // Must be registered before /api/visitors/:id so "history" isn't taken as an id.
+  router.get(
+    '/api/visitors/history',
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      const scoped = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      const websiteId = asString(req.query.websiteId);
+      let siteIds = scoped;
+      if (websiteId) {
+        if (!scoped.includes(websiteId)) throw new HttpError(403, 'Forbidden');
+        siteIds = [websiteId];
+      }
+      if (siteIds.length === 0) {
+        res.json({ visitors: [], total: 0, limit: 0, offset: 0 });
+        return;
+      }
+
+      const limit = Math.min(50, Math.max(1, Number(asString(req.query.limit)) || 25));
+      const offset = Math.max(0, Number(asString(req.query.offset)) || 0);
+      const q = asString(req.query.q)?.trim().slice(0, 100).replace(/[%_\\]/g, ' ') ?? '';
+
+      let where = `website_id IN (${placeholders(siteIds.length)})`;
+      const params: unknown[] = [...siteIds];
+      if (q) {
+        where +=
+          ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR ip LIKE ? OR geo_city LIKE ? OR geo_country LIKE ?)';
+        const like = `%${q}%`;
+        params.push(like, like, like, like, like, like);
+      }
+
+      const totalRow = await deps.db.get<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM visitors WHERE ${where}`,
+        params,
+      );
+      const rows = await deps.db.all<VisitorRow>(
+        `SELECT * FROM visitors WHERE ${where} ORDER BY last_seen_at DESC LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      );
+
+      // Chats count only for the returned page — cheap.
+      const chatsBy = new Map<string, number>();
+      if (rows.length > 0) {
+        const counts = await deps.db.all<{ visitor_id: string; n: number }>(
+          `SELECT visitor_id, COUNT(*) AS n FROM conversations
+            WHERE visitor_id IN (${placeholders(rows.length)}) GROUP BY visitor_id`,
+          rows.map((r) => r.id),
+        );
+        for (const c of counts) chatsBy.set(c.visitor_id, Number(c.n));
+      }
+
+      res.json({
+        visitors: rows.map((r) => ({
+          ...toVisitor(r),
+          online: deps.presence.isVisitorOnline(r.id),
+          chats: chatsBy.get(r.id) ?? 0,
+        })),
+        total: Number(totalRow?.n ?? 0),
+        limit,
+        offset,
+      });
+    }),
+  );
 
   // GET /api/visitors/:id — profile, session path, stats
   router.get(
