@@ -63,10 +63,15 @@ export function TrendLines({ detail, mode = 'day' }: { detail: NonNullable<Repor
   const xTicks =
     mode === 'hour'
       ? [0, 4, 8, 12, 16, 20]
-      : detail.length > 5
-        ? [0, 3, 6, 9, 12].filter((i) => i < detail.length)
-        : detail.map((_, i) => i);
-  const tickLabel = (i: number) => (mode === 'hour' ? hourLabel(i) : dayFull(detail[i].day));
+      : detail.length <= 16
+        ? detail.map((_, i) => i)
+        : detail.map((_, i) => i).filter((i) => i % 3 === 0);
+  // Day mode shows plain day-of-month numbers (2 3 4 5…); the 1st gets its month.
+  const tickLabel = (i: number) => {
+    if (mode === 'hour') return hourLabel(i);
+    const d = new Date(`${detail[i].day}T00:00:00`);
+    return d.getDate() === 1 || i === 0 ? dayFull(detail[i].day) : String(d.getDate());
+  };
   const hoverLeft = hover != null ? (hover / Math.max(1, detail.length - 1)) * 100 : 0;
   const fullDate = (day: string) =>
     mode === 'hour'
