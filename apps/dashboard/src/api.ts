@@ -81,12 +81,24 @@ export interface AgentReportRow {
   closed: number;
   active: number;
   handled: number;
+  resolutionRate?: number | null;
   avgFirstResponseSeconds: number | null;
   avgDurationSeconds: number | null;
   rating: { average: number | null; count: number };
 }
 
 export type ReportRange = 'today' | '7d' | '30d' | 'all';
+
+export interface WebsitePerfRow {
+  id: string;
+  name: string;
+  color: string;
+  chats: number;
+  missed: number;
+  avgReplySeconds: number | null;
+  resolutionRate: number | null;
+  csat: number | null;
+}
 
 export interface ReportsOverview {
   range?: string;
@@ -95,6 +107,23 @@ export interface ReportsOverview {
   csat: { average: number | null; count: number };
   perAgent: AgentReportRow[];
   trend?: { day: string; count: number }[];
+  tiles?: {
+    resolutionRate: number | null;
+    avgChatDurationSeconds: number | null;
+    avgReplySeconds: number | null;
+    peakHour: { start: number; share: number } | null;
+    returningRate: number | null;
+    conversionRate: number | null;
+  };
+  outcomes?: { resolved: number; transferred: number; missed: number; open: number };
+  byHour?: number[];
+  trendDetail?: { day: string; count: number; frtSeconds: number | null; durationSeconds: number | null }[];
+  csatDist?: number[];
+  funnel?: { visitors: number; chats: number; answered: number; resolved: number };
+  countries?: { country: string; cc: string | null; n: number; pct: number }[];
+  topics?: { word: string; n: number; pct: number }[];
+  websitePerf?: WebsitePerfRow[];
+  yesterdayFrtSeconds?: number | null;
 }
 
 export interface CreateWebsiteInput {
