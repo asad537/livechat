@@ -1,14 +1,16 @@
 import React from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import type { Role } from '@livechat/shared';
 import { useApp } from './state';
-import { classNames, initials } from './util';
+import { classNames } from './util';
 import Login from './pages/Login';
 import Inbox from './pages/Inbox';
 import Visitors from './pages/Visitors';
 import Monitoring from './pages/Monitoring';
 import Reports from './pages/Reports';
 import Admin from './pages/Admin';
+import Profile from './pages/Profile';
+import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
 import ChatDock from './components/ChatDock';
@@ -32,6 +34,7 @@ function RequireRole({ roles, children }: { roles: Role[]; children: React.React
 
 function Sidebar() {
   const { me, logout, connected, conversations } = useApp();
+  const navigate = useNavigate();
   if (!me) return null;
 
   const unread = Object.values(conversations).reduce(
@@ -92,10 +95,13 @@ function Sidebar() {
         )}
       </nav>
       <div className="sidebar-foot">
-        <div className="sidebar-user">
-          <span className="avatar" style={{ background: me.avatarColor }}>
-            {initials(me.name)}
-          </span>
+        <div
+          className="sidebar-user sidebar-user-link"
+          role="button"
+          title="My profile"
+          onClick={() => navigate('/profile')}
+        >
+          <Avatar name={me.name} color={me.avatarColor} url={me.avatarUrl} />
           <div className="sidebar-user-meta">
             <span className="sidebar-user-name">
               {me.name}
@@ -106,7 +112,14 @@ function Sidebar() {
             </span>
             <span className="sidebar-user-role">{me.role}</span>
           </div>
-          <button className="icon-btn icon-btn-dark" onClick={logout} title="Sign out">
+          <button
+            className="icon-btn icon-btn-dark"
+            onClick={(e) => {
+              e.stopPropagation();
+              logout();
+            }}
+            title="Sign out"
+          >
             <IconLogout size={16} />
           </button>
         </div>
@@ -144,6 +157,7 @@ export default function App() {
           <Route path="/" element={<Inbox />} />
           <Route path="/visitors" element={<Visitors key="live" />} />
           <Route path="/history" element={<Visitors key="history" initialView="history" />} />
+          <Route path="/profile" element={<Profile />} />
           <Route
             path="/monitoring"
             element={

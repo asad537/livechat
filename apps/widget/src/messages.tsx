@@ -157,11 +157,30 @@ export function CallCard({ m }: { m: LocalMessage }): JSX.Element {
 
 // ─── One message row ─────────────────────────────────────────
 
+export interface AgentChip {
+  name: string;
+  avatarColor: string;
+  avatarUrl?: string | null;
+}
+
 export interface MessageRowProps {
   m: LocalMessage;
   server: string;
   token: string;
-  fallbackAgent: { name: string; avatarColor: string } | null;
+  fallbackAgent: AgentChip | null;
+}
+
+/** Avatar dot: profile photo when available, colored initials otherwise. */
+export function AvatarDot({ who, server }: { who: AgentChip | null | undefined; server: string }): JSX.Element {
+  if (who?.avatarUrl) {
+    const src = /^https?:/i.test(who.avatarUrl) ? who.avatarUrl : `${server}${who.avatarUrl}`;
+    return <img class="lc-avatar-dot lc-avatar-img" src={src} alt="" />;
+  }
+  return (
+    <div class="lc-avatar-dot" style={`background:${who?.avatarColor ?? '#64748b'}`}>
+      {initials(who?.name)}
+    </div>
+  );
 }
 
 export function MessageRow({ m, server, token, fallbackAgent }: MessageRowProps): JSX.Element {
@@ -196,9 +215,7 @@ export function MessageRow({ m, server, token, fallbackAgent }: MessageRowProps)
   return (
     <div class="lc-row lc-row-a">
       <div class="lc-arow">
-        <div class="lc-avatar-dot" style={`background:${sender?.avatarColor ?? '#64748b'}`}>
-          {initials(sender?.name)}
-        </div>
+        <AvatarDot who={sender} server={server} />
         {content}
       </div>
       <div class="lc-meta" style="padding-left:31px">
@@ -230,11 +247,11 @@ export function renderMessages(
   return out;
 }
 
-export function TypingRow({ agent }: { agent: { name: string; avatarColor: string } | null }): JSX.Element {
+export function TypingRow({ agent, server }: { agent: AgentChip | null; server: string }): JSX.Element {
   return (
     <div class="lc-row lc-row-a">
       <div class="lc-arow">
-        <div class="lc-avatar-dot" style={`background:${agent?.avatarColor ?? '#64748b'}`}>{initials(agent?.name)}</div>
+        <AvatarDot who={agent} server={server} />
         <div class="lc-bubble lc-bubble-a">
           <span class="lc-dots">
             <span />

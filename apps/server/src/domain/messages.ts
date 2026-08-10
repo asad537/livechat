@@ -58,6 +58,7 @@ interface SenderRow {
   id: string;
   name: string;
   avatar_color: string;
+  avatar_url?: string | null;
 }
 
 interface ConversationRefRow {
@@ -142,7 +143,7 @@ export async function hydrateMessages(deps: AppDeps, rows: MessageRow[]): Promis
       : Promise.resolve([] as CallRow[]),
     senderIds.length
       ? deps.db.all<SenderRow>(
-          `SELECT id, name, avatar_color FROM users WHERE id IN (${placeholders(senderIds.length)})`,
+          `SELECT id, name, avatar_color, avatar_url FROM users WHERE id IN (${placeholders(senderIds.length)})`,
           senderIds,
         )
       : Promise.resolve([] as SenderRow[]),
@@ -151,7 +152,10 @@ export async function hydrateMessages(deps: AppDeps, rows: MessageRow[]): Promis
   const files = new Map(fileRows.map((r) => [r.id, toFileMeta(r)]));
   const calls = new Map(callRows.map((r) => [r.id, toCallMeta(r)]));
   const senders = new Map(
-    senderRows.map((r) => [r.id, { name: r.name, avatarColor: r.avatar_color }]),
+    senderRows.map((r) => [
+      r.id,
+      { name: r.name, avatarColor: r.avatar_color, avatarUrl: r.avatar_url ?? null },
+    ]),
   );
 
   return rows.map((row) => ({

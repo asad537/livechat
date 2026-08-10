@@ -171,12 +171,14 @@ export async function emitConversationAgent(deps: AppDeps, conversationId: strin
     [conversationId],
   );
   if (!conv) return;
-  let agent: { name: string; avatarColor: string } | null = null;
+  let agent: { name: string; avatarColor: string; avatarUrl?: string | null } | null = null;
   if (conv.assigned_user_id) {
     const user = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [
       conv.assigned_user_id,
     ]);
-    if (user) agent = { name: user.name, avatarColor: user.avatar_color };
+    if (user) {
+      agent = { name: user.name, avatarColor: user.avatar_color, avatarUrl: user.avatar_url ?? null };
+    }
   }
   deps.io.of(WIDGET_NAMESPACE).to(convRoom(conversationId)).emit(EV.ChatAgent, {
     conversationId,

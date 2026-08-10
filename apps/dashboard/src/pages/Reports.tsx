@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, type ReportRange, type ReportsOverview } from '../api';
 import { useApp } from '../state';
-import { classNames, formatSeconds, initials } from '../util';
+import Avatar from '../components/Avatar';
+import { classNames, formatSeconds } from '../util';
 
 function StatCard({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
   return (
@@ -169,9 +170,12 @@ export default function Reports() {
                     </td>
                     <td>
                       <span className="cell-user">
-                        <span className="avatar avatar-sm" style={{ background: row.user.avatarColor }}>
-                          {initials(row.user.name)}
-                        </span>
+                        <Avatar
+                          name={row.user.name}
+                          color={row.user.avatarColor}
+                          url={row.user.avatarUrl}
+                          size="sm"
+                        />
                         <span className="lb-user-meta">
                           <span className="lb-user-name">{row.user.name}</span>
                           <span className="lb-bar-track">

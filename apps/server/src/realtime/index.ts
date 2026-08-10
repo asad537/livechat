@@ -645,7 +645,7 @@ async function onWidgetConnected(
 
   let conversation = null;
   let messages: unknown[] = [];
-  let agent: { name: string; avatarColor: string } | null = null;
+  let agent: { name: string; avatarColor: string; avatarUrl?: string | null } | null = null;
 
   if (conv) {
     data.conversationId = conv.id;
@@ -662,7 +662,13 @@ async function onWidgetConnected(
       const assigned = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [
         conv.assigned_user_id,
       ]);
-      if (assigned) agent = { name: assigned.name, avatarColor: assigned.avatar_color };
+      if (assigned) {
+        agent = {
+          name: assigned.name,
+          avatarColor: assigned.avatar_color,
+          avatarUrl: assigned.avatar_url ?? null,
+        };
+      }
     }
   }
 

@@ -73,6 +73,9 @@ ALTER TABLE visitors ADD COLUMN ip VARCHAR(64);
 ALTER TABLE visitors ADD COLUMN geo_country VARCHAR(64);
 ALTER TABLE visitors ADD COLUMN geo_city VARCHAR(64);
 
+-- Profile pictures (idempotent)
+ALTER TABLE users ADD COLUMN avatar_url TEXT;
+
 -- Visitor tracking + CRM (idempotent)
 ALTER TABLE visitors ADD COLUMN geo_cc VARCHAR(4);
 ALTER TABLE visitors ADD COLUMN user_agent TEXT;

@@ -54,6 +54,7 @@ interface AppContextValue {
   dockedChatId: string | null;
   openDockedChat(id: string): void;
   closeDockedChat(): void;
+  setMeUser(user: UserPublic): void;
   login(email: string, password: string): Promise<void>;
   logout(): void;
   pushToast(title: string, body?: string, kind?: Toast['kind']): void;
@@ -433,6 +434,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dockedChatId,
     openDockedChat,
     closeDockedChat,
+    setMeUser: setMe,
     login,
     logout,
     pushToast,

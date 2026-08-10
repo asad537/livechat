@@ -34,7 +34,7 @@ interface ReadyPayload {
   website: WebsiteBranding;
   conversation?: ConversationSummary | null;
   messages?: ChatMessage[];
-  agent?: { name: string; avatarColor: string } | null;
+  agent?: { name: string; avatarColor: string; avatarUrl?: string | null } | null;
 }
 
 interface ConvState {
@@ -60,7 +60,11 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [visitorToken, setVisitorToken] = useState('');
   const [conversation, setConversation] = useState<ConvState | null>(null);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
-  const [agent, setAgent] = useState<{ name: string; avatarColor: string } | null>(null);
+  const [agent, setAgent] = useState<{
+    name: string;
+    avatarColor: string;
+    avatarUrl?: string | null;
+  } | null>(null);
   const [agentTyping, setAgentTyping] = useState(false);
   const [unread, setUnread] = useState(0);
   const [draft, setDraft] = useState('');
@@ -198,7 +202,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       if (conv.status === 'CLOSED' || conv.status === 'MISSED') setAgentTyping(false);
     });
 
-    socket.on(EV.ChatAgent, ({ agent: a }: { conversationId: string; agent: { name: string; avatarColor: string } | null }) => {
+    socket.on(EV.ChatAgent, ({ agent: a }: { conversationId: string; agent: { name: string; avatarColor: string; avatarUrl?: string | null } | null }) => {
       setAgent(a ?? null);
     });
 
@@ -454,9 +458,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
               <div class="lc-title">{website.name}</div>
               {agent ? (
                 <div class="lc-agent-chip">
-                  <span class="lc-avatar-dot" style={`background:${agent.avatarColor}`}>
-                    {initials(agent.name)}
-                  </span>
+                  {agent.avatarUrl ? (
+                    <img
+                      class="lc-avatar-dot lc-avatar-img"
+                      src={/^https?:/i.test(agent.avatarUrl) ? agent.avatarUrl : `${server}${agent.avatarUrl}`}
+                      alt=""
+                    />
+                  ) : (
+                    <span class="lc-avatar-dot" style={`background:${agent.avatarColor}`}>
+                      {initials(agent.name)}
+                    </span>
+                  )}
                   <span class="lc-agent-name">{agent.name}</span>
                   <span class="lc-online-dot" />
                 </div>
@@ -528,7 +540,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
           <div class="lc-body" ref={bodyRef}>
             {messages.length === 0 && website.greeting && <div class="lc-greet">{website.greeting}</div>}
             {renderMessages(messages, { server, token: visitorToken, fallbackAgent: agent })}
-            {agentTyping && !ended && <TypingRow agent={agent} />}
+            {agentTyping && !ended && <TypingRow agent={agent} server={server} />}
             {showInfoForm && <InfoForm onSubmit={submitInfo} onDismiss={dismissInfo} />}
           </div>
 

@@ -541,4 +541,6 @@ export const WIDGET_CSS = `
 }
 :where(.lc-root) .lc-confirm-no:hover { color: #111827; }
 @keyframes lc-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+:where(.lc-root) .lc-avatar-img { object-fit: cover; padding: 0; border: none; }
 `;

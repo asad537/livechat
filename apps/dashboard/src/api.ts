@@ -115,6 +115,37 @@ export const api = {
 
   me: () => request<{ user: UserPublic; websites: Website[]; teams: Team[] }>(API.me),
 
+  updateMe: (patch: {
+    name?: string;
+    avatarColor?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => request<{ user: UserPublic }>(API.me, { method: 'PATCH', body: patch }),
+
+  uploadMyAvatar: async (file: File): Promise<UserPublic> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const token = getToken() ?? '';
+    const res = await fetch(`${API.me}/avatar`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: fd,
+    });
+    if (!res.ok) {
+      let message = 'Upload failed';
+      try {
+        const data = (await res.json()) as Record<string, unknown>;
+        if (typeof data.error === 'string') message = data.error;
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(message, res.status);
+    }
+    return ((await res.json()) as { user: UserPublic }).user;
+  },
+
+  deleteMyAvatar: () => request<{ user: UserPublic }>(`${API.me}/avatar`, { method: 'DELETE' }),
+
   users: async (): Promise<UserPublic[]> =>
     unwrapList<UserPublic>(await request<unknown>(API.users), 'users'),
 

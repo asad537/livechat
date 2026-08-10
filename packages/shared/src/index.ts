@@ -20,6 +20,7 @@ export interface UserPublic {
   role: Role;
   maxChats: number;
   avatarColor: string;
+  avatarUrl?: string | null; // server path, e.g. /api/users/:id/avatar?v=...
   online?: boolean;
   activeChats?: number;
 }
@@ -107,7 +108,7 @@ export interface ChatMessage {
   readAt: string | null;
   file?: FileMeta | null;
   call?: CallMeta | null;
-  sender?: { name: string; avatarColor: string } | null;
+  sender?: { name: string; avatarColor: string; avatarUrl?: string | null } | null;
   tempId?: string;
 }
 
