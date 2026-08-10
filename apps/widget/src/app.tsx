@@ -157,6 +157,16 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       );
       setMessages((payload.messages ?? []) as LocalMessage[]);
       setConnected(true);
+
+      // First-time visitor on this browser → pop the chat open once with the
+      // greeting, so they see "How can we help?" without clicking the bubble.
+      // Skips repeat visits and anyone who minimized it earlier this session.
+      const seenKey = `livechat:greeted:${widgetKey}`;
+      const noHistory = (payload.messages ?? []).length === 0;
+      if (noHistory && !lsGet(seenKey) && !dismissedRef.current) {
+        lsSet(seenKey, '1');
+        window.setTimeout(() => setOpen(true), 700);
+      }
     });
 
     socket.on(EV.ChatMessage, ({ message }: { message: ChatMessage }) => {
