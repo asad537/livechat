@@ -4245,3 +4245,33 @@ img.avatar {
   color: var(--text-muted);
   font-size: 11px;
 }
+
+/* Leaderboard table polish */
+.lb-table th,
+.lb-table td {
+  white-space: nowrap;
+}
+
+.lb-table th {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  padding: 10px 10px;
+}
+
+.lb-table td {
+  padding: 10px 10px;
+}
+
+.lb-user-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.lb-user-meta {
+  min-width: 130px;
+}
+
+.lb-bar-track {
+  max-width: 150px;
+}

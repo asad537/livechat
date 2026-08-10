@@ -478,12 +478,14 @@ export default function Reports() {
                                   className={classNames('dot', online[row.user.id] ? 'dot-online' : 'dot-offline')}
                                 />
                               </span>
-                              <span className="lb-bar-track">
-                                <span
-                                  className="lb-bar-fill"
-                                  style={{ width: `${Math.max(2, (row.handled / maxHandled) * 100)}%` }}
-                                />
-                              </span>
+                              {row.handled > 0 && (
+                                <span className="lb-bar-track">
+                                  <span
+                                    className="lb-bar-fill"
+                                    style={{ width: `${Math.max(2, (row.handled / maxHandled) * 100)}%` }}
+                                  />
+                                </span>
+                              )}
                             </span>
                           </span>
                         </td>
