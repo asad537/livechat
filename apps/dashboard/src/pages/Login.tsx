@@ -60,13 +60,6 @@ export default function Login() {
         <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
-        <div className="login-hint">
-          <span>Demo accounts</span>
-          <code>admin@demo.com / admin123</code>
-          <code>lead@demo.com / lead123</code>
-          <code>sara@demo.com / csr123</code>
-          <code>ali@demo.com / csr123</code>
-        </div>
       </form>
     </div>
   );
