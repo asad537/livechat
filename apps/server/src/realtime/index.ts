@@ -34,6 +34,7 @@ import {
   hasCapacity,
   loadSummary,
   recordAssignment,
+  setVisitorRefresh,
   toBranding,
   toVisitor,
   transferConversation,
@@ -192,8 +193,25 @@ async function buildVisitorList(deps: AppDeps, websiteId: string): Promise<Visit
       WHERE visitor_id IN (${placeholders}) GROUP BY visitor_id`,
     ids,
   );
+  // Current open conversation per visitor (+ its agent name) — for the live
+  // "busy with another agent" hint, independent of history scoping.
+  const openRows = await deps.db.all<{
+    visitor_id: string;
+    id: string;
+    status: string;
+    assigned_user_id: string | null;
+    agent_name: string | null;
+  }>(
+    `SELECT c.visitor_id, c.id, c.status, c.assigned_user_id, u.name AS agent_name
+       FROM conversations c
+       LEFT JOIN users u ON u.id = c.assigned_user_id
+      WHERE c.visitor_id IN (${placeholders})
+        AND c.status IN ('WAITING', 'OFFERED', 'ACTIVE')`,
+    ids,
+  );
   const pagesBy = new Map(pageCounts.map((r) => [r.visitor_id, Number(r.n)]));
   const chatsBy = new Map(chatCounts.map((r) => [r.visitor_id, Number(r.n)]));
+  const openBy = new Map(openRows.map((r) => [r.visitor_id, r]));
   return online.map((o) => {
     const row = byId.get(o.visitorId);
     const base: Visitor = row
@@ -209,6 +227,15 @@ async function buildVisitorList(deps: AppDeps, websiteId: string): Promise<Visit
         };
     base.sessionPages = pagesBy.get(o.visitorId) ?? 0;
     base.chats = chatsBy.get(o.visitorId) ?? 0;
+    const open = openBy.get(o.visitorId);
+    base.activeConversation = open
+      ? {
+          id: open.id,
+          status: open.status as NonNullable<Visitor['activeConversation']>['status'],
+          assignedUserId: open.assigned_user_id,
+          agentName: open.agent_name,
+        }
+      : null;
     return base;
   });
 }
@@ -319,6 +346,21 @@ async function getConversation(
 export function attachRealtime(deps: AppDeps): void {
   attachWidgetNamespace(deps, deps.io.of(WIDGET_NAMESPACE));
   attachAgentNamespace(deps, deps.io.of(AGENT_NAMESPACE));
+
+  // Assignment/status changes → refresh the live visitor list for that site
+  // (coalesced per website so a burst produces one broadcast).
+  const pendingVisitorRefresh = new Map<string, NodeJS.Timeout>();
+  setVisitorRefresh((websiteId) => {
+    if (pendingVisitorRefresh.has(websiteId)) return;
+    const t = setTimeout(() => {
+      pendingVisitorRefresh.delete(websiteId);
+      void broadcastVisitors(deps, websiteId).catch((err) =>
+        console.error('[realtime] visitor refresh', err),
+      );
+    }, 150);
+    t.unref?.();
+    pendingVisitorRefresh.set(websiteId, t);
+  });
 
   // Fires once the visitor-offline grace period expires (not on every page
   // navigation) — only then do agents see them drop out of "Online now".

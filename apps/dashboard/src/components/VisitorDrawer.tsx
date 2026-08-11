@@ -109,6 +109,22 @@ export default function VisitorDrawer({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // When this visitor's live open conversation changes (started, transferred,
+  // closed), refresh the Past-chats list so it — and its count — stay honest
+  // without a manual reload.
+  const liveConvKey = `${live?.activeConversation?.id ?? ''}:${live?.activeConversation?.status ?? ''}:${live?.activeConversation?.assignedUserId ?? ''}`;
+  const firstConvKey = useRef(true);
+  useEffect(() => {
+    if (firstConvKey.current) {
+      firstConvKey.current = false;
+      return; // initial load already fetched chats
+    }
+    void api
+      .visitorConversations(visitorId)
+      .then(setChats)
+      .catch(() => undefined);
+  }, [liveConvKey, visitorId]);
+
   const v: Visitor | null = useMemo(() => {
     if (!profile) return live ?? null;
     return { ...profile.visitor, ...(live ?? {}), notes: profile.visitor.notes };
@@ -181,8 +197,18 @@ export default function VisitorDrawer({
     URL.revokeObjectURL(url);
   };
 
-  // The conversation shown in the Chat tab: an already-open one, or one we just started.
-  const openConv = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED');
+  // Current open conversation for this visitor. Prefer the LIVE signal from
+  // the visitors stream (activeConversation) — it always knows the current
+  // agent even when history scoping hides another CSR's transcript, and it
+  // updates in real time on transfer / start / accept without a reload.
+  const liveOpen = live?.activeConversation ?? null;
+  const scopedOpen = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED') ?? null;
+  const openConv: {
+    id: string;
+    status: string;
+    assignedUserId: string | null;
+    agentName: string | null;
+  } | null = liveOpen ?? scopedOpen ?? null;
   // Can the current agent actually open this conversation? (Assigned to me,
   // unassigned/queued, my CSR's chat if I'm a Team Lead, or I'm an
   // admin/manager.) Otherwise it's someone else's chat.
@@ -190,7 +216,7 @@ export default function VisitorDrawer({
     !openConv ||
     openConv.assignedUserId == null ||
     openConv.assignedUserId === me?.id ||
-    (me?.role === 'LEAD' && csrIds.includes(openConv.assignedUserId)) ||
+    (me?.role === 'LEAD' && !!openConv.assignedUserId && csrIds.includes(openConv.assignedUserId)) ||
     me?.role === 'ADMIN' ||
     me?.role === 'MANAGER';
   const busyAgent = openConv && !canOpenConv ? openConv.agentName : null;

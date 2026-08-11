@@ -71,6 +71,14 @@ export interface Visitor {
   phone?: string | null;
   notes?: string | null;
   chats?: number;                   // lifetime conversation count
+  // Live open conversation (WAITING/OFFERED/ACTIVE), if any — drives the
+  // "busy with another agent" hint independent of history scoping.
+  activeConversation?: {
+    id: string;
+    status: ConversationStatus;
+    assignedUserId: string | null;
+    agentName: string | null;
+  } | null;
 }
 
 export interface VisitorPage {

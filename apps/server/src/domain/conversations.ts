@@ -206,6 +206,15 @@ export async function loadSummaries(
   return summaries;
 }
 
+// Registered by the realtime layer — lets domain trigger a live visitor-list
+// refresh (which carries each visitor's current open conversation + agent)
+// whenever an assignment/status change happens, so "busy with another agent"
+// and post-transfer ownership update everywhere without a page reload.
+let visitorRefresh: ((websiteId: string) => void) | null = null;
+export function setVisitorRefresh(fn: (websiteId: string) => void): void {
+  visitorRefresh = fn;
+}
+
 /** Push a fresh summary to the assignee's room and the website watchers' room in `/agent`. */
 export async function emitInboxUpdate(deps: AppDeps, conversationId: string): Promise<void> {
   const conversation = await loadSummary(deps, conversationId);
@@ -215,6 +224,8 @@ export async function emitInboxUpdate(deps: AppDeps, conversationId: string): Pr
     agentNs.to(`user:${conversation.assignedUserId}`).emit(EV.InboxUpdate, { conversation });
   }
   agentNs.to(`website:${conversation.websiteId}`).emit(EV.InboxUpdate, { conversation });
+  // Keep the live visitor list (open-conversation + agent name) in sync.
+  visitorRefresh?.(conversation.websiteId);
 }
 
 /** Emit `EV.ChatStatus` with a fresh summary to the conversation room in both namespaces. */
