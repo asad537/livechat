@@ -657,7 +657,12 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
     // A page reload/navigation closes this socket for a second — the presence
     // store keeps the visitor online through a grace window, and the real
     // offline handling lives in the setVisitorOfflineListener callback.
+    // last_seen_at is stamped HERE too, so "Last seen" stays truthful even if
+    // a server restart wipes the pending grace timer.
     socket.on('disconnect', () => {
+      void deps.db
+        .run('UPDATE visitors SET last_seen_at = ? WHERE id = ?', [nowIso(), data.visitorId])
+        .catch(() => undefined);
       deps.presence.removeVisitor(data.websiteId, data.visitorId, socket.id);
     });
   });
@@ -674,6 +679,16 @@ async function onWidgetConnected(
     nowIso(),
     data.visitorId,
   ]);
+
+  // Heartbeat: long visits keep last_seen_at fresh (~60s accuracy) even if
+  // the process restarts mid-visit and never sees this socket disconnect.
+  const heartbeat = setInterval(() => {
+    void deps.db
+      .run('UPDATE visitors SET last_seen_at = ? WHERE id = ?', [nowIso(), data.visitorId])
+      .catch(() => undefined);
+  }, 60_000);
+  heartbeat.unref?.();
+  socket.on('disconnect', () => clearInterval(heartbeat));
 
   // Resume the open conversation, if any.
   const conv = await deps.db.get<ConversationRow>(
