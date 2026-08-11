@@ -409,7 +409,13 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       // ── Visit/session tracking (Zendesk-style) ──
       const now = nowIso();
       const gapMs = Date.now() - Date.parse(visitorRow.last_seen_at || visitorRow.created_at);
-      const newSession = !visitorRow.session_started_at || gapMs > 30 * 60 * 1000;
+      // "Visits" counts analytics-style (30-min idle = new visit)…
+      const newVisit = !visitorRow.session_started_at || gapMs > 30 * 60 * 1000;
+      // …but the live "On site" timer restarts whenever the visitor actually
+      // went offline and came back (page navigation keeps them online via the
+      // presence grace, so the timer keeps running across pages).
+      const newSession =
+        !visitorRow.session_started_at || !deps.presence.isVisitorOnline(visitorRow.id);
       await deps.db.run(
         `UPDATE visitors SET
            last_seen_at = ?,
@@ -423,7 +429,7 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           (asString(socket.handshake.headers['user-agent'] as string) ?? '').slice(0, 500) || null,
           asString(auth.referrer)?.slice(0, 500) ?? '',
           asString(auth.referrer)?.slice(0, 500) ?? '',
-          newSession ? 1 : 0,
+          newVisit ? 1 : 0,
           newSession ? 1 : 0,
           now,
           now,
