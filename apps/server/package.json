@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "start": "node --disable-warning=ExperimentalWarning --import tsx src/index.ts",
+    "seed:team": "tsx src/seed-team.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
