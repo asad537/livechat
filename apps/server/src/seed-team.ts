@@ -63,9 +63,9 @@ const TEAMS: Array<{ lead: [string, string]; csrs: Array<[string, string]> }> = 
 ];
 
 const ADMINS: Array<[string, string]> = [
-  ['amir@customboxes.com', 'Amir'],
-  ['maxlead@customboxes.com', 'Max Lead'],
-  ['bobfadi@customboxes.com', 'Bob Fadi'],
+  ['amir@thecustomboxes.com', 'Amir'],
+  ['maxlead@thecustomboxes.com', 'Max Lead'],
+  ['bobfadi@thecustomboxes.com', 'Bob Fadi'],
 ];
 
 const MANAGERS: Array<[string, string]> = [
@@ -84,6 +84,9 @@ const REMOVE_EMAILS = [
   'leadb@t.com',
   'csra@t.com',
   'csrb@t.com',
+  'amir@customboxes.com',
+  'maxlead@customboxes.com',
+  'bobfadi@customboxes.com',
 ];
 
 const COLORS = [
