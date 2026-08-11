@@ -90,7 +90,7 @@ export default function ChatHistory() {
         </div>
       </div>
 
-      <div className="rec-filters card">
+      <div className="rec-filters ch-filters card">
         <label className="rec-field rec-field-grow">
           <span>Search</span>
           <div className="rec-search">

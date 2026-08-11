@@ -5492,3 +5492,47 @@ img.avatar {
   gap: 4px;
   white-space: nowrap;
 }
+
+/* Chat History — responsive filter grid */
+.ch-filters {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.6fr) repeat(5, minmax(110px, 1fr));
+  gap: 12px 14px;
+  align-items: end;
+  padding: 14px 16px;
+}
+
+.ch-filters .rec-field,
+.ch-filters .rec-search {
+  min-width: 0;
+}
+
+.ch-filters .rec-field input,
+.ch-filters .rec-field select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1150px) {
+  .ch-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ch-filters .rec-field-grow {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .ch-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Wide tables scroll inside their card instead of squashing the page */
+.vt-card {
+  overflow-x: auto;
+}
+
+.vt-card .vt-table {
+  min-width: 720px;
+}
