@@ -71,8 +71,14 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
   };
 
   return (
-    <form className="card admin-form" onSubmit={submit}>
-      <h3>{initial ? `Edit ${initial.name}` : 'New website'}</h3>
+    <div className="modal-backdrop" onClick={onCancel}>
+    <form className="modal modal-wide admin-form" onSubmit={submit} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-head">
+        <h3>{initial ? `Edit ${initial.name}` : 'New website'}</h3>
+        <button type="button" className="icon-btn" onClick={onCancel} aria-label="Close">
+          <IconX size={16} />
+        </button>
+      </div>
       <div className="form-grid">
         <label className="field">
           <span>Name</span>
@@ -144,6 +150,7 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
         </button>
       </div>
     </form>
+    </div>
   );
 }
 
