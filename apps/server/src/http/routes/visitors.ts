@@ -15,12 +15,34 @@ import {
   agent,
   asString,
   h,
+  myCsrIds,
   placeholders,
   toVisitor,
   type VisitorRow,
 } from '../helpers.js';
 
 const MAX_PATH_ENTRIES = 50;
+
+/**
+ * Which conversations a user may see in a visitor's history:
+ *  • CSR  → only chats they personally handled (own name)
+ *  • LEAD → own chats + their own CSRs' chats (not other teams')
+ *  • ADMIN/MANAGER → everything (empty clause)
+ * Returns an `assigned_user_id` SQL fragment + params.
+ */
+async function conversationScope(
+  deps: AppDeps,
+  user: { id: string; role: Role },
+): Promise<{ sql: string; params: string[] }> {
+  if (user.role === 'CSR') {
+    return { sql: ' AND assigned_user_id = ?', params: [user.id] };
+  }
+  if (user.role === 'LEAD') {
+    const mine = [user.id, ...(await myCsrIds(deps, user.id))];
+    return { sql: ` AND assigned_user_id IN (${placeholders(mine.length)})`, params: mine };
+  }
+  return { sql: '', params: [] };
+}
 
 async function loadScopedVisitor(
   deps: AppDeps,
@@ -114,6 +136,9 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const user = agent(req);
       const row = await loadScopedVisitor(deps, req, user.id, user.role);
 
+      // Chat counts follow the same past-chat visibility rules (see below).
+      const chatScope = await conversationScope(deps, user);
+
       const pathRows = await deps.db.all<{ url: string | null; title: string | null; created_at: string }>(
         `SELECT url, title, created_at FROM (
            SELECT url, title, created_at FROM visitor_pages
@@ -127,13 +152,22 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
         at: p.created_at,
       }));
 
+      const cs = chatScope.sql; // '' for admin/manager, ' AND assigned_user_id IN (...)' otherwise
       const stats = await deps.db.get<{ chats: number; pages: number; rated: number; avg: number | null }>(
         `SELECT
-           (SELECT COUNT(*) FROM conversations WHERE visitor_id = ?) AS chats,
+           (SELECT COUNT(*) FROM conversations WHERE visitor_id = ?${cs}) AS chats,
            (SELECT COUNT(*) FROM visitor_pages WHERE visitor_id = ?) AS pages,
-           (SELECT COUNT(*) FROM conversations WHERE visitor_id = ? AND rating IS NOT NULL) AS rated,
-           (SELECT AVG(rating) FROM conversations WHERE visitor_id = ? AND rating IS NOT NULL) AS avg`,
-        [row.id, row.id, row.id, row.id],
+           (SELECT COUNT(*) FROM conversations WHERE visitor_id = ?${cs} AND rating IS NOT NULL) AS rated,
+           (SELECT AVG(rating) FROM conversations WHERE visitor_id = ?${cs} AND rating IS NOT NULL) AS avg`,
+        [
+          row.id,
+          ...chatScope.params,
+          row.id,
+          row.id,
+          ...chatScope.params,
+          row.id,
+          ...chatScope.params,
+        ],
       );
 
       const online = deps.presence.isVisitorOnline(row.id);
@@ -200,6 +234,10 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const user = agent(req);
       const row = await loadScopedVisitor(deps, req, user.id, user.role);
 
+      const scope = await conversationScope(deps, user);
+      const scopeSql = scope.sql.replace('assigned_user_id', 'c.assigned_user_id');
+      const scopeParams = scope.params;
+
       const convs = await deps.db.all<{
         id: string;
         status: string;
@@ -219,10 +257,10 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
                   ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS preview
            FROM conversations c
            LEFT JOIN users u ON u.id = c.assigned_user_id
-          WHERE c.visitor_id = ?
+          WHERE c.visitor_id = ?${scopeSql}
           ORDER BY c.created_at DESC
           LIMIT 100`,
-        [row.id],
+        [row.id, ...scopeParams],
       );
       res.json(
         convs.map((c) => ({
