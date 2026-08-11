@@ -58,7 +58,7 @@ interface AppContextValue {
   openDockedChat(id: string): void;
   closeDockedChat(): void;
   setMeUser(user: UserPublic): void;
-  login(email: string, password: string): Promise<void>;
+  login(email: string, password: string, remember?: boolean): Promise<void>;
   logout(): void;
   pushToast(title: string, body?: string, kind?: Toast['kind']): void;
   dismissToast(id: number): void;
@@ -406,9 +406,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [unreadTotal]);
 
   // ─── Auth actions ──────────────────────────────────────────
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, remember = true) => {
     const res = await api.login(email, password);
-    setToken(res.token);
+    setToken(res.token, remember);
     setMe(res.user);
     setTokenState(res.token);
   }, []);

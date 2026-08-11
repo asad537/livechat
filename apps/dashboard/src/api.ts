@@ -16,15 +16,19 @@ import { API } from '@livechat/shared';
 const TOKEN_KEY = 'livechat.dashboard.token';
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+// remember=true → persist across browser restarts (localStorage);
+// false → only for this tab session (sessionStorage).
+export function setToken(token: string, remember = true): void {
+  clearToken();
+  (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, token);
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 // ─── Fetch helper ────────────────────────────────────────────
