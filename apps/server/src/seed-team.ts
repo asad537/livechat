@@ -63,6 +63,7 @@ const TEAMS: Array<{ lead: [string, string]; csrs: Array<[string, string]> }> = 
 ];
 
 const ADMINS: Array<[string, string]> = [
+  ['admin@thecustomboxes.com', 'Admin'],
   ['amir@thecustomboxes.com', 'Amir'],
   ['maxlead@thecustomboxes.com', 'Max Lead'],
   ['bobfadi@thecustomboxes.com', 'Bob Fadi'],
