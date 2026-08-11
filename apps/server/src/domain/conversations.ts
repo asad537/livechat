@@ -104,47 +104,106 @@ export async function loadSummary(
   deps: AppDeps,
   conversationId: string,
 ): Promise<ConversationSummary | undefined> {
-  const conv = await deps.db.get<ConversationRow>('SELECT * FROM conversations WHERE id = ?', [
-    conversationId,
-  ]);
-  if (!conv) return undefined;
+  return (await loadSummaries(deps, [conversationId]))[0];
+}
 
-  const [visitorRow, websiteRow, assignedRow, lastMessageRow, unreadRow] = await Promise.all([
-    deps.db.get<VisitorRow>('SELECT * FROM visitors WHERE id = ?', [conv.visitor_id]),
-    deps.db.get<WebsiteRow>('SELECT * FROM websites WHERE id = ?', [conv.website_id]),
-    conv.assigned_user_id
-      ? deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [conv.assigned_user_id])
-      : Promise.resolve(undefined),
-    deps.db.get<MessageRow>(
-      'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1',
-      [conversationId],
+const placeholders = (n: number): string => Array.from({ length: n }, () => '?').join(', ');
+
+/**
+ * Batched summary loader — a fixed 6 queries for ANY number of ids
+ * (instead of ~6 queries PER conversation). This is the hot path for the
+ * inbox list with many concurrent agents.
+ */
+export async function loadSummaries(
+  deps: AppDeps,
+  conversationIds: string[],
+): Promise<ConversationSummary[]> {
+  if (conversationIds.length === 0) return [];
+  const idPh = placeholders(conversationIds.length);
+
+  const convs = await deps.db.all<ConversationRow>(
+    `SELECT * FROM conversations WHERE id IN (${idPh})`,
+    conversationIds,
+  );
+  if (convs.length === 0) return [];
+
+  const visitorIds = [...new Set(convs.map((c) => c.visitor_id))];
+  const websiteIds = [...new Set(convs.map((c) => c.website_id))];
+  const userIds = [...new Set(convs.map((c) => c.assigned_user_id).filter(Boolean))] as string[];
+  const convIds = convs.map((c) => c.id);
+  const cPh = placeholders(convIds.length);
+
+  const [visitorRows, websiteRows, userRows, lastMsgRows, unreadRows] = await Promise.all([
+    deps.db.all<VisitorRow>(
+      `SELECT * FROM visitors WHERE id IN (${placeholders(visitorIds.length)})`,
+      visitorIds,
     ),
-    deps.db.get<{ n: number }>(
-      "SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' AND read_at IS NULL",
-      [conversationId],
+    deps.db.all<WebsiteRow>(
+      `SELECT * FROM websites WHERE id IN (${placeholders(websiteIds.length)})`,
+      websiteIds,
+    ),
+    userIds.length > 0
+      ? deps.db.all<UserRow>(
+          `SELECT * FROM users WHERE id IN (${placeholders(userIds.length)})`,
+          userIds,
+        )
+      : Promise.resolve([] as UserRow[]),
+    // Latest message per conversation in one pass (ties deduped in JS).
+    deps.db.all<MessageRow>(
+      `SELECT m.* FROM messages m
+         JOIN (SELECT conversation_id, MAX(created_at) AS mc FROM messages
+                WHERE conversation_id IN (${cPh}) GROUP BY conversation_id) x
+           ON x.conversation_id = m.conversation_id AND m.created_at = x.mc`,
+      convIds,
+    ),
+    deps.db.all<{ conversation_id: string; n: number }>(
+      `SELECT conversation_id, COUNT(*) AS n FROM messages
+        WHERE conversation_id IN (${cPh}) AND sender_type = 'VISITOR' AND read_at IS NULL
+        GROUP BY conversation_id`,
+      convIds,
     ),
   ]);
 
-  const lastMessage = lastMessageRow ? (await hydrateMessages(deps, [lastMessageRow]))[0] : null;
+  const visitors = new Map(visitorRows.map((r) => [r.id, r]));
+  const websites = new Map(websiteRows.map((r) => [r.id, r]));
+  const users = new Map(userRows.map((r) => [r.id, r]));
+  const unread = new Map(unreadRows.map((r) => [r.conversation_id, Number(r.n)]));
+  const lastByConv = new Map<string, MessageRow>();
+  for (const m of lastMsgRows) {
+    const prev = lastByConv.get(m.conversation_id);
+    if (!prev || m.id > prev.id) lastByConv.set(m.conversation_id, m);
+  }
+  const hydrated = await hydrateMessages(deps, [...lastByConv.values()]);
+  const lastHydrated = new Map(hydrated.map((m) => [m.conversationId, m]));
 
-  return {
-    id: conv.id,
-    websiteId: conv.website_id,
-    visitorId: conv.visitor_id,
-    status: conv.status,
-    assignedUserId: conv.assigned_user_id,
-    createdAt: conv.created_at,
-    activatedAt: conv.activated_at,
-    closedAt: conv.closed_at,
-    rating: conv.rating === null || conv.rating === undefined ? null : Number(conv.rating),
-    visitor: visitorRow
-      ? toVisitor(visitorRow, deps.presence.isVisitorOnline(conv.visitor_id))
-      : undefined,
-    website: websiteRow ? toBranding(websiteRow) : undefined,
-    assignedUser: assignedRow ? toUserPublic(assignedRow) : null,
-    lastMessage,
-    unreadCount: Number(unreadRow?.n ?? 0),
-  };
+  const byId = new Map(convs.map((c) => [c.id, c]));
+  const summaries: ConversationSummary[] = [];
+  for (const id of conversationIds) {
+    const conv = byId.get(id);
+    if (!conv) continue;
+    const visitorRow = visitors.get(conv.visitor_id);
+    const websiteRow = websites.get(conv.website_id);
+    const assignedRow = conv.assigned_user_id ? users.get(conv.assigned_user_id) : undefined;
+    summaries.push({
+      id: conv.id,
+      websiteId: conv.website_id,
+      visitorId: conv.visitor_id,
+      status: conv.status,
+      assignedUserId: conv.assigned_user_id,
+      createdAt: conv.created_at,
+      activatedAt: conv.activated_at,
+      closedAt: conv.closed_at,
+      rating: conv.rating === null || conv.rating === undefined ? null : Number(conv.rating),
+      visitor: visitorRow
+        ? toVisitor(visitorRow, deps.presence.isVisitorOnline(conv.visitor_id))
+        : undefined,
+      website: websiteRow ? toBranding(websiteRow) : undefined,
+      assignedUser: assignedRow ? toUserPublic(assignedRow) : null,
+      lastMessage: lastHydrated.get(conv.id) ?? null,
+      unreadCount: unread.get(conv.id) ?? 0,
+    });
+  }
+  return summaries;
 }
 
 /** Push a fresh summary to the assignee's room and the website watchers' room in `/agent`. */

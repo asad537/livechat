@@ -129,6 +129,23 @@ export interface ReportsOverview {
   trendMode?: 'day' | 'hour';
 }
 
+export interface ChatHistoryRow {
+  id: string;
+  status: string;
+  createdAt: string;
+  closedAt: string | null;
+  durationSeconds: number | null;
+  rating: number | null;
+  websiteId: string;
+  website: string;
+  websiteColor: string;
+  agent: string | null;
+  visitorId: string;
+  visitor: string | null;
+  visitorEmail: string | null;
+  messages: number;
+}
+
 export interface ReportRecord {
   id: string;
   createdAt: string;
@@ -218,6 +235,26 @@ export const api = {
       password?: string;
     },
   ) => request<UserPublic>(`${API.users}/${id}`, { method: 'PATCH', body: patch }),
+
+  deleteUser: (id: string) => request<{ ok: boolean }>(`${API.users}/${id}`, { method: 'DELETE' }),
+
+  chatHistory: (opts: {
+    page?: number;
+    websiteId?: string;
+    agentId?: string;
+    status?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(opts)) {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+    }
+    return request<{ chats: ChatHistoryRow[]; total: number; page: number; pages: number }>(
+      `/api/chats/history?${params.toString()}`,
+    );
+  },
 
   teams: async (): Promise<Team[]> => unwrapList<Team>(await request<unknown>(API.teams), 'teams'),
 

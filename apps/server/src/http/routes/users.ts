@@ -71,11 +71,12 @@ export function buildUsersRouter(deps: AppDeps): Router {
     }),
   );
 
-  // POST /api/users — ADMIN only
+  // POST /api/users — ADMIN anyone; MANAGER may add agents (LEAD/CSR only,
+  // never another ADMIN/MANAGER — no privilege escalation).
   router.post(
     API.users,
     auth,
-    requireRole('ADMIN'),
+    requireRole('ADMIN', 'MANAGER'),
     h(async (req, res) => {
       const email = requireString(req.body?.email, 'email', 255).toLowerCase();
       const name = requireString(req.body?.name, 'name', 255);
@@ -87,6 +88,10 @@ export function buildUsersRouter(deps: AppDeps): Router {
 
       const role = (req.body?.role ?? 'CSR') as Role;
       if (!ROLES.includes(role)) throw new HttpError(400, 'Invalid role');
+      const creator = agent(req);
+      if (creator.role === 'MANAGER' && role !== 'LEAD' && role !== 'CSR') {
+        throw new HttpError(403, 'Managers can only add team leads and CSRs');
+      }
 
       const maxChatsRaw = req.body?.maxChats;
       const maxChats =
@@ -181,6 +186,39 @@ export function buildUsersRouter(deps: AppDeps): Router {
       const updated = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [row.id]);
       if (!updated) throw new HttpError(500, 'Failed to update user');
       res.json(toUserWithPresence(deps, updated));
+    }),
+  );
+
+  // DELETE /api/users/:id — ADMIN only. Chats keep their history (the agent
+  // column just goes blank); open chats return to the queue.
+  router.delete(
+    `${API.users}/:id`,
+    auth,
+    requireRole('ADMIN'),
+    h(async (req, res) => {
+      const me = agent(req);
+      const row = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [req.params.id]);
+      if (!row) throw new HttpError(404, 'User not found');
+      if (row.id === me.id) throw new HttpError(400, 'You cannot delete your own account');
+      if (row.role === 'ADMIN') {
+        const admins = await deps.db.get<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM users WHERE role = 'ADMIN'",
+        );
+        if (Number(admins?.n ?? 0) <= 1) {
+          throw new HttpError(400, 'Cannot delete the last admin');
+        }
+      }
+
+      // Their open chats go back to the unassigned queue; closed history stays.
+      await deps.db.run(
+        "UPDATE conversations SET assigned_user_id = NULL WHERE assigned_user_id = ? AND status IN ('WAITING','OFFERED','ACTIVE')",
+        [row.id],
+      );
+      // Orphan their CSRs (if a Team Lead) so admin can reassign.
+      await deps.db.run('UPDATE users SET team_lead_id = NULL WHERE team_lead_id = ?', [row.id]);
+      await deps.db.run('DELETE FROM team_members WHERE user_id = ?', [row.id]);
+      await deps.db.run('DELETE FROM users WHERE id = ?', [row.id]);
+      res.json({ ok: true });
     }),
   );
 

@@ -5440,3 +5440,55 @@ img.avatar {
   width: auto;
   min-width: 52px;
 }
+
+/* Chat History page */
+.rec-field-grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+.rec-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  padding: 0 10px;
+  color: var(--text-muted);
+}
+
+.rec-search input {
+  border: none !important;
+  background: transparent !important;
+  padding: 8px 0 !important;
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-search input:focus {
+  outline: none;
+  box-shadow: none !important;
+}
+
+.ch-row {
+  cursor: pointer;
+}
+
+.ch-row:hover td {
+  background: var(--accent-soft, #eaecfd);
+}
+
+.ch-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.row-actions {
+  display: inline-flex;
+  gap: 4px;
+  white-space: nowrap;
+}

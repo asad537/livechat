@@ -7,7 +7,7 @@ import {
 } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requireAgent, toUserPublic, type UserRow } from '../../core/auth.js';
-import { loadSummary, userCanAccessWebsite } from '../../domain/conversations.js';
+import { loadSummaries, loadSummary, userCanAccessWebsite } from '../../domain/conversations.js';
 import { hydrateMessages, type MessageRow } from '../../domain/messages.js';
 import {
   HttpError,
@@ -106,12 +106,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
           LIMIT 20`,
         params,
       );
-      const summaries: ConversationSummary[] = [];
-      for (const row of rows) {
-        const summary = await loadSummary(deps, row.id);
-        if (summary) summaries.push(summary);
-      }
-      res.json(summaries);
+      res.json(await loadSummaries(deps, rows.map((r) => r.id)));
     }),
   );
 
@@ -199,13 +194,151 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         ORDER BY c.created_at DESC
         LIMIT 200`;
       const rows = await deps.db.all<{ id: string }>(sql, params);
+      res.json(await loadSummaries(deps, rows.map((r) => r.id)));
+    }),
+  );
 
-      const summaries: ConversationSummary[] = [];
-      for (const row of rows) {
-        const summary = await loadSummary(deps, row.id);
-        if (summary) summaries.push(summary);
+  // GET /api/chats/history — paginated finished-chat archive with filters.
+  // Role-scoped: ADMIN/MANAGER all · LEAD self+own CSRs · CSR own only.
+  router.get(
+    '/api/chats/history',
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      const page = Math.max(1, Number(asString(req.query.page)) || 1);
+      const PER_PAGE = 20;
+
+      const where: string[] = [];
+      const params: unknown[] = [];
+
+      // Website scope
+      const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      const websiteId = asString(req.query.websiteId);
+      if (websiteId) {
+        if (user.role !== 'ADMIN' && user.role !== 'MANAGER' && !siteIds.includes(websiteId)) {
+          throw new HttpError(403, 'Forbidden');
+        }
+        where.push('c.website_id = ?');
+        params.push(websiteId);
+      } else if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+        if (siteIds.length === 0) {
+          res.json({ chats: [], total: 0, page: 1, pages: 1 });
+          return;
+        }
+        where.push(`c.website_id IN (${placeholders(siteIds.length)})`);
+        params.push(...siteIds);
       }
-      res.json(summaries);
+
+      // People scope
+      if (user.role === 'CSR') {
+        where.push('c.assigned_user_id = ?');
+        params.push(user.id);
+      } else if (user.role === 'LEAD') {
+        const mine = [user.id, ...(await myCsrIds(deps, user.id))];
+        where.push(
+          `(c.assigned_user_id IN (${placeholders(mine.length)}) OR c.assigned_user_id IS NULL)`,
+        );
+        params.push(...mine);
+      }
+
+      // Filters
+      const status = asString(req.query.status);
+      if (status && STATUSES.includes(status as ConversationStatus)) {
+        where.push('c.status = ?');
+        params.push(status);
+      } else if (status !== 'ALL') {
+        // History defaults to finished chats.
+        where.push("c.status IN ('CLOSED', 'MISSED')");
+      }
+      const agentId = asString(req.query.agentId);
+      if (agentId) {
+        if (user.role === 'CSR' && agentId !== user.id) throw new HttpError(403, 'Forbidden');
+        if (user.role === 'LEAD') {
+          const mine = [user.id, ...(await myCsrIds(deps, user.id))];
+          if (!mine.includes(agentId)) throw new HttpError(403, 'Forbidden');
+        }
+        where.push('c.assigned_user_id = ?');
+        params.push(agentId);
+      }
+      const from = asString(req.query.from);
+      if (from) {
+        where.push('c.created_at >= ?');
+        params.push(`${from}T00:00:00.000Z`);
+      }
+      const to = asString(req.query.to);
+      if (to) {
+        where.push('c.created_at <= ?');
+        params.push(`${to}T23:59:59.999Z`);
+      }
+      const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
+      if (q.length >= 2) {
+        where.push('(v.name LIKE ? OR v.email LIKE ?)');
+        params.push(`%${q}%`, `%${q}%`);
+      }
+
+      const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+      const totalRow = await deps.db.get<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM conversations c JOIN visitors v ON v.id = c.visitor_id ${whereSql}`,
+        params,
+      );
+      const total = Number(totalRow?.n ?? 0);
+      const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+
+      const rows = await deps.db.all<{
+        id: string;
+        status: string;
+        created_at: string;
+        activated_at: string | null;
+        closed_at: string | null;
+        rating: number | null;
+        website_id: string;
+        website_name: string;
+        website_color: string;
+        agent_name: string | null;
+        visitor_id: string;
+        visitor_name: string | null;
+        visitor_email: string | null;
+        msgs: number;
+      }>(
+        `SELECT c.id, c.status, c.created_at, c.activated_at, c.closed_at, c.rating,
+                c.website_id, w.name AS website_name, w.primary_color AS website_color,
+                u.name AS agent_name,
+                v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email,
+                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msgs
+           FROM conversations c
+           JOIN visitors v ON v.id = c.visitor_id
+           JOIN websites w ON w.id = c.website_id
+           LEFT JOIN users u ON u.id = c.assigned_user_id
+          ${whereSql}
+          ORDER BY c.created_at DESC
+          LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
+        params,
+      );
+
+      res.json({
+        chats: rows.map((r) => ({
+          id: r.id,
+          status: r.status,
+          createdAt: r.created_at,
+          closedAt: r.closed_at,
+          durationSeconds:
+            r.activated_at && r.closed_at
+              ? Math.max(0, Math.round((Date.parse(r.closed_at) - Date.parse(r.activated_at)) / 1000))
+              : null,
+          rating: r.rating === null || r.rating === undefined ? null : Number(r.rating),
+          websiteId: r.website_id,
+          website: r.website_name,
+          websiteColor: r.website_color,
+          agent: r.agent_name,
+          visitorId: r.visitor_id,
+          visitor: r.visitor_name || r.visitor_email || null,
+          visitorEmail: r.visitor_email,
+          messages: Number(r.msgs),
+        })),
+        total,
+        page,
+        pages,
+      });
     }),
   );
 

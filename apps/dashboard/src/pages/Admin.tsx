@@ -553,7 +553,12 @@ function TeamLeadSelect({
 
 function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   const { pushToast, online, me } = useApp();
-  const readOnly = me?.role === 'MANAGER';
+  // Managers may ADD agents (team leads + CSRs only) but never edit anyone.
+  const isManager = me?.role === 'MANAGER';
+  const canEdit = me?.role === 'ADMIN';
+  const roleOptions = isManager
+    ? ROLE_OPTIONS.filter((o) => o.value === 'LEAD' || o.value === 'CSR')
+    : ROLE_OPTIONS;
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -567,6 +572,17 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   const leads = users.filter((u) => u.role === 'LEAD');
   const leadName = (id: string | null | undefined) =>
     id ? (users.find((u) => u.id === id)?.name ?? '—') : '—';
+
+  const remove = async (u: UserPublic) => {
+    if (!window.confirm(`Delete ${u.name} (${u.email})?\n\nTheir open chats return to the queue; closed chat history is kept.`)) return;
+    try {
+      await api.deleteUser(u.id);
+      pushToast('User deleted', `${u.name} has been removed.`, 'success');
+      reload();
+    } catch (err) {
+      pushToast('Delete failed', err instanceof Error ? err.message : undefined, 'error');
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -599,9 +615,9 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
 
   return (
     <div className="admin-tab">
-      {!showForm && !readOnly && (
+      {!showForm && (
         <button className="btn btn-primary btn-sm admin-add" onClick={() => setShowForm(true)}>
-          <IconPlus size={15} /> New user
+          <IconPlus size={15} /> {isManager ? 'New agent' : 'New user'}
         </button>
       )}
       {showForm && (
@@ -636,7 +652,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
             <label className="field">
               <span>Role</span>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                {ROLE_OPTIONS.map((o) => (
+                {roleOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
@@ -687,7 +703,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
               <th>Team lead</th>
               <th className="num">Max chats</th>
               <th>Status</th>
-              {!readOnly && <th />}
+              {canEdit && <th />}
             </tr>
           </thead>
           <tbody>
@@ -709,18 +725,29 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
                   <span className={classNames('dot', online[u.id] ? 'dot-online' : 'dot-offline')} />
                   {online[u.id] ? ' Online' : ' Offline'}
                 </td>
-                {!readOnly && (
+                {canEdit && (
                   <td className="num">
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(u)}>
-                      Edit
-                    </button>
+                    <span className="row-actions">
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEditing(u)}>
+                        Edit
+                      </button>
+                      {u.id !== me?.id && (
+                        <button
+                          className="btn btn-ghost btn-sm btn-danger"
+                          title="Delete this user"
+                          onClick={() => void remove(u)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </span>
                   </td>
                 )}
               </tr>
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={readOnly ? 6 : 7} className="empty-hint">
+                <td colSpan={canEdit ? 7 : 6} className="empty-hint">
                   No users found.
                 </td>
               </tr>

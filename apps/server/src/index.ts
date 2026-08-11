@@ -28,6 +28,10 @@ async function main(): Promise<void> {
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
+    // Background browser tabs throttle timers — a generous ping timeout keeps
+    // idle visitors from being dropped (and flickering offline) needlessly.
+    pingInterval: 25_000,
+    pingTimeout: 60_000,
   });
 
   // Optional Redis adapter → multi-node fan-out (production scaling)

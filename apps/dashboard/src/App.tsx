@@ -11,6 +11,7 @@ import Reports from './pages/Reports';
 import Admin from './pages/Admin';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
+import ChatHistory from './pages/ChatHistory';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
@@ -24,6 +25,7 @@ import {
   IconHome,
   IconInbox,
   IconLogout,
+  IconMessage,
   IconPlug,
   IconUsers,
   IconWorkflow,
@@ -100,7 +102,10 @@ function Sidebar() {
           {navItem(<IconUsers size={17} />, 'Visitors')}
         </NavLink>
         <NavLink to="/history" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-          {navItem(<IconClock size={17} />, 'History')}
+          {navItem(<IconClock size={17} />, 'Visitor History')}
+        </NavLink>
+        <NavLink to="/chat-history" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(<IconMessage size={17} />, 'Chat History')}
         </NavLink>
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
@@ -245,6 +250,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/visitors" element={<Visitors key="live" />} />
           <Route path="/history" element={<Visitors key="history" initialView="history" />} />
+          <Route path="/chat-history" element={<ChatHistory />} />
           <Route path="/profile" element={<Profile />} />
           <Route
             path="/monitoring"

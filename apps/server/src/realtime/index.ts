@@ -318,6 +318,32 @@ async function getConversation(
 export function attachRealtime(deps: AppDeps): void {
   attachWidgetNamespace(deps, deps.io.of(WIDGET_NAMESPACE));
   attachAgentNamespace(deps, deps.io.of(AGENT_NAMESPACE));
+
+  // Fires once the visitor-offline grace period expires (not on every page
+  // navigation) — only then do agents see them drop out of "Online now".
+  deps.presence.setVisitorOfflineListener((websiteId, visitorId) => {
+    void (async () => {
+      await deps.db.run('UPDATE visitors SET last_seen_at = ? WHERE id = ?', [
+        nowIso(),
+        visitorId,
+      ]);
+      await broadcastVisitors(deps, websiteId);
+
+      // Visitor left during an OFFERED conversation they never replied to →
+      // give them 10 minutes to come back before marking it MISSED.
+      const offered = await deps.db.get<ConversationRow>(
+        "SELECT * FROM conversations WHERE visitor_id = ? AND status = 'OFFERED' ORDER BY created_at DESC LIMIT 1",
+        [visitorId],
+      );
+      if (offered) {
+        const replied = await deps.db.get<{ id: string }>(
+          "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
+          [offered.id],
+        );
+        if (!replied) scheduleMissedTimer(deps, offered.id);
+      }
+    })().catch((err: unknown) => console.error('[realtime] visitor offline', err));
+  });
 }
 
 // ═════════════════════════════ /widget ═══════════════════════
@@ -622,30 +648,11 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
     registerWidgetCallHandlers(deps, socket);
 
     // ── Disconnect ──
+    // A page reload/navigation closes this socket for a second — the presence
+    // store keeps the visitor online through a grace window, and the real
+    // offline handling lives in the setVisitorOfflineListener callback.
     socket.on('disconnect', () => {
-      void (async () => {
-        const wentOffline = deps.presence.removeVisitor(data.websiteId, data.visitorId, socket.id);
-        if (!wentOffline) return;
-        await deps.db.run('UPDATE visitors SET last_seen_at = ? WHERE id = ?', [
-          nowIso(),
-          data.visitorId,
-        ]);
-        await broadcastVisitors(deps, data.websiteId);
-
-        // Visitor left during an OFFERED conversation they never replied to →
-        // give them 10 minutes to come back before marking it MISSED.
-        const offered = await deps.db.get<ConversationRow>(
-          "SELECT * FROM conversations WHERE visitor_id = ? AND status = 'OFFERED' ORDER BY created_at DESC LIMIT 1",
-          [data.visitorId],
-        );
-        if (offered) {
-          const replied = await deps.db.get<{ id: string }>(
-            "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
-            [offered.id],
-          );
-          if (!replied) scheduleMissedTimer(deps, offered.id);
-        }
-      })().catch((err: unknown) => console.error('[realtime] widget disconnect', err));
+      deps.presence.removeVisitor(data.websiteId, data.visitorId, socket.id);
     });
   });
 }
