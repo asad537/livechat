@@ -92,7 +92,7 @@ export async function sendTranscriptEmail(deps: AppDeps, conversationId: string)
           m.sender_type === 'VISITOR'
             ? visitor.name || 'You'
             : m.sender_type === 'BOT'
-              ? 'AI Assistant'
+              ? 'Assistant'
               : m.sender_name || 'Agent';
         const body =
           m.kind === 'FILE'

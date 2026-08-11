@@ -84,6 +84,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [infoDismissed, setInfoDismissed] = useState(() => lsGet(infoDismissKey) === '1');
   const [invite, setInvite] = useState<Invite | null>(null);
   const [rated, setRated] = useState(false);
+  const [feedbackAsk, setFeedbackAsk] = useState(false); // agent requested a rating mid-chat
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [call, setCall] = useState<ActiveCall | null>(null);
   const [, setCallTick] = useState(0);
@@ -256,6 +257,12 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       if (message) showToast(message);
     });
 
+    // Agent asked for a rating — show the stars right in the chat.
+    socket.on(EV.ChatFeedbackRequest, () => {
+      setFeedbackAsk(true);
+      if (!dismissedRef.current) setOpen(true);
+    });
+
     // Closing the window/browser doesn't always flush the websocket close
     // frame — without this the server only notices at ping-timeout (30s+).
     // pagehide fires on close AND navigation: the beacon tells the server to
@@ -422,6 +429,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     setAgent(null);
     setAgentTyping(false);
     setRated(false);
+    setFeedbackAsk(false);
     reportedReads.current.clear();
     const socket = socketRef.current;
     if (socket) {
@@ -607,6 +615,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
               </button>
             </div>
           ) : (
+            <>
+            {feedbackAsk && !rated && (
+              <div class="lc-closedbar lc-feedback-ask">
+                <RatingCard onSubmit={submitRating} />
+              </div>
+            )}
+            {feedbackAsk && rated && (
+              <div class="lc-closedbar lc-feedback-ask">
+                <span>Thank you for your feedback! 💚</span>
+              </div>
+            )}
             <div class="lc-composer">
               <button
                 type="button"
@@ -642,6 +661,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 <IconSend />
               </button>
             </div>
+            </>
           )}
 
           {toast && <div class="lc-toast">{toast}</div>}

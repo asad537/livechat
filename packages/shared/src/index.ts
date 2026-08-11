@@ -171,6 +171,7 @@ export const EV = {
   ChatTyping: 'chat:typing',                 // { conversationId, from: 'VISITOR'|'AGENT', typing: boolean }
   ChatStatus: 'chat:status',                 // { conversation: ConversationSummary }
   ChatAgent: 'chat:agent',                   // { conversationId, agent: {name, avatarColor} | null }
+  ChatFeedbackRequest: 'chat:feedback-request', // { conversationId } — agent asked the visitor to rate
 
   // calls (both namespaces)
   CallInvite: 'call:invite',                 // { call: CallMeta, from: {name} }
@@ -189,6 +190,7 @@ export const EV = {
   AgentTransfer: 'agent:transfer',           // { conversationId, toUserId }
   AgentTyping: 'agent:typing',               // { conversationId, typing: boolean }
   AgentRead: 'agent:read',                   // { conversationId, messageIds: string[] }
+  AgentRequestFeedback: 'agent:request-feedback', // { conversationId } → pops the rating UI on the widget
   AgentWatchWebsite: 'agent:watch-website',  // { websiteId } subscribe to visitor list + inbox of a website
   AgentSetAway: 'agent:set-away',            // { away: boolean } manual availability
   AgentCallStart: 'agent:call:start',        // { conversationId, kind: CallKind }

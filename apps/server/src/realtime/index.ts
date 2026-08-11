@@ -574,9 +574,11 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         const comment = asString(p.comment)?.trim().slice(0, 500) || null;
         if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
 
-        // Rate the visitor's most recently closed conversation, once.
+        // Rate the visitor's current chat (agent may request feedback
+        // mid-conversation) or the most recently closed one — once.
         const conv = await deps.db.get<ConversationRow>(
-          "SELECT * FROM conversations WHERE visitor_id = ? AND status = 'CLOSED' ORDER BY closed_at DESC LIMIT 1",
+          `SELECT * FROM conversations WHERE visitor_id = ? AND status IN ('ACTIVE', 'CLOSED')
+            ORDER BY CASE WHEN status = 'ACTIVE' THEN 0 ELSE 1 END, created_at DESC LIMIT 1`,
           [data.visitorId],
         );
         if (!conv || conv.rating != null) return; // only rate once
@@ -1105,6 +1107,41 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         deps.io.of(WIDGET_NAMESPACE).to(convRoom(conv.id)).emit(EV.ChatReceipt, receipt);
         deps.io.of(AGENT_NAMESPACE).to(convRoom(conv.id)).emit(EV.ChatReceipt, receipt);
         await emitInboxUpdate(deps, conv.id);
+      }),
+    );
+
+    // ── Request feedback: pops the rating stars on the visitor's widget ──
+    socket.on(
+      EV.AgentRequestFeedback,
+      safe(socket, async (payload: unknown) => {
+        if (data.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
+          return;
+        }
+        const p = (payload ?? {}) as Record<string, unknown>;
+        const conv = await getConversation(deps, asString(p.conversationId));
+        if (!conv) return;
+        if (conv.status !== 'ACTIVE') {
+          socket.emit(EV.AppError, { message: 'Feedback can only be requested in an active chat' });
+          return;
+        }
+        if (!(await canSendAsAgent(deps, conv, data.userId, data.role))) {
+          socket.emit(EV.AppError, { message: 'Only the assigned agent can request feedback' });
+          return;
+        }
+        if (conv.rating != null) {
+          socket.emit(EV.AppError, { message: 'The customer already rated this chat' });
+          return;
+        }
+        deps.io.of(WIDGET_NAMESPACE).to(convRoom(conv.id)).emit(EV.ChatFeedbackRequest, {
+          conversationId: conv.id,
+        });
+        await postMessage(deps, {
+          conversationId: conv.id,
+          senderType: 'SYSTEM',
+          kind: 'SYSTEM',
+          body: `${data.name} requested feedback — the customer can now rate this chat ⭐`,
+        });
       }),
     );
 

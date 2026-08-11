@@ -21,6 +21,7 @@ import {
   IconPaperclip,
   IconPhone,
   IconSend,
+  IconStar,
   IconTransfer,
   IconVideo,
   IconX,
@@ -359,6 +360,16 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
             )}
             {canSend && conversation?.status === 'ACTIVE' && (
               <>
+                <button
+                  className="icon-btn"
+                  title="Request feedback — the customer gets a rating prompt"
+                  onClick={() => {
+                    getSocket()?.emit(EV.AgentRequestFeedback, { conversationId });
+                    pushToast('Feedback requested', 'The customer can now rate this chat. ⭐', 'success');
+                  }}
+                >
+                  <IconStar size={17} />
+                </button>
                 <button
                   className="icon-btn"
                   title="Start audio call"
