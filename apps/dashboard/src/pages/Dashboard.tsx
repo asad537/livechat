@@ -10,9 +10,9 @@ import {
   IconChart,
   IconCheckCircle,
   IconClock,
+  IconGlobe,
   IconMessage,
   IconPhoneOff,
-  IconStar,
   IconUser,
   IconUsers,
 } from '../icons';
@@ -211,23 +211,14 @@ export default function Dashboard() {
               }
             />
             <Tile
-              label={`CSAT (${RANGE_HINT[range]})`}
-              value={
-                data.csat.average != null ? (
-                  <>
-                    {data.csat.average.toFixed(1)}
-                    <span className="rp-tile-suffix">/5</span>
-                  </>
-                ) : (
-                  '—'
-                )
-              }
-              icon={<IconStar size={17} />}
-              tint="#fef3c7"
-              color="#d97706"
+              label="Total visitors"
+              value={(data.funnel?.visitors ?? 0).toLocaleString()}
+              icon={<IconGlobe size={17} />}
+              tint="#dbeafe"
+              color="#2563eb"
               delta={
                 <span className="db-delta db-delta-flat">
-                  {data.csat.count} rating{data.csat.count === 1 ? '' : 's'}
+                  {RANGE_HINT[range]}
                 </span>
               }
             />
