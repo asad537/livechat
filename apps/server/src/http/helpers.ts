@@ -179,9 +179,17 @@ export async function userTeamIds(deps: AppDeps, userId: string): Promise<string
   return rows.map((r) => r.team_id);
 }
 
-/** Websites the user may see: ADMIN = all, otherwise via team membership. */
+/** Ids of the CSRs assigned under a Team Lead. */
+export async function myCsrIds(deps: AppDeps, leadId: string): Promise<string[]> {
+  const rows = await deps.db.all<{ id: string }>('SELECT id FROM users WHERE team_lead_id = ?', [
+    leadId,
+  ]);
+  return rows.map((r) => r.id);
+}
+
+/** Websites the user may see: ADMIN/MANAGER = all, otherwise via team membership. */
 export async function accessibleWebsiteRows(deps: AppDeps, user: UserRow): Promise<WebsiteRow[]> {
-  if (user.role === 'ADMIN') {
+  if (user.role === 'ADMIN' || user.role === 'MANAGER') {
     return deps.db.all<WebsiteRow>('SELECT * FROM websites ORDER BY name');
   }
   const teamIds = await userTeamIds(deps, user.id);
@@ -192,10 +200,10 @@ export async function accessibleWebsiteRows(deps: AppDeps, user: UserRow): Promi
   );
 }
 
-/** Teams visible to the user (with members): ADMIN = all, otherwise own memberships. */
+/** Teams visible to the user (with members): ADMIN/MANAGER = all, otherwise own memberships. */
 export async function visibleTeams(deps: AppDeps, user: UserRow): Promise<Team[]> {
   let teamRows: TeamRow[];
-  if (user.role === 'ADMIN') {
+  if (user.role === 'ADMIN' || user.role === 'MANAGER') {
     teamRows = await deps.db.all<TeamRow>('SELECT * FROM teams ORDER BY name');
   } else {
     teamRows = await deps.db.all<TeamRow>(
@@ -239,16 +247,26 @@ export async function getConversationRow(
 
 /**
  * May this agent view a conversation's transcript/history?
- * ADMIN → always; assignee → yes; team lead of the website's team → yes;
- * plain team member → only while the conversation is unassigned (queue preview).
+ * ADMIN/MANAGER → always; assignee → yes; Team Lead → their own CSRs' chats
+ * plus the unassigned queue; plain team member → only while the conversation
+ * is unassigned (queue preview).
  */
 export async function canViewConversation(
   deps: AppDeps,
   user: UserRow,
   conv: ConversationRow,
 ): Promise<boolean> {
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN' || user.role === 'MANAGER') return true;
   if (conv.assigned_user_id === user.id) return true;
+  if (user.role === 'LEAD' && conv.assigned_user_id) {
+    const csr = await deps.db.get<{ id: string }>(
+      'SELECT id FROM users WHERE id = ? AND team_lead_id = ?',
+      [conv.assigned_user_id, user.id],
+    );
+    return !!csr;
+  }
+  if (conv.assigned_user_id) return false;
+  // Unassigned queue preview — needs website access via team membership.
   const site = await deps.db.get<{ team_id: string }>(
     'SELECT team_id FROM websites WHERE id = ?',
     [conv.website_id],
@@ -258,7 +276,5 @@ export async function canViewConversation(
     'SELECT is_lead FROM team_members WHERE team_id = ? AND user_id = ?',
     [site.team_id, user.id],
   );
-  if (!membership) return false;
-  if (Number(membership.is_lead) === 1) return true;
-  return conv.assigned_user_id === null || conv.assigned_user_id === undefined;
+  return !!membership;
 }

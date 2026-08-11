@@ -376,15 +376,23 @@ export function registerAgentCallHandlers(deps: AppDeps, socket: Socket): void {
   const data = (): AgentSocketData => socket.data as AgentSocketData;
   const participant = (): string => `AGENT:${data().userId}`;
 
-  /** Assignee, ADMIN, or a LEAD with access to the website may act on a conversation's calls. */
+  /** Assignee, ADMIN, or the assignee's Team Lead may act on a conversation's calls. */
   const canActOnConversation = async (conversation: {
     websiteId: string;
     assignedUserId: string | null;
   }): Promise<boolean> => {
     const { userId, role } = data();
     if (role === 'ADMIN') return true;
+    if (role === 'MANAGER') return false; // view-only
     if (conversation.assignedUserId === userId) return true;
     if (role === 'LEAD') {
+      if (conversation.assignedUserId) {
+        const csr = await deps.db.get<{ id: string }>(
+          'SELECT id FROM users WHERE id = ? AND team_lead_id = ?',
+          [conversation.assignedUserId, userId],
+        );
+        return !!csr;
+      }
       return userCanAccessWebsite(deps, userId, role, conversation.websiteId);
     }
     return false;
@@ -497,6 +505,10 @@ export function registerAgentCallHandlers(deps: AppDeps, socket: Socket): void {
       );
       if (!invitee) {
         sendError(socket, 'User not found');
+        return;
+      }
+      if (invitee.role === 'MANAGER') {
+        sendError(socket, 'Managers cannot join calls');
         return;
       }
       if (invitee.role !== 'ADMIN') {

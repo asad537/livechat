@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import type { Role } from '@livechat/shared';
 import { useApp } from './state';
-import { classNames } from './util';
+import { classNames, roleLabel } from './util';
 import Login from './pages/Login';
 import Inbox from './pages/Inbox';
 import Visitors from './pages/Visitors';
@@ -61,7 +61,7 @@ function Sidebar() {
     0,
   );
 
-  const isLeadUp = me.role === 'LEAD' || me.role === 'ADMIN';
+  const isLeadUp = me.role !== 'CSR'; // LEAD, MANAGER and ADMIN
 
   const navItem = (icon: React.ReactNode, label: string, badge?: React.ReactNode) => (
     <>
@@ -113,7 +113,7 @@ function Sidebar() {
           </NavLink>
         )}
       </nav>
-      {me.role === 'ADMIN' && (
+      {(me.role === 'ADMIN' || me.role === 'MANAGER') && (
         <>
           <div className="nav-section-label nav-section-admin">Admin</div>
           <nav className="sidebar-nav sidebar-nav-admin">
@@ -145,7 +145,7 @@ function Sidebar() {
         </>
       )}
       <div className="sidebar-foot">
-        <AvailabilityToggle />
+        {me.role !== 'MANAGER' && <AvailabilityToggle />}
         <div
           className="sidebar-user sidebar-user-link"
           role="button"
@@ -155,7 +155,7 @@ function Sidebar() {
           <Avatar name={me.name} color={me.avatarColor} url={me.avatarUrl} />
           <div className="sidebar-user-meta">
             <span className="sidebar-user-name">{me.name}</span>
-            <span className="sidebar-user-role">{me.role}</span>
+            <span className="sidebar-user-role">{roleLabel(me.role)}</span>
           </div>
           <button
             className="icon-btn icon-btn-dark"
@@ -249,7 +249,7 @@ export default function App() {
           <Route
             path="/monitoring"
             element={
-              <RequireRole roles={['LEAD', 'ADMIN']}>
+              <RequireRole roles={['LEAD', 'MANAGER', 'ADMIN']}>
                 <Monitoring />
               </RequireRole>
             }
@@ -257,7 +257,7 @@ export default function App() {
           <Route
             path="/reports"
             element={
-              <RequireRole roles={['LEAD', 'ADMIN']}>
+              <RequireRole roles={['LEAD', 'MANAGER', 'ADMIN']}>
                 <Reports />
               </RequireRole>
             }
@@ -265,7 +265,7 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
-              <RequireRole roles={['LEAD', 'ADMIN']}>
+              <RequireRole roles={['LEAD', 'MANAGER', 'ADMIN']}>
                 <Dashboard />
               </RequireRole>
             }
@@ -274,7 +274,7 @@ export default function App() {
           <Route
             path="/admin/:section"
             element={
-              <RequireRole roles={['ADMIN']}>
+              <RequireRole roles={['ADMIN', 'MANAGER']}>
                 <Admin />
               </RequireRole>
             }

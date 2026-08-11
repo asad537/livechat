@@ -162,7 +162,8 @@ export const api = {
       body: { email, password },
     }),
 
-  me: () => request<{ user: UserPublic; websites: Website[]; teams: Team[] }>(API.me),
+  me: () =>
+    request<{ user: UserPublic; websites: Website[]; teams: Team[]; csrIds?: string[] }>(API.me),
 
   updateMe: (patch: {
     name?: string;
@@ -198,8 +199,25 @@ export const api = {
   users: async (): Promise<UserPublic[]> =>
     unwrapList<UserPublic>(await request<unknown>(API.users), 'users'),
 
-  createUser: (input: { email: string; name: string; password: string; role: Role; maxChats: number }) =>
-    request<unknown>(API.users, { method: 'POST', body: input }),
+  createUser: (input: {
+    email: string;
+    name: string;
+    password: string;
+    role: Role;
+    maxChats: number;
+    teamLeadId?: string | null;
+  }) => request<unknown>(API.users, { method: 'POST', body: input }),
+
+  updateUser: (
+    id: string,
+    patch: {
+      name?: string;
+      role?: Role;
+      maxChats?: number;
+      teamLeadId?: string | null;
+      password?: string;
+    },
+  ) => request<UserPublic>(`${API.users}/${id}`, { method: 'PATCH', body: patch }),
 
   teams: async (): Promise<Team[]> => unwrapList<Team>(await request<unknown>(API.teams), 'teams'),
 

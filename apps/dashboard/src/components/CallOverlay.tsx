@@ -354,7 +354,7 @@ export default function CallOverlay({ call }: { call: CallMeta }) {
     const list: { id: string; name: string; avatarColor: string; role: string }[] = [];
     for (const team of teams) {
       for (const m of team.members ?? []) {
-        if (m.id === me?.id || seen.has(m.id) || !online[m.id]) continue;
+        if (m.id === me?.id || seen.has(m.id) || !online[m.id] || m.role === 'MANAGER') continue;
         seen.add(m.id);
         list.push({ id: m.id, name: m.name, avatarColor: m.avatarColor, role: m.role });
       }

@@ -175,3 +175,6 @@ CREATE INDEX IF NOT EXISTS idx_files_conversation ON files (conversation_id);
 CREATE INDEX IF NOT EXISTS idx_visitors_website ON visitors (website_id);
 CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members (user_id);
 CREATE INDEX IF NOT EXISTS idx_calls_conversation ON calls (conversation_id);
+
+-- Role hierarchy: a CSR is assigned under one Team Lead (idempotent)
+ALTER TABLE users ADD COLUMN team_lead_id VARCHAR(36);

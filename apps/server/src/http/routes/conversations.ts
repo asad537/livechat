@@ -17,6 +17,7 @@ import {
   canViewConversation,
   getConversationRow,
   h,
+  myCsrIds,
   placeholders,
 } from '../helpers.js';
 
@@ -24,10 +25,11 @@ const STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE', 'CLOSED'
 
 type Scope = 'mine' | 'team' | 'all';
 
-/** Clamp the requested scope to what the role allows (CSR→mine, LEAD≤team, ADMIN any). */
+/** Clamp the requested scope to what the role allows (CSR→mine, LEAD≤team, ADMIN/MANAGER any). */
 function effectiveScope(role: UserRow['role'], requested: string | undefined): Scope {
   if (role === 'CSR') return 'mine';
   if (role === 'LEAD') return requested === 'mine' ? 'mine' : 'team';
+  if (role === 'MANAGER') return 'all'; // global view-only
   if (requested === 'mine' || requested === 'team') return requested;
   return 'all';
 }
@@ -61,7 +63,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
 
       const where: string[] = [];
       const params: unknown[] = [];
-      if (user.role !== 'ADMIN') {
+      if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
         const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
         if (siteIds.length === 0) {
           res.json([]);
@@ -74,6 +76,16 @@ export function buildConversationsRouter(deps: AppDeps): Router {
                AND c.website_id IN (${placeholders(siteIds.length)})))`,
           );
           params.push(user.id, ...siteIds);
+        } else if (user.role === 'LEAD') {
+          // Own + own CSRs' chats + unassigned queue of accessible sites.
+          const csrIds = await myCsrIds(deps, user.id);
+          const mine = [user.id, ...csrIds];
+          where.push(
+            `(c.assigned_user_id IN (${placeholders(mine.length)})
+               OR (c.assigned_user_id IS NULL
+                   AND c.website_id IN (${placeholders(siteIds.length)})))`,
+          );
+          params.push(...mine, ...siteIds);
         } else {
           where.push(`c.website_id IN (${placeholders(siteIds.length)})`);
           params.push(...siteIds);
@@ -147,6 +159,22 @@ export function buildConversationsRouter(deps: AppDeps): Router {
           // team scope (LEAD, or ADMIN narrowing to team-style view)
           if (user.role === 'ADMIN') {
             // ADMIN has no team; team scope degrades to all.
+          } else if (user.role === 'LEAD') {
+            // Team Lead: own chats + own CSRs' chats + the unassigned
+            // queue of accessible sites (to claim by typing).
+            const csrIds = await myCsrIds(deps, user.id);
+            const mine = [user.id, ...csrIds];
+            if (siteIds.length > 0) {
+              where.push(
+                `(c.assigned_user_id IN (${placeholders(mine.length)})
+                   OR (c.assigned_user_id IS NULL
+                       AND c.website_id IN (${placeholders(siteIds.length)})))`,
+              );
+              params.push(...mine, ...siteIds);
+            } else {
+              where.push(`c.assigned_user_id IN (${placeholders(mine.length)})`);
+              params.push(...mine);
+            }
           } else if (siteIds.length === 0) {
             res.json([]);
             return;

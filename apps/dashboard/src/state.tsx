@@ -39,6 +39,7 @@ interface AppContextValue {
   authed: boolean;
   booting: boolean;
   me: UserPublic | null;
+  csrIds: string[]; // when I'm a Team Lead: ids of my CSRs
   websites: Website[];
   teams: Team[];
   conversations: Record<string, ConversationSummary>;
@@ -84,6 +85,7 @@ let toastCounter = 0;
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() => getToken());
   const [me, setMe] = useState<UserPublic | null>(null);
+  const [csrIds, setCsrIds] = useState<string[]>([]);
   const [websites, setWebsites] = useState<Website[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [conversations, setConversations] = useState<Record<string, ConversationSummary>>({});
@@ -137,7 +139,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshConversations = useCallback(async () => {
     const user = meRef.current;
     if (!user) return;
-    const scope = user.role === 'ADMIN' ? 'all' : user.role === 'LEAD' ? 'team' : 'mine';
+    const scope =
+      user.role === 'ADMIN' || user.role === 'MANAGER'
+        ? 'all'
+        : user.role === 'LEAD'
+          ? 'team'
+          : 'mine';
     try {
       const list = await api.conversations({ scope });
       setConversations((prev) => {
@@ -156,6 +163,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setMe(data.user);
       setWebsites(data.websites);
       setTeams(data.teams);
+      setCsrIds(data.csrIds ?? []);
     } catch {
       /* ignore */
     }
@@ -174,6 +182,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMe(data.user);
         setWebsites(data.websites);
         setTeams(data.teams);
+        setCsrIds(data.csrIds ?? []);
       })
       .catch(() => {
         if (cancelled) return;
@@ -187,10 +196,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const onDisconnect = () => setConnected(false);
     const onConnectError = () => setConnected(false);
 
-    const onReady = (payload: { me: UserPublic; websites: Website[]; teams: Team[] }) => {
+    const onReady = (payload: {
+      me: UserPublic;
+      websites: Website[];
+      teams: Team[];
+      csrIds?: string[];
+    }) => {
       setMe(payload.me);
       setWebsites(payload.websites);
       setTeams(payload.teams);
+      setCsrIds(payload.csrIds ?? []);
       // Seed presence from the roster's online flags.
       setOnline(() => {
         const next: Record<string, boolean> = { [payload.me.id]: true };
@@ -439,6 +454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     authed: !!token,
     booting: !!token && !me,
     me,
+    csrIds,
     websites,
     teams,
     conversations,

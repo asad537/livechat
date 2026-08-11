@@ -26,7 +26,13 @@ export default function TransferModal({ conversation, onClose }: Props) {
       }
     }
     return members
-      .filter((m) => m.id !== conversation.assignedUserId && m.id !== me?.id && !!online[m.id])
+      .filter(
+        (m) =>
+          m.id !== conversation.assignedUserId &&
+          m.id !== me?.id &&
+          m.role !== 'MANAGER' && // view-only, never takes chats
+          !!online[m.id],
+      )
       .map((m) => ({
         ...m,
         activeCount: activeCounts[m.id] ?? m.activeChats ?? 0,

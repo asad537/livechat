@@ -5428,3 +5428,15 @@ img.avatar {
 .sound-opt-check {
   font-size: 11px;
 }
+
+/* Role hierarchy badges */
+.role-manager {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+/* "TEAM LEAD" / "MANAGER" labels need more room than the old 52px */
+.team-member-role {
+  width: auto;
+  min-width: 52px;
+}

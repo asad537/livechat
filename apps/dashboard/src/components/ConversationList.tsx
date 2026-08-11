@@ -85,7 +85,7 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     [all],
   );
 
-  const showAllTab = me?.role === 'LEAD' || me?.role === 'ADMIN';
+  const showAllTab = me != null && me.role !== 'CSR';
 
   const displayItems = searchResults ?? items;
 
@@ -127,7 +127,7 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
             className={classNames('conv-tab', tab === 'all' && 'active')}
             onClick={() => setTab('all')}
           >
-            {me?.role === 'LEAD' ? 'Team' : 'All'}
+            {me?.role === 'LEAD' ? 'My Team' : 'All'}
           </button>
         )}
       </div>

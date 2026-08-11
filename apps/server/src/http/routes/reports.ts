@@ -62,11 +62,11 @@ export function buildReportsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAgent(deps.db, deps.config);
 
-  // GET /api/reports/overview?websiteId=&range=today|7d|30d|all — LEAD/ADMIN
+  // GET /api/reports/overview?websiteId=&range=today|7d|30d|all — ADMIN/MANAGER/LEAD
   router.get(
     API.reports,
     auth,
-    requireRole('ADMIN', 'LEAD'),
+    requireRole('ADMIN', 'MANAGER', 'LEAD'),
     h(async (req, res) => {
       const user = agent(req);
       const siteRows = await accessibleWebsiteRows(deps, user);
@@ -81,19 +81,28 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const range = asString(req.query.range) ?? 'today';
       const since = rangeStart(range);
 
-      // Agents in scope: ADMIN → everyone; LEAD → members of their teams.
+      // Agents in scope: ADMIN/MANAGER → everyone; Team Lead → self + own CSRs.
       let agents: UserRow[];
-      if (user.role === 'ADMIN') {
-        agents = await deps.db.all<UserRow>('SELECT * FROM users ORDER BY name');
-      } else {
+      if (user.role === 'LEAD') {
         agents = await deps.db.all<UserRow>(
-          `SELECT DISTINCT u.* FROM users u
-             JOIN team_members tm ON tm.user_id = u.id
-            WHERE tm.team_id IN (SELECT team_id FROM team_members WHERE user_id = ?)
-            ORDER BY u.name`,
-          [user.id],
+          'SELECT * FROM users WHERE id = ? OR team_lead_id = ? ORDER BY name',
+          [user.id, user.id],
         );
+      } else {
+        agents = await deps.db.all<UserRow>('SELECT * FROM users ORDER BY name');
       }
+
+      // A Team Lead's numbers cover only their own CSRs' chats (unassigned
+      // queue/missed chats stay visible — they belong to the website, not an
+      // agent). ADMIN/MANAGER see everything.
+      const leadScope = user.role === 'LEAD' ? agents.map((a) => a.id) : null;
+      const agentFilter = leadScope
+        ? ` AND (assigned_user_id IN (${placeholders(leadScope.length)}) OR assigned_user_id IS NULL)`
+        : '';
+      const cAgentFilter = leadScope
+        ? ` AND (c.assigned_user_id IN (${placeholders(leadScope.length)}) OR c.assigned_user_id IS NULL)`
+        : '';
+      const agentParams: string[] = leadScope ?? [];
 
       const empty = {
         range,
@@ -158,20 +167,20 @@ export function buildReportsRouter(deps: AppDeps): Router {
       ] = await Promise.all([
         deps.db.all<ConvRow>(
           `SELECT id, website_id, status, assigned_user_id, created_at, activated_at, closed_at, rating
-             FROM (SELECT * FROM conversations WHERE ${siteFilter}${rangeFilter}
+             FROM (SELECT * FROM conversations WHERE ${siteFilter}${rangeFilter}${agentFilter}
                    ORDER BY created_at DESC LIMIT 10000) t`,
-          [...siteIds, ...rangeParams],
+          [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.all<{ status: string; assigned_user_id: string | null; n: number }>(
           `SELECT status, assigned_user_id, COUNT(*) AS n FROM conversations
-            WHERE ${siteFilter} AND status IN ('ACTIVE','WAITING','OFFERED')
+            WHERE ${siteFilter} AND status IN ('ACTIVE','WAITING','OFFERED')${agentFilter}
             GROUP BY status, assigned_user_id`,
-          siteIds,
+          [...siteIds, ...agentParams],
         ),
         deps.db.all<{ created_at: string; activated_at: string | null; closed_at: string | null; status: string }>(
           `SELECT created_at, activated_at, closed_at, status FROM conversations
-            WHERE ${siteFilter} AND created_at >= ?`,
-          [...siteIds, trendSince],
+            WHERE ${siteFilter} AND created_at >= ?${agentFilter}`,
+          [...siteIds, trendSince, ...agentParams],
         ),
         deps.db.get<{ n: number; ret: number }>(
           `SELECT COUNT(*) AS n, SUM(CASE WHEN total_visits > 1 THEN 1 ELSE 0 END) AS ret
@@ -187,20 +196,20 @@ export function buildReportsRouter(deps: AppDeps): Router {
         deps.db.all<{ cid: string }>(
           `SELECT DISTINCT h.conversation_id AS cid FROM assignment_history h
              JOIN conversations c ON c.id = h.conversation_id
-            WHERE h.reason = 'TRANSFER' AND ${cSiteFilter}${cRangeFilter}`,
-          [...siteIds, ...rangeParams],
+            WHERE h.reason = 'TRANSFER' AND ${cSiteFilter}${cRangeFilter}${cAgentFilter}`,
+          [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.all<{ cid: string; st: string; at: string; kind: string; body: string | null }>(
           `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at, m.kind, m.body
              FROM messages m JOIN conversations c ON c.id = m.conversation_id
-            WHERE ${cSiteFilter}${cRangeFilter}
+            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter}
             ORDER BY m.conversation_id, m.created_at LIMIT 20000`,
-          [...siteIds, ...rangeParams],
+          [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.all<{ status: string; created_at: string; activated_at: string | null; closed_at: string | null }>(
           `SELECT status, created_at, activated_at, closed_at FROM conversations
-            WHERE ${siteFilter} AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))`,
-          [...siteIds, yesterdayStart, todayStart, yesterdayStart, todayStart],
+            WHERE ${siteFilter} AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))${agentFilter}`,
+          [...siteIds, yesterdayStart, todayStart, yesterdayStart, todayStart, ...agentParams],
         ),
       ]);
 
@@ -208,9 +217,9 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const msgs14 = await deps.db.all<{ cid: string; st: string; at: string }>(
         `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at
            FROM messages m JOIN conversations c ON c.id = m.conversation_id
-          WHERE ${cSiteFilter} AND c.created_at >= ?
+          WHERE ${cSiteFilter} AND c.created_at >= ?${cAgentFilter}
           ORDER BY m.conversation_id, m.created_at LIMIT 30000`,
-        [...siteIds, trendSince],
+        [...siteIds, trendSince, ...agentParams],
       );
       const replyByDay = new Map<string, number[]>();
       {
@@ -569,7 +578,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
   router.get(
     '/api/reports/records',
     auth,
-    requireRole('ADMIN', 'LEAD'),
+    requireRole('ADMIN', 'MANAGER', 'LEAD'),
     h(async (req, res) => {
       const user = agent(req);
       const scoped = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
@@ -597,10 +606,25 @@ export function buildReportsRouter(deps: AppDeps): Router {
         where += ' AND c.created_at <= ?';
         params.push(`${to}T23:59:59.999Z`);
       }
+      // A Team Lead may only pull records for self + own CSRs.
+      const leadScope =
+        user.role === 'LEAD'
+          ? (
+              await deps.db.all<{ id: string }>(
+                'SELECT id FROM users WHERE id = ? OR team_lead_id = ?',
+                [user.id, user.id],
+              )
+            ).map((r) => r.id)
+          : null;
+
       const agentId = asString(req.query.agentId);
       if (agentId) {
+        if (leadScope && !leadScope.includes(agentId)) throw new HttpError(403, 'Forbidden');
         where += ' AND c.assigned_user_id = ?';
         params.push(agentId);
+      } else if (leadScope) {
+        where += ` AND (c.assigned_user_id IN (${placeholders(leadScope.length)}) OR c.assigned_user_id IS NULL)`;
+        params.push(...leadScope);
       }
       const status = asString(req.query.status);
       if (status) {

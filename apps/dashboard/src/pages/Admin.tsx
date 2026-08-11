@@ -5,7 +5,7 @@ import { DEFAULT_MAX_CHATS } from '@livechat/shared';
 import { api, type CreateWebsiteInput } from '../api';
 import { useApp } from '../state';
 import Avatar from '../components/Avatar';
-import { classNames, initials } from '../util';
+import { classNames, initials, roleLabel } from '../util';
 import { IconCheck, IconCopy, IconPlus, IconUserPlus, IconX } from '../icons';
 
 type Section = 'agents' | 'departments' | 'workflows' | 'integrations';
@@ -140,7 +140,8 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
 
 // ─── Websites tab ────────────────────────────────────────────
 function WebsitesTab({ teams }: { teams: Team[] }) {
-  const { pushToast, refreshDirectory } = useApp();
+  const { pushToast, refreshDirectory, me } = useApp();
+  const readOnly = me?.role === 'MANAGER';
   const [websites, setWebsites] = useState<Website[]>([]);
   const [editing, setEditing] = useState<Website | null>(null);
   const [creating, setCreating] = useState(false);
@@ -239,7 +240,7 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
 
   return (
     <div className="admin-tab">
-      {!creating && !editing && (
+      {!creating && !editing && !readOnly && (
         <button className="btn btn-primary btn-sm admin-add" onClick={() => setCreating(true)}>
           <IconPlus size={15} /> New website
         </button>
@@ -268,17 +269,21 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
                   {teams.find((t) => t.id === site.teamId)?.name ?? '—'}
                 </span>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(site)}>
-                Edit
-              </button>
-              <button
-                className="btn btn-ghost btn-sm btn-danger"
-                disabled={deletingId === site.id}
-                onClick={() => void remove(site)}
-                title="Delete this website and all of its data"
-              >
-                {deletingId === site.id ? 'Deleting…' : 'Delete'}
-              </button>
+              {!readOnly && (
+                <>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setEditing(site)}>
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm btn-danger"
+                    disabled={deletingId === site.id}
+                    onClick={() => void remove(site)}
+                    title="Delete this website and all of its data"
+                  >
+                    {deletingId === site.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </>
+              )}
             </div>
             <div className="website-card-greeting">“{site.greeting}”</div>
             {stats[site.id] && (
@@ -302,14 +307,16 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
                 {copiedId === site.id ? <IconCheck size={14} /> : <IconCopy size={14} />}
                 {copiedId === site.id ? ' Copied' : ' Copy embed code'}
               </button>
-              <button
-                className="btn btn-ghost btn-sm"
-                disabled={scanningId === site.id}
-                onClick={() => void scan(site)}
-                title="Crawl this website so the AI assistant answers from its live content"
-              >
-                {scanningId === site.id ? 'Scanning…' : '🤖 Scan website for AI'}
-              </button>
+              {!readOnly && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={scanningId === site.id}
+                  onClick={() => void scan(site)}
+                  title="Crawl this website so the AI assistant answers from its live content"
+                >
+                  {scanningId === site.id ? 'Scanning…' : '🤖 Scan website for AI'}
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -321,7 +328,8 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
 
 // ─── Teams tab ───────────────────────────────────────────────
 function TeamsTab({ users }: { users: UserPublic[] }) {
-  const { pushToast, online, refreshDirectory } = useApp();
+  const { pushToast, online, refreshDirectory, me } = useApp();
+  const readOnly = me?.role === 'MANAGER';
   const [teams, setTeams] = useState<Team[]>([]);
   const [newName, setNewName] = useState('');
   const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -408,16 +416,18 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
 
   return (
     <div className="admin-tab">
-      <form className="admin-inline-form" onSubmit={createTeam}>
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="New department name"
-        />
-        <button className="btn btn-primary btn-sm" type="submit" disabled={!newName.trim() || busy}>
-          <IconPlus size={15} /> Create department
-        </button>
-      </form>
+      {!readOnly && (
+        <form className="admin-inline-form" onSubmit={createTeam}>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New department name"
+          />
+          <button className="btn btn-primary btn-sm" type="submit" disabled={!newName.trim() || busy}>
+            <IconPlus size={15} /> Create department
+          </button>
+        </form>
+      )}
       <div className="admin-list">
         {teams.map((team) => {
           const memberIds = new Set((team.members ?? []).map((m) => m.id));
@@ -426,16 +436,18 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
             <div key={team.id} className="card team-card">
               <div className="team-card-head">
                 <h3>{team.name}</h3>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setAddingTo(addingTo === team.id ? null : team.id);
-                    setAddUserId(candidates[0]?.id ?? '');
-                    setAddIsLead(false);
-                  }}
-                >
-                  <IconUserPlus size={15} /> Add member
-                </button>
+                {!readOnly && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setAddingTo(addingTo === team.id ? null : team.id);
+                      setAddUserId(candidates[0]?.id ?? '');
+                      setAddIsLead(false);
+                    }}
+                  >
+                    <IconUserPlus size={15} /> Add member
+                  </button>
+                )}
               </div>
               {addingTo === team.id && (
                 <div className="team-add-row">
@@ -472,24 +484,26 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
                       {m.name}
                       <span className={classNames('dot', online[m.id] ? 'dot-online' : 'dot-offline')} />
                     </span>
-                    <span className="team-member-role">{m.role}</span>
+                    <span className="team-member-role">{roleLabel(m.role)}</span>
                     <label className="check-field" title="Team lead">
                       <input
                         type="checkbox"
                         checked={m.isLead}
-                        disabled={busy}
+                        disabled={busy || readOnly}
                         onChange={() => void toggleLead(team.id, m)}
                       />
                       Lead
                     </label>
-                    <button
-                      className="icon-btn icon-btn-danger"
-                      title="Remove from team"
-                      disabled={busy}
-                      onClick={() => void removeMember(team.id, m.id)}
-                    >
-                      <IconX size={14} />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        className="icon-btn icon-btn-danger"
+                        title="Remove from team"
+                        disabled={busy}
+                        onClick={() => void removeMember(team.id, m.id)}
+                      >
+                        <IconX size={14} />
+                      </button>
+                    )}
                   </div>
                 ))}
                 {(team.members ?? []).length === 0 && (
@@ -506,15 +520,53 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
 }
 
 // ─── Users tab ───────────────────────────────────────────────
+const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: 'CSR', label: 'CSR' },
+  { value: 'LEAD', label: 'Team Lead' },
+  { value: 'MANAGER', label: 'Manager' },
+  { value: 'ADMIN', label: 'Admin' },
+];
+
+function TeamLeadSelect({
+  leads,
+  value,
+  onChange,
+}: {
+  leads: UserPublic[];
+  value: string;
+  onChange(v: string): void;
+}) {
+  return (
+    <label className="field">
+      <span>Team Lead (this CSR reports to)</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— No team lead —</option>
+        {leads.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
-  const { pushToast, online } = useApp();
+  const { pushToast, online, me } = useApp();
+  const readOnly = me?.role === 'MANAGER';
   const [showForm, setShowForm] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('CSR');
+  const [teamLeadId, setTeamLeadId] = useState('');
   const [maxChats, setMaxChats] = useState(DEFAULT_MAX_CHATS);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<UserPublic | null>(null);
+
+  const leads = users.filter((u) => u.role === 'LEAD');
+  const leadName = (id: string | null | undefined) =>
+    id ? (users.find((u) => u.id === id)?.name ?? '—') : '—';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -527,6 +579,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
         password,
         role,
         maxChats,
+        teamLeadId: role === 'CSR' && teamLeadId ? teamLeadId : null,
       });
       pushToast('User created', `${name.trim()} can now sign in.`, 'success');
       setShowForm(false);
@@ -534,6 +587,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
       setName('');
       setPassword('');
       setRole('CSR');
+      setTeamLeadId('');
       setMaxChats(DEFAULT_MAX_CHATS);
       reload();
     } catch (err) {
@@ -545,7 +599,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
 
   return (
     <div className="admin-tab">
-      {!showForm && (
+      {!showForm && !readOnly && (
         <button className="btn btn-primary btn-sm admin-add" onClick={() => setShowForm(true)}>
           <IconPlus size={15} /> New user
         </button>
@@ -582,11 +636,16 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
             <label className="field">
               <span>Role</span>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                <option value="CSR">CSR</option>
-                <option value="LEAD">LEAD</option>
-                <option value="ADMIN">ADMIN</option>
+                {ROLE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </label>
+            {role === 'CSR' && (
+              <TeamLeadSelect leads={leads} value={teamLeadId} onChange={setTeamLeadId} />
+            )}
             <label className="field">
               <span>Max concurrent chats</span>
               <input
@@ -608,6 +667,16 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
           </div>
         </form>
       )}
+      {editing && (
+        <EditUserForm
+          user={editing}
+          leads={leads.filter((l) => l.id !== editing.id)}
+          onDone={(changed) => {
+            setEditing(null);
+            if (changed) reload();
+          }}
+        />
+      )}
       <div className="card">
         <table className="table">
           <thead>
@@ -615,8 +684,10 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
               <th>User</th>
               <th>Email</th>
               <th>Role</th>
+              <th>Team lead</th>
               <th className="num">Max chats</th>
               <th>Status</th>
+              {!readOnly && <th />}
             </tr>
           </thead>
           <tbody>
@@ -630,18 +701,26 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
                 </td>
                 <td>{u.email}</td>
                 <td>
-                  <span className={`role-badge role-${u.role.toLowerCase()}`}>{u.role}</span>
+                  <span className={`role-badge role-${u.role.toLowerCase()}`}>{roleLabel(u.role)}</span>
                 </td>
+                <td>{u.role === 'CSR' ? leadName(u.teamLeadId) : '—'}</td>
                 <td className="num">{u.maxChats}</td>
                 <td>
                   <span className={classNames('dot', online[u.id] ? 'dot-online' : 'dot-offline')} />
                   {online[u.id] ? ' Online' : ' Offline'}
                 </td>
+                {!readOnly && (
+                  <td className="num">
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(u)}>
+                      Edit
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-hint">
+                <td colSpan={readOnly ? 6 : 7} className="empty-hint">
                   No users found.
                 </td>
               </tr>
@@ -653,9 +732,102 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   );
 }
 
+// ─── Edit user (role / team lead / capacity / password) ──────
+function EditUserForm({
+  user,
+  leads,
+  onDone,
+}: {
+  user: UserPublic;
+  leads: UserPublic[];
+  onDone(changed: boolean): void;
+}) {
+  const { pushToast } = useApp();
+  const [name, setName] = useState(user.name);
+  const [role, setRole] = useState<Role>(user.role);
+  const [teamLeadId, setTeamLeadId] = useState(user.teamLeadId ?? '');
+  const [maxChats, setMaxChats] = useState(user.maxChats);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.updateUser(user.id, {
+        name: name.trim(),
+        role,
+        maxChats,
+        teamLeadId: role === 'CSR' && teamLeadId ? teamLeadId : null,
+        ...(password ? { password } : {}),
+      });
+      pushToast('User updated', `${name.trim()} saved.`, 'success');
+      onDone(true);
+    } catch (err) {
+      pushToast('Update failed', err instanceof Error ? err.message : undefined, 'error');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="card admin-form" onSubmit={submit}>
+      <h3>Edit {user.name}</h3>
+      <div className="form-grid">
+        <label className="field">
+          <span>Full name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label className="field">
+          <span>Role</span>
+          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+            {ROLE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {role === 'CSR' && (
+          <TeamLeadSelect leads={leads} value={teamLeadId} onChange={setTeamLeadId} />
+        )}
+        <label className="field">
+          <span>Max concurrent chats</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={maxChats}
+            onChange={(e) => setMaxChats(Math.max(1, Number(e.target.value) || 1))}
+          />
+        </label>
+        <label className="field">
+          <span>New password (optional)</span>
+          <input
+            type="password"
+            value={password}
+            minLength={6}
+            placeholder="Leave blank to keep current"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn btn-ghost" onClick={() => onDone(false)}>
+          Cancel
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={busy}>
+          {busy ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ─── Workflows tab ───────────────────────────────────────────
 function WorkflowsTab() {
-  const { pushToast, refreshDirectory } = useApp();
+  const { pushToast, refreshDirectory, me } = useApp();
+  const readOnly = me?.role === 'MANAGER';
   const [websites, setWebsites] = useState<Website[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -727,7 +899,7 @@ function WorkflowsTab() {
             <span className="wf-site-name">{site.name}</span>
             <button
               className={classNames('switch', (site.aiEnabled ?? true) && 'on')}
-              disabled={busyId === site.id}
+              disabled={busyId === site.id || readOnly}
               onClick={() => void toggleAi(site)}
               aria-label={`AI assistant for ${site.name}`}
             >

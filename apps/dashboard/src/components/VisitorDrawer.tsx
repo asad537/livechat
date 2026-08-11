@@ -40,7 +40,7 @@ export default function VisitorDrawer({
   onStartChat,
   onOpenConversation,
 }: Props) {
-  const { me } = useApp();
+  const { me, csrIds } = useApp();
   const [profile, setProfile] = useState<VisitorProfile | null>(null);
   const [chats, setChats] = useState<VisitorChat[] | null>(null);
   const [tab, setTab] = useState<Tab>('chat');
@@ -184,13 +184,15 @@ export default function VisitorDrawer({
   // The conversation shown in the Chat tab: an already-open one, or one we just started.
   const openConv = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED');
   // Can the current agent actually open this conversation? (Assigned to me,
-  // unassigned/queued, or I'm a lead/admin.) Otherwise it's someone else's chat.
+  // unassigned/queued, my CSR's chat if I'm a Team Lead, or I'm an
+  // admin/manager.) Otherwise it's someone else's chat.
   const canOpenConv =
     !openConv ||
     openConv.assignedUserId == null ||
     openConv.assignedUserId === me?.id ||
-    me?.role === 'LEAD' ||
-    me?.role === 'ADMIN';
+    (me?.role === 'LEAD' && csrIds.includes(openConv.assignedUserId)) ||
+    me?.role === 'ADMIN' ||
+    me?.role === 'MANAGER';
   const busyAgent = openConv && !canOpenConv ? openConv.agentName : null;
   const chatConvId = (canOpenConv ? openConv?.id : undefined) ?? startedId;
 
@@ -334,6 +336,18 @@ export default function VisitorDrawer({
               </div>
             ) : chats === null ? (
               <p className="vd-muted vd-chat-loading">Loading…</p>
+            ) : me?.role === 'MANAGER' ? (
+              // Managers observe — they never open a chat with a visitor.
+              <div className="vd-chat-starter">
+                <div className="vd-chat-starter-hint">
+                  <span className="vd-chat-starter-emoji">👁️</span>
+                  <p>
+                    No open conversation with {name}.
+                    <br />
+                    Managers have view-only access and cannot start chats.
+                  </p>
+                </div>
+              </div>
             ) : (
               // No open conversation yet — typing here starts one instantly.
               <div className="vd-chat-starter">
@@ -413,12 +427,14 @@ export default function VisitorDrawer({
                   }}
                 />
               </label>
-              <div className="vd-form-actions">
-                {savedFlash && <span className="vd-saved">✓ Saved</span>}
-                <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
-                  {saving ? 'Saving…' : 'Save details'}
-                </button>
-              </div>
+              {me?.role !== 'MANAGER' && (
+                <div className="vd-form-actions">
+                  {savedFlash && <span className="vd-saved">✓ Saved</span>}
+                  <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
+                    {saving ? 'Saving…' : 'Save details'}
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* Session path */}

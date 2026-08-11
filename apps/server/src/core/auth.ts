@@ -61,6 +61,7 @@ export interface UserRow {
   max_chats: number;
   avatar_color: string;
   avatar_url?: string | null;
+  team_lead_id?: string | null;
   created_at: string;
 }
 
@@ -73,6 +74,7 @@ export function toUserPublic(row: UserRow): UserPublic {
     maxChats: Number(row.max_chats),
     avatarColor: row.avatar_color,
     avatarUrl: row.avatar_url ?? null,
+    teamLeadId: row.team_lead_id ?? null,
   };
 }
 

@@ -3,7 +3,9 @@
 // Import via the `@livechat/shared` alias (tsconfig paths / vite alias).
 // ─────────────────────────────────────────────────────────────
 
-export type Role = 'ADMIN' | 'LEAD' | 'CSR';
+// ADMIN → full control · MANAGER → view everything, edit nothing ·
+// LEAD ("Team Lead") → owns CSRs via teamLeadId · CSR → frontline agent.
+export type Role = 'ADMIN' | 'MANAGER' | 'LEAD' | 'CSR';
 export type ConversationStatus = 'WAITING' | 'OFFERED' | 'ACTIVE' | 'CLOSED' | 'MISSED';
 export type SenderType = 'VISITOR' | 'AGENT' | 'SYSTEM' | 'BOT';
 export type MessageKind = 'TEXT' | 'FILE' | 'CALL' | 'SYSTEM';
@@ -21,6 +23,7 @@ export interface UserPublic {
   maxChats: number;
   avatarColor: string;
   avatarUrl?: string | null; // server path, e.g. /api/users/:id/avatar?v=...
+  teamLeadId?: string | null; // for CSRs: the Team Lead they report to
   online?: boolean;
   away?: boolean;
   activeChats?: number;
@@ -192,7 +195,7 @@ export const EV = {
   AgentCallInvite: 'agent:call:invite-participant', // { callId, userId }
 
   // server → agent
-  AgentReady: 'agent:ready',                 // { me: UserPublic, websites: Website[], teams: Team[] }
+  AgentReady: 'agent:ready',                 // { me: UserPublic, websites: Website[], teams: Team[], csrIds: string[] }
   InboxUpdate: 'inbox:update',               // { conversation: ConversationSummary }
   VisitorsUpdate: 'visitors:update',         // { websiteId, visitors: Visitor[] }
   PresenceUpdate: 'presence:update',         // { userId, online: boolean, away?: boolean }

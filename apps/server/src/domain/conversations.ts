@@ -233,6 +233,7 @@ export async function findEligibleCsr(
     .filter(
       (m) =>
         m.id !== excludeUserId &&
+        m.role !== 'MANAGER' && // managers are view-only, never auto-assigned
         deps.presence.isAgentAvailable(m.id) &&
         Number(m.active) < Number(m.max_chats),
     )
@@ -376,14 +377,18 @@ export async function drainQueue(deps: AppDeps, websiteId?: string): Promise<voi
 
 // ─── Access control ──────────────────────────────────────────
 
-/** ADMIN sees everything; everyone else must be a member of the website's team. */
+/**
+ * ADMIN sees everything; MANAGER sees everything too (view-only — mutations
+ * are blocked by role guards upstream); everyone else must be a member of
+ * the website's team.
+ */
 export async function userCanAccessWebsite(
   deps: AppDeps,
   userId: string,
   role: Role,
   websiteId: string,
 ): Promise<boolean> {
-  if (role === 'ADMIN') return true;
+  if (role === 'ADMIN' || role === 'MANAGER') return true;
   const website = await deps.db.get<WebsiteRow>('SELECT * FROM websites WHERE id = ?', [websiteId]);
   if (!website) return false;
   const member = await deps.db.get<{ id: string }>(

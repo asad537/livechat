@@ -111,16 +111,17 @@ async function authorizeConversation(
     );
     if (!user) return null;
     const actor: Actor = { type: 'AGENT', id: user.id, role: user.role };
-    if (user.role === 'ADMIN') return { actor, conversation };
+    // MANAGER may read (download) anywhere; uploads are blocked in the route.
+    if (user.role === 'ADMIN' || user.role === 'MANAGER') return { actor, conversation };
     if (conversation.assigned_user_id === user.id) return { actor, conversation };
-    // LEAD of the website's team
-    const lead = await deps.db.get(
-      `SELECT tm.id FROM team_members tm
-         JOIN websites w ON w.team_id = tm.team_id
-        WHERE w.id = ? AND tm.user_id = ? AND tm.is_lead = 1`,
-      [conversation.website_id, user.id],
-    );
-    if (lead) return { actor, conversation };
+    // Team Lead of the assigned CSR
+    if (user.role === 'LEAD' && conversation.assigned_user_id) {
+      const csr = await deps.db.get(
+        'SELECT id FROM users WHERE id = ? AND team_lead_id = ?',
+        [conversation.assigned_user_id, user.id],
+      );
+      if (csr) return { actor, conversation };
+    }
     return null;
   }
 
@@ -199,6 +200,10 @@ export function buildFilesRouter(deps: AppDeps): Router {
       const auth = await authorizeConversation(deps, token, conversationId);
       if (!auth) {
         res.status(403).json({ error: 'Not authorized for this conversation' });
+        return;
+      }
+      if (auth.actor.type === 'AGENT' && auth.actor.role === 'MANAGER') {
+        res.status(403).json({ error: 'Managers have view-only access' });
         return;
       }
       const file = req.file;

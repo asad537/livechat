@@ -41,6 +41,7 @@ interface OpenAck {
 export default function ChatPane({ conversationId, showSidebar = true }: Props) {
   const {
     me,
+    csrIds,
     conversations,
     updateConversation,
     markConversationRead,
@@ -67,24 +68,31 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
 
   const canSend = useMemo(() => {
     if (!me || !conversation) return false;
+    if (me.role === 'MANAGER') return false; // view-only role
     if (conversation.status === 'CLOSED' || conversation.status === 'MISSED') return false;
+    const assigneeIsMyCsr =
+      me.role === 'LEAD' &&
+      conversation.assignedUserId != null &&
+      csrIds.includes(conversation.assignedUserId);
     if (conversation.status === 'WAITING') {
       // Zendesk-style: typing in a queued chat joins it.
       return (
         conversation.assignedUserId === me.id ||
         conversation.assignedUserId == null ||
-        me.role === 'LEAD' ||
+        assigneeIsMyCsr ||
         me.role === 'ADMIN'
       );
     }
-    return conversation.assignedUserId === me.id || me.role === 'ADMIN';
-  }, [me, conversation]);
+    // ACTIVE: assignee, ADMIN, or the assignee's Team Lead may reply.
+    return conversation.assignedUserId === me.id || me.role === 'ADMIN' || assigneeIsMyCsr;
+  }, [me, csrIds, conversation]);
 
   const joinByTyping = canSend && conversation?.status === 'WAITING';
 
   const watchingReadOnly = !!conversation && !canSend && !openError &&
     conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' &&
-    (me?.role === 'LEAD' || me?.role === 'ADMIN') && conversation.assignedUserId !== me?.id;
+    (me?.role === 'LEAD' || me?.role === 'ADMIN' || me?.role === 'MANAGER') &&
+    conversation.assignedUserId !== me?.id;
 
   const markRead = useCallback(
     (msgs: ChatMessage[]) => {
@@ -301,7 +309,13 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     !!conversation &&
     conversation.status === 'WAITING' &&
     !!me &&
-    (conversation.assignedUserId === me.id || me.role === 'LEAD' || me.role === 'ADMIN');
+    me.role !== 'MANAGER' &&
+    (conversation.assignedUserId === me.id ||
+      conversation.assignedUserId == null ||
+      me.role === 'ADMIN' ||
+      (me.role === 'LEAD' &&
+        conversation.assignedUserId != null &&
+        csrIds.includes(conversation.assignedUserId)));
 
   let lastDay = '';
 
@@ -361,7 +375,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                 </button>
               </>
             )}
-            {conversation && conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' && (me?.role !== 'CSR' || canSend) && (
+            {conversation && conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' && me?.role !== 'MANAGER' && (me?.role !== 'CSR' || canSend) && (
               <>
                 <button className="icon-btn" title="Transfer" onClick={() => setShowTransfer(true)}>
                   <IconTransfer size={17} />
@@ -377,7 +391,9 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
         {watchingReadOnly && (
           <div className="watch-banner">
             <IconEye size={15} />
-            Monitoring — you are watching this conversation live. Only the assigned agent can reply.
+            {me?.role === 'MANAGER'
+              ? 'Monitoring — view-only. Managers can watch every conversation but never reply.'
+              : 'Monitoring — you are watching this conversation live. Only the assigned agent can reply.'}
           </div>
         )}
 
@@ -425,11 +441,13 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
             </div>
           ) : !canSend ? (
             <div className="composer-closed">
-              {watchingReadOnly
-                ? 'Read-only view.'
-                : conversation?.status === 'WAITING'
-                  ? 'Accept the chat to start replying.'
-                  : 'Only the assigned agent can reply.'}
+              {me?.role === 'MANAGER'
+                ? 'View-only (Manager).'
+                : watchingReadOnly
+                  ? 'Read-only view.'
+                  : conversation?.status === 'WAITING'
+                    ? 'Accept the chat to start replying.'
+                    : 'Only the assigned agent can reply.'}
             </div>
           ) : (
             <>

@@ -18,6 +18,7 @@ import {
   agent,
   asString,
   h,
+  myCsrIds,
   requireString,
   toWebsite,
   visibleTeams,
@@ -56,14 +57,16 @@ export function buildAuthRouter(deps: AppDeps): Router {
     auth,
     h(async (req, res) => {
       const user = agent(req);
-      const [websiteRows, teams] = await Promise.all([
+      const [websiteRows, teams, csrIds] = await Promise.all([
         accessibleWebsiteRows(deps, user),
         visibleTeams(deps, user),
+        user.role === 'LEAD' ? myCsrIds(deps, user.id) : Promise.resolve([]),
       ]);
       res.json({
         user: toUserPublic(user),
         websites: websiteRows.map(toWebsite),
         teams,
+        csrIds,
       });
     }),
   );

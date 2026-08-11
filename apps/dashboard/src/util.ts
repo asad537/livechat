@@ -193,3 +193,9 @@ export function avatarGradient(seed: string): string {
   const [a, b] = AVATAR_GRADIENTS[Math.abs(h) % AVATAR_GRADIENTS.length];
   return `linear-gradient(135deg, ${a}, ${b})`;
 }
+
+/** Human label for a role — LEAD reads as "Team Lead" everywhere in the UI. */
+export function roleLabel(role: string): string {
+  if (role === 'LEAD') return 'TEAM LEAD';
+  return role;
+}

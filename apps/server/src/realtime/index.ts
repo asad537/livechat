@@ -262,7 +262,21 @@ async function loadHistory(deps: AppDeps, conversationId: string) {
 
 // ─── Access helpers ──────────────────────────────────────────
 
-/** Assignee, ADMIN, or LEAD with access to the website's team may manage (accept/close/transfer/send). */
+/** Is `userId` the Team Lead of the user the conversation is assigned to? */
+async function isLeadOfAssignee(deps: AppDeps, conv: ConversationRow, userId: string): Promise<boolean> {
+  if (!conv.assigned_user_id) return false;
+  const csr = await deps.db.get<{ id: string }>(
+    'SELECT id FROM users WHERE id = ? AND team_lead_id = ?',
+    [conv.assigned_user_id, userId],
+  );
+  return !!csr;
+}
+
+/**
+ * Assignee or ADMIN may manage (accept/close/transfer/send); a Team Lead may
+ * manage their own CSRs' chats and the unassigned queue of accessible sites.
+ * MANAGER never manages — view-only.
+ */
 async function canManageConversation(
   deps: AppDeps,
   conv: ConversationRow,
@@ -270,14 +284,25 @@ async function canManageConversation(
   role: Role,
 ): Promise<boolean> {
   if (role === 'ADMIN') return true;
+  if (role === 'MANAGER') return false;
   if (conv.assigned_user_id === userId) return true;
-  if (role === 'LEAD') return userCanAccessWebsite(deps, userId, role, conv.website_id);
+  if (role === 'LEAD') {
+    if (conv.assigned_user_id) return isLeadOfAssignee(deps, conv, userId);
+    return userCanAccessWebsite(deps, userId, role, conv.website_id);
+  }
   return false;
 }
 
-/** Only the assignee or an ADMIN may send agent messages. */
-function canSendAsAgent(conv: ConversationRow, userId: string, role: Role): boolean {
-  return role === 'ADMIN' || conv.assigned_user_id === userId;
+/** Assignee, ADMIN, or the assignee's own Team Lead may send agent messages. */
+async function canSendAsAgent(
+  deps: AppDeps,
+  conv: ConversationRow,
+  userId: string,
+  role: Role,
+): Promise<boolean> {
+  if (role === 'ADMIN' || conv.assigned_user_id === userId) return true;
+  if (role === 'LEAD') return isLeadOfAssignee(deps, conv, userId);
+  return false;
 }
 
 async function getConversation(
@@ -731,7 +756,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           reply({ error: 'Conversation not found' });
           return;
         }
-        const allowed = await canManageConversation(deps, conv, data.userId, data.role);
+        // MANAGER may open anything to watch; everyone else needs manage access.
+        const allowed =
+          data.role === 'MANAGER' ||
+          (await canManageConversation(deps, conv, data.userId, data.role));
         if (!allowed) {
           reply({ error: 'Forbidden' });
           socket.emit(EV.AppError, { message: 'You do not have access to this conversation' });
@@ -758,6 +786,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       EV.AgentMessage,
       safe(socket, async (payload: unknown) => {
         if (!allowAgentMsg()) return;
+        if (data.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
+          return;
+        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const body = asString(p.body)?.trim().slice(0, MAX_MESSAGE_CHARS);
         const tempId = asString(p.tempId) ?? undefined;
@@ -802,7 +834,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
             body: `${data.name} has joined the chat`,
           });
           await activateConversation(deps, conv.id);
-        } else if (!canSendAsAgent(conv, data.userId, data.role)) {
+        } else if (!(await canSendAsAgent(deps, conv, data.userId, data.role))) {
           socket.emit(EV.AppError, { message: 'Only the assigned agent can send messages here' });
           return;
         }
@@ -822,6 +854,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       safe(socket, async (payload: unknown, ack?: unknown) => {
         const reply =
           typeof ack === 'function' ? (ack as (r: { conversationId: string }) => void) : null;
+        if (data.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
+          return;
+        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const websiteId = asString(p.websiteId);
         const visitorId = asString(p.visitorId);
@@ -848,7 +884,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           // Already an open conversation — post into it (when allowed) and
           // hand its id back so the client opens that chat instead of erroring.
           await socket.join(convRoom(open.id));
-          if (canSendAsAgent(open, data.userId, data.role)) {
+          if (await canSendAsAgent(deps, open, data.userId, data.role)) {
             await postMessage(deps, {
               conversationId: open.id,
               senderType: 'AGENT',
@@ -897,6 +933,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentAccept,
       safe(socket, async (payload: unknown) => {
+        if (data.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
+          return;
+        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv) return;
@@ -941,6 +981,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentClose,
       safe(socket, async (payload: unknown) => {
+        if (data.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
+          return;
+        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv) return;
@@ -957,6 +1001,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentTransfer,
       safe(socket, async (payload: unknown) => {
+        if (data.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
+          return;
+        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const toUserId = asString(p.toUserId);
         const conv = await getConversation(deps, asString(p.conversationId));
@@ -972,6 +1020,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         const target = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [toUserId]);
         if (!target) {
           socket.emit(EV.AppError, { message: 'Target agent not found' });
+          return;
+        }
+        if (target.role === 'MANAGER') {
+          socket.emit(EV.AppError, { message: 'Managers cannot take chats' });
           return;
         }
         const isMember = await userCanAccessWebsite(
@@ -992,6 +1044,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentTyping,
       safe(socket, (payload: unknown) => {
+        if (data.role === 'MANAGER') return; // watchers never show as typing
         const p = (payload ?? {}) as Record<string, unknown>;
         const conversationId = asString(p.conversationId);
         if (!conversationId) return;
@@ -1014,7 +1067,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         const messageIds = asStringArray(p.messageIds);
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv || messageIds.length === 0) return;
-        if (!canSendAsAgent(conv, data.userId, data.role)) return;
+        if (!(await canSendAsAgent(deps, conv, data.userId, data.role))) return;
         const readAt = nowIso();
         await deps.db.run(
           `UPDATE messages SET read_at = ? WHERE conversation_id = ? AND sender_type = 'VISITOR' AND read_at IS NULL AND id IN (${messageIds.map(() => '?').join(',')})`,
@@ -1097,8 +1150,8 @@ async function onAgentConnected(
     deps.io.of(AGENT_NAMESPACE).emit(EV.PresenceUpdate, { userId: data.userId, online: true });
   }
 
-  // Scoped websites + teams (ADMIN = all; others via team membership).
-  const isAdmin = data.role === 'ADMIN';
+  // Scoped websites + teams (ADMIN/MANAGER = all; others via team membership).
+  const isAdmin = data.role === 'ADMIN' || data.role === 'MANAGER';
   const websiteRows = isAdmin
     ? await deps.db.all<WebsiteRow>('SELECT * FROM websites ORDER BY name ASC')
     : await deps.db.all<WebsiteRow>(
@@ -1147,7 +1200,17 @@ async function onAgentConnected(
     });
   }
 
-  socket.emit(EV.AgentReady, { me: toUserPublic(ctx.user), websites, teams });
+  // A Team Lead's CSR ids ride along so the dashboard can gate the composer.
+  const csrIds =
+    data.role === 'LEAD'
+      ? (
+          await deps.db.all<{ id: string }>('SELECT id FROM users WHERE team_lead_id = ?', [
+            data.userId,
+          ])
+        ).map((r) => r.id)
+      : [];
+
+  socket.emit(EV.AgentReady, { me: toUserPublic(ctx.user), websites, teams, csrIds });
 
   // A newly-online agent may free up the queue.
   await drainQueue(deps);
