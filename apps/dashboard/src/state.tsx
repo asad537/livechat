@@ -402,7 +402,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [conversations]);
 
   useEffect(() => {
-    document.title = unreadTotal > 0 ? `(${unreadTotal}) LiveChat` : 'LiveChat — Agent Dashboard';
+    document.title = unreadTotal > 0 ? `(${unreadTotal}) TCB Connect` : 'TCB Connect — Agent Dashboard';
   }, [unreadTotal]);
 
   // ─── Auth actions ──────────────────────────────────────────

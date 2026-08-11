@@ -80,8 +80,8 @@ function Sidebar() {
           <LogoMark size={22} />
         </span>
         <span className="sidebar-brand-text">
-          <span className="sidebar-brand-name">LiveChat</span>
-          <span className="sidebar-brand-sub">Agency workspace</span>
+          <span className="sidebar-brand-name">TCB Connect</span>
+          <span className="sidebar-brand-sub">The Custom Boxes</span>
         </span>
       </div>
       <div className="nav-section-label">Workspace</div>
