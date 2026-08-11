@@ -1308,6 +1308,7 @@ async function onAgentConnected(
   const websites: Website[] = websiteRows.map((w) => ({
     id: w.id,
     name: w.name,
+    label: w.label ?? null,
     logoUrl: w.logo_url,
     primaryColor: w.primary_color,
     greeting: w.greeting,

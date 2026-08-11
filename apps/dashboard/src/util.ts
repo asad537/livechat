@@ -204,3 +204,4 @@ export function roleLabel(role: string): string {
 export function siteLabel(w: { label?: string | null; name?: string | null } | null | undefined): string {
   return (w?.label?.trim() || w?.name || '') as string;
 }
+

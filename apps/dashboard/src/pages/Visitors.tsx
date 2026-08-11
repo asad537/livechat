@@ -93,7 +93,9 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     void Promise.all(
       websites.map((w) => api.websiteVisitors(w.id).catch(() => [] as Visitor[])),
     ).then((lists) => setRestVisitors(lists.flat()));
-    void api.servedVisitors(10).then(setServedVisitors).catch(() => setServedVisitors([]));
+    // Fetch more than we display so the "already served" exclusion below is
+    // reasonably complete (served visitors are hidden from Online now).
+    void api.servedVisitors(40).then(setServedVisitors).catch(() => setServedVisitors([]));
   }, [websites]);
   useEffect(() => {
     refresh();
@@ -161,10 +163,13 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     return list;
   }, [visitorsByWebsite, restVisitors, websites, query, siteById]);
 
-  const onlineList = visitors.filter((v) => v.online);
+  // Ids of visitors we've already served — they belong under "Recently served",
+  // not "Online now" (which is for fresh, not-yet-served visitors).
+  const servedIds = useMemo(() => new Set(servedVisitors.map((v) => v.id)), [servedVisitors]);
+  const onlineList = visitors.filter((v) => v.online && !servedIds.has(v.id));
 
   // "Recently served" — visitors an agent messaged, enriched with live online
-  // state, filtered by the same search box, capped at 10.
+  // state, filtered by the same search box, capped at 12.
   const servedList = useMemo(() => {
     const liveById = new Map<string, Visitor>();
     for (const w of websites) for (const v of visitorsByWebsite[w.id] ?? []) liveById.set(v.id, v);
@@ -180,7 +185,7 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
           .some((s) => String(s).toLowerCase().includes(q)),
       );
     }
-    return list.slice(0, 10);
+    return list.slice(0, 12);
   }, [servedVisitors, visitorsByWebsite, websites, query, siteById]);
 
   const drawerLive = drawerId ? visitors.find((v) => v.id === drawerId) ?? null : null;
