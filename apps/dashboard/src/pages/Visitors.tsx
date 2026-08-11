@@ -281,7 +281,10 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
             className="btn btn-primary btn-sm"
             onClick={(e) => {
               e.stopPropagation();
-              setStartTarget(v);
+              // Already in a live chat → open it in the dock; otherwise compose.
+              const openId = v.activeConversation?.id;
+              if (openId) openDockedChat(openId);
+              else setStartTarget(v);
             }}
           >
             Chat
