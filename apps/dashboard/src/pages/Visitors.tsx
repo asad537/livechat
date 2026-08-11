@@ -14,6 +14,7 @@ import {
   initials,
   pageLabel,
   referrerLabel,
+  siteLabel,
   uaParse,
 } from '../util';
 import VisitorDrawer from '../components/VisitorDrawer';
@@ -234,7 +235,7 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
           {site ? (
             <span className="vt-site-chip">
               <span className="chip-dot" style={{ background: site.primaryColor }} />
-              {site.name}
+              {siteLabel(site)}
             </span>
           ) : (
             <span className="vt-muted">—</span>

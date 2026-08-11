@@ -191,3 +191,6 @@ CREATE INDEX IF NOT EXISTS idx_users_team_lead ON users (team_lead_id);
 
 -- Per-user IP allow-list (comma-separated IPs/CIDRs; empty = unrestricted)
 ALTER TABLE users ADD COLUMN allowed_ips TEXT;
+
+-- Optional short label agents see in the website chip (idempotent)
+ALTER TABLE websites ADD COLUMN label VARCHAR(255);

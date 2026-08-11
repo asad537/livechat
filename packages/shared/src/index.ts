@@ -33,6 +33,7 @@ export interface UserPublic {
 export interface WebsiteBranding {
   id: string;
   name: string;
+  label?: string | null; // short name agents see in the website chip (falls back to name)
   logoUrl: string | null;
   primaryColor: string;
   headerColor?: string | null; // widget header bar; NULL = primaryColor

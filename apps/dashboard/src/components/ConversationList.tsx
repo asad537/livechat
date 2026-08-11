@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ConversationStatus, ConversationSummary } from '@livechat/shared';
 import { useApp } from '../state';
 import { api } from '../api';
-import { classNames, formatWhen, initials } from '../util';
+import { classNames, formatWhen, initials, siteLabel } from '../util';
 
 interface Props {
   selectedId: string | null;
@@ -181,7 +181,7 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                         className="chip-dot"
                         style={{ background: c.website.primaryColor || 'var(--accent)' }}
                       />
-                      {c.website.name}
+                      {siteLabel(c.website)}
                     </span>
                   )}
                   {c.assignedUser && <span className="chip">{c.assignedUser.name}</span>}

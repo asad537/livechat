@@ -9,7 +9,7 @@ import { EV } from '@livechat/shared';
 import { useApp } from '../state';
 import { getSocket } from '../socket';
 import { uploadFile } from '../api';
-import { classNames, formatDay, formatTime, initials, newTempId } from '../util';
+import { classNames, formatDay, formatTime, initials, newTempId, siteLabel } from '../util';
 import MessageBubble from './MessageBubble';
 import HistoryTimeline from './HistoryTimeline';
 import TransferModal from './TransferModal';
@@ -345,7 +345,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                       className="chip-dot"
                       style={{ background: conversation.website.primaryColor || 'var(--accent)' }}
                     />
-                    {conversation.website.name}
+                    {siteLabel(conversation.website)}
                   </span>
                 )}
                 {conversation && <StatusPill status={conversation.status} />}

@@ -301,7 +301,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         msgs: number;
       }>(
         `SELECT c.id, c.status, c.created_at, c.activated_at, c.closed_at, c.rating,
-                c.website_id, w.name AS website_name, w.primary_color AS website_color,
+                c.website_id, COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
                 u.name AS agent_name,
                 v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email,
                 (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msgs

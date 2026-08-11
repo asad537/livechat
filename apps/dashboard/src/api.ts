@@ -167,6 +167,7 @@ export interface ReportRecord {
 
 export interface CreateWebsiteInput {
   name: string;
+  label?: string | null;
   domains: string[];
   primaryColor: string;
   greeting: string;
@@ -225,7 +226,7 @@ export const api = {
     name: string;
     password: string;
     role: Role;
-    maxChats: number;
+    maxChats?: number;
     teamLeadId?: string | null;
     allowedIps?: string | null;
   }) => request<unknown>(API.users, { method: 'POST', body: input }),

@@ -149,11 +149,12 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
 
       const id = newId();
       await deps.db.run(
-        `INSERT INTO websites (id, name, widget_key, domains, team_id, logo_url, primary_color, header_color, greeting, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO websites (id, name, label, widget_key, domains, team_id, logo_url, primary_color, header_color, greeting, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           name,
+          asString(req.body?.label)?.trim().slice(0, 255) || null,
           newWidgetKey(),
           normalizeDomains(req.body?.domains),
           teamId,
@@ -187,6 +188,10 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
       if (body.name !== undefined) {
         sets.push('name = ?');
         params.push(requireString(body.name, 'name', 255));
+      }
+      if (body.label !== undefined) {
+        sets.push('label = ?');
+        params.push(asString(body.label)?.trim().slice(0, 255) || null);
       }
       if (body.domains !== undefined) {
         sets.push('domains = ?');

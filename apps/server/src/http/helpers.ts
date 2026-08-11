@@ -55,6 +55,7 @@ export function requireString(v: unknown, field: string, maxLen = 500): string {
 export interface WebsiteRow {
   id: string;
   name: string;
+  label?: string | null;
   widget_key: string;
   domains: string | null;
   team_id: string;
@@ -115,6 +116,7 @@ export function toBranding(row: WebsiteRow): WebsiteBranding {
   return {
     id: row.id,
     name: row.name,
+    label: row.label ?? null,
     logoUrl: row.logo_url ?? null,
     primaryColor: row.primary_color,
     headerColor: row.header_color ?? null,

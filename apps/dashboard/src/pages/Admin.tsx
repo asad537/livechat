@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { Role, Team, UserPublic, Website } from '@livechat/shared';
-import { DEFAULT_MAX_CHATS } from '@livechat/shared';
 import { api, type CreateWebsiteInput } from '../api';
 import { useApp } from '../state';
 import Avatar from '../components/Avatar';
@@ -33,6 +32,7 @@ interface WebsiteFormProps {
 function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
   const { pushToast } = useApp();
   const [name, setName] = useState(initial?.name ?? '');
+  const [label, setLabel] = useState(initial?.label ?? '');
   const [domains, setDomains] = useState(initial?.domains?.join(', ') ?? '');
   const [primaryColor, setPrimaryColor] = useState(initial?.primaryColor ?? '#6366f1');
   const [headerColor, setHeaderColor] = useState(initial?.headerColor ?? '');
@@ -47,6 +47,7 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
     setBusy(true);
     const payload: CreateWebsiteInput = {
       name: name.trim(),
+      label: label.trim() || null,
       domains: domains
         .split(',')
         .map((d) => d.trim())
@@ -76,6 +77,14 @@ function WebsiteForm({ initial, teams, onSaved, onCancel }: WebsiteFormProps) {
         <label className="field">
           <span>Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Acme Store" />
+        </label>
+        <label className="field">
+          <span>Display name (agent chip)</span>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Optional — e.g. TCB"
+          />
         </label>
         <label className="field">
           <span>Team</span>
@@ -566,7 +575,6 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   const [role, setRole] = useState<Role>('CSR');
   const [teamLeadId, setTeamLeadId] = useState('');
   const [allowedIps, setAllowedIps] = useState('');
-  const [maxChats, setMaxChats] = useState(DEFAULT_MAX_CHATS);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<UserPublic | null>(null);
 
@@ -616,7 +624,6 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
         name: name.trim(),
         password,
         role,
-        maxChats,
         teamLeadId: role === 'CSR' && teamLeadId ? teamLeadId : null,
         allowedIps: allowedIps.trim() || null,
       });
@@ -628,7 +635,6 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
       setRole('CSR');
       setTeamLeadId('');
       setAllowedIps('');
-      setMaxChats(DEFAULT_MAX_CHATS);
       reload();
     } catch (err) {
       pushToast('Create failed', err instanceof Error ? err.message : undefined, 'error');
@@ -692,16 +698,6 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
             {role === 'CSR' && (
               <TeamLeadSelect leads={leads} value={teamLeadId} onChange={setTeamLeadId} />
             )}
-            <label className="field">
-              <span>Max concurrent chats</span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={maxChats}
-                onChange={(e) => setMaxChats(Math.max(1, Number(e.target.value) || 1))}
-              />
-            </label>
             <label className="field field-wide">
               <span>Allowed IP addresses (optional)</span>
               <input
@@ -745,7 +741,6 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
               <th>Email</th>
               <th>Role</th>
               <th>Team lead</th>
-              <th className="num">Max chats</th>
               <th>Status</th>
               {canEdit && <th />}
             </tr>
@@ -765,7 +760,6 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
                   <span className={`role-badge role-${u.role.toLowerCase()}`}>{roleLabel(u.role)}</span>
                 </td>
                 <td>{u.role === 'CSR' ? leadName(u.teamLeadId) : '—'}</td>
-                <td className="num">{u.maxChats}</td>
                 <td>
                   <span className={classNames('dot', online[u.id] ? 'dot-online' : 'dot-offline')} />
                   {online[u.id] ? ' Online' : ' Offline'}
@@ -792,7 +786,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={canEdit ? 7 : 6} className="empty-hint">
+                <td colSpan={canEdit ? 6 : 5} className="empty-hint">
                   No users found.
                 </td>
               </tr>
@@ -818,7 +812,6 @@ function EditUserForm({
   const [name, setName] = useState(user.name);
   const [role, setRole] = useState<Role>(user.role);
   const [teamLeadId, setTeamLeadId] = useState(user.teamLeadId ?? '');
-  const [maxChats, setMaxChats] = useState(user.maxChats);
   const [password, setPassword] = useState('');
   const [allowedIps, setAllowedIps] = useState(user.allowedIps ?? '');
   const [busy, setBusy] = useState(false);
@@ -831,7 +824,6 @@ function EditUserForm({
       await api.updateUser(user.id, {
         name: name.trim(),
         role,
-        maxChats,
         teamLeadId: role === 'CSR' && teamLeadId ? teamLeadId : null,
         allowedIps: allowedIps.trim() || null,
         ...(password ? { password } : {}),
@@ -871,16 +863,6 @@ function EditUserForm({
         {role === 'CSR' && (
           <TeamLeadSelect leads={leads} value={teamLeadId} onChange={setTeamLeadId} />
         )}
-        <label className="field">
-          <span>Max concurrent chats</span>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={maxChats}
-            onChange={(e) => setMaxChats(Math.max(1, Number(e.target.value) || 1))}
-          />
-        </label>
         <label className="field">
           <span>New password (optional)</span>
           <input

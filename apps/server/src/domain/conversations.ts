@@ -51,6 +51,7 @@ export interface VisitorRow {
 export interface WebsiteRow {
   id: string;
   name: string;
+  label?: string | null;
   widget_key: string;
   domains: string | null;
   team_id: string;
@@ -88,6 +89,7 @@ export function toBranding(row: WebsiteRow): WebsiteBranding {
   return {
     id: row.id,
     name: row.name,
+    label: row.label ?? null,
     logoUrl: row.logo_url,
     primaryColor: row.primary_color,
     headerColor: row.header_color ?? null,
@@ -271,9 +273,8 @@ async function countActiveChats(deps: AppDeps, userId: string): Promise<number> 
 
 /** True when the user is online AND has spare capacity (ACTIVE chats < max_chats). */
 export async function hasCapacity(deps: AppDeps, user: UserRow): Promise<boolean> {
-  // Away agents stay signed in but receive no auto-assigned chats.
-  if (!deps.presence.isAgentAvailable(user.id)) return false;
-  return (await countActiveChats(deps, user.id)) < Number(user.max_chats);
+  // No per-agent chat cap — an online (non-away) agent can always take a chat.
+  return deps.presence.isAgentAvailable(user.id);
 }
 
 /**
@@ -299,13 +300,14 @@ export async function findEligibleCsr(
     [website.team_id],
   );
 
+  // No per-agent chat cap anymore: any available, non-manager team member is
+  // eligible; the least-loaded one is picked so load still spreads evenly.
   const candidates = members
     .filter(
       (m) =>
         m.id !== excludeUserId &&
         m.role !== 'MANAGER' && // managers are view-only, never auto-assigned
-        deps.presence.isAgentAvailable(m.id) &&
-        Number(m.active) < Number(m.max_chats),
+        deps.presence.isAgentAvailable(m.id),
     )
     .sort((a, b) => Number(a.active) - Number(b.active));
 
