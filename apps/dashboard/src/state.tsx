@@ -107,6 +107,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   meRef.current = me;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
+  const websitesRef = useRef(websites);
+  websitesRef.current = websites;
   const activeCallRef = useRef<CallMeta | null>(null);
   activeCallRef.current = activeCall;
   /** Conversation id we just started a call in — used to pick up the CALL message. */
@@ -361,6 +363,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       socket.off(EV.AppError, onAppError);
     };
   }, [token, pushToast, refreshConversations]);
+
+  // ─── Focus re-sync ─────────────────────────────────────────
+  // If a live update was missed (network blip, server restart, tab asleep),
+  // coming back to the dashboard pulls a fresh visitor list + inbox — no
+  // manual reload needed. AgentWatchWebsite replies with a full snapshot.
+  useEffect(() => {
+    if (!token) return;
+    const resync = () => {
+      if (document.visibilityState !== 'visible') return;
+      const socket = getSocket();
+      if (!socket?.connected) return;
+      for (const site of websitesRef.current) {
+        socket.emit(EV.AgentWatchWebsite, { websiteId: site.id });
+      }
+      void refreshConversations();
+    };
+    document.addEventListener('visibilitychange', resync);
+    window.addEventListener('focus', resync);
+    return () => {
+      document.removeEventListener('visibilitychange', resync);
+      window.removeEventListener('focus', resync);
+    };
+  }, [token, refreshConversations]);
 
   // ─── Tab title unread counter ──────────────────────────────
   const unreadTotal = useMemo(() => {

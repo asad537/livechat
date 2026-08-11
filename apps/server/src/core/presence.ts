@@ -28,7 +28,8 @@ export interface PresenceStore {
 
 // Page reloads / navigation close the widget socket for a moment — keep the
 // visitor "online" this long so they don't flicker into Recently Active.
-const VISITOR_OFFLINE_GRACE_MS = 60_000;
+// Short enough that actually leaving the site shows offline quickly.
+const VISITOR_OFFLINE_GRACE_MS = 20_000;
 
 export function createPresence(): PresenceStore {
   const agents = new Map<string, Set<string>>();
