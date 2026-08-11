@@ -113,20 +113,21 @@ async function upsertUser(
   role: 'ADMIN' | 'MANAGER' | 'LEAD' | 'CSR',
   teamLeadId: string | null,
   maxChats: number,
+  allowedIps: string | null = null,
 ): Promise<string> {
   const row = await db.get<UserRow>('SELECT * FROM users WHERE email = ?', [email]);
   if (row) {
     await db.run(
-      'UPDATE users SET name = ?, role = ?, team_lead_id = ?, max_chats = ? WHERE id = ?',
-      [name, role, teamLeadId, maxChats, row.id],
+      'UPDATE users SET name = ?, role = ?, team_lead_id = ?, max_chats = ?, allowed_ips = ? WHERE id = ?',
+      [name, role, teamLeadId, maxChats, allowedIps, row.id],
     );
     return row.id;
   }
   const id = newId();
   await db.run(
-    `INSERT INTO users (id, email, name, password_hash, role, max_chats, avatar_color, team_lead_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, email, name, hashPassword(PASSWORD), role, maxChats, colorFor(id), teamLeadId, nowIso()],
+    `INSERT INTO users (id, email, name, password_hash, role, max_chats, avatar_color, team_lead_id, allowed_ips, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, email, name, hashPassword(PASSWORD), role, maxChats, colorFor(id), teamLeadId, allowedIps, nowIso()],
   );
   return id;
 }
@@ -165,27 +166,29 @@ async function main(): Promise<void> {
     teams = [{ id, name: 'Customer Support' }];
   }
 
-  // 1. Admins + Managers (global access — no team membership needed).
+  const DEFAULT_ALLOWED_IPS = '122.129.75.18, 202.166.170.138';
+
+  // 1. Admins + Managers (global access — unrestricted IP, no team membership needed).
   for (const [email, name] of ADMINS) {
-    await upsertUser(db, email, name, 'ADMIN', null, 10);
+    await upsertUser(db, email, name, 'ADMIN', null, 10, null);
     console.log(`  ADMIN     ${name} <${email}>`);
   }
   for (const [email, name] of MANAGERS) {
-    await upsertUser(db, email, name, 'MANAGER', null, 5);
+    await upsertUser(db, email, name, 'MANAGER', null, 5, null);
     console.log(`  MANAGER   ${name} <${email}>`);
   }
 
-  // 2. Team Leads, then their CSRs linked via team_lead_id.
+  // 2. Team Leads, then their CSRs linked via team_lead_id (restricted to office IPs).
   let leads = 0;
   let csrs = 0;
   for (const group of TEAMS) {
     const [leadEmail, leadName] = group.lead;
-    const leadId = await upsertUser(db, leadEmail, leadName, 'LEAD', null, 5);
+    const leadId = await upsertUser(db, leadEmail, leadName, 'LEAD', null, 5, DEFAULT_ALLOWED_IPS);
     leads++;
     for (const t of teams) await ensureMember(db, t.id, leadId, true);
     console.log(`  TEAM LEAD ${leadName} <${leadEmail}> — ${group.csrs.length} CSR(s)`);
     for (const [email, name] of group.csrs) {
-      const csrId = await upsertUser(db, email, name, 'CSR', leadId, 3);
+      const csrId = await upsertUser(db, email, name, 'CSR', leadId, 3, DEFAULT_ALLOWED_IPS);
       csrs++;
       for (const t of teams) await ensureMember(db, t.id, csrId, false);
       console.log(`      CSR   ${name} <${email}>`);
