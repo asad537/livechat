@@ -56,6 +56,7 @@ const osIcon = (os: string) => {
 export default function Visitors({ initialView = 'live' }: { initialView?: 'live' | 'history' }) {
   const { websites, visitorsByWebsite, pushToast, openDockedChat, connected } = useApp();
   const [restVisitors, setRestVisitors] = useState<Visitor[]>([]);
+  const [servedVisitors, setServedVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [startTarget, setStartTarget] = useState<Visitor | null>(null);
@@ -84,12 +85,14 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     for (const w of websites) socket.emit(EV.AgentWatchWebsite, { websiteId: w.id });
   }, [websites, connected]);
 
-  // REST list brings the recently-offline visitors (last 24h) of every site.
+  // REST list brings the recently-offline visitors (last 24h) of every site;
+  // plus the "recently served" list (visitors an agent actually messaged).
   const refresh = useCallback(() => {
     if (websites.length === 0) return;
     void Promise.all(
       websites.map((w) => api.websiteVisitors(w.id).catch(() => [] as Visitor[])),
     ).then((lists) => setRestVisitors(lists.flat()));
+    void api.servedVisitors(10).then(setServedVisitors).catch(() => setServedVisitors([]));
   }, [websites]);
   useEffect(() => {
     refresh();
@@ -158,7 +161,27 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   }, [visitorsByWebsite, restVisitors, websites, query, siteById]);
 
   const onlineList = visitors.filter((v) => v.online);
-  const offlineList = visitors.filter((v) => !v.online);
+
+  // "Recently served" — visitors an agent messaged, enriched with live online
+  // state, filtered by the same search box, capped at 10.
+  const servedList = useMemo(() => {
+    const liveById = new Map<string, Visitor>();
+    for (const w of websites) for (const v of visitorsByWebsite[w.id] ?? []) liveById.set(v.id, v);
+    let list = servedVisitors.map((v) => {
+      const live = liveById.get(v.id);
+      return live ? { ...v, online: live.online, currentPage: live.currentPage } : v;
+    });
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((v) =>
+        [v.name, v.email, v.phone, v.ip, v.country, v.city, siteById.get(v.websiteId)?.name]
+          .filter(Boolean)
+          .some((s) => String(s).toLowerCase().includes(q)),
+      );
+    }
+    return list.slice(0, 10);
+  }, [servedVisitors, visitorsByWebsite, websites, query, siteById]);
+
   const drawerLive = drawerId ? visitors.find((v) => v.id === drawerId) ?? null : null;
 
   const startChat = () => {
@@ -335,21 +358,19 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
             </>
           )}
 
-          {offlineList.length > 0 && (
+          {servedList.length > 0 && (
             <>
               <h3 className="vt-group-title vt-group-offline">
-                <IconClock size={13} /> Recently active ({Math.min(offlineList.length, 10)})
+                <IconClock size={13} /> Recently served ({servedList.length})
               </h3>
-              {table(offlineList.slice(0, 10))}
-              {offlineList.length > 10 && (
-                <button className="vt-more-link" onClick={() => navigate('/history')}>
-                  View all older visitors in History →
-                </button>
-              )}
+              {table(servedList)}
+              <button className="vt-more-link" onClick={() => navigate('/chat-history')}>
+                View all past chats in Chat History →
+              </button>
             </>
           )}
 
-          {websites.length > 0 && visitors.length === 0 && (
+          {websites.length > 0 && onlineList.length === 0 && servedList.length === 0 && (
             <div className="empty-state card">
               <IconUsers size={32} className="empty-state-icon" />
               <p>{query ? 'No visitors match your search' : 'No visitors right now'}</p>

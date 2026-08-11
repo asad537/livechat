@@ -128,6 +128,48 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     }),
   );
 
+  // GET /api/visitors/served?limit= — visitors an agent has actually messaged,
+  // most-recently-served first. Role-scoped (CSR own, LEAD own CSRs, ADMIN/
+  // MANAGER all). Registered before /:id so "served" isn't taken as an id.
+  router.get(
+    '/api/visitors/served',
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      const scoped = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      if (scoped.length === 0) {
+        res.json({ visitors: [] });
+        return;
+      }
+      const limit = Math.min(50, Math.max(1, Number(asString(req.query.limit)) || 10));
+      const scope = await conversationScope(deps, user); // ' AND assigned_user_id …'
+      const cScope = scope.sql.replace('assigned_user_id', 'c.assigned_user_id');
+
+      const rows = await deps.db.all<VisitorRow & { served_at: string; n_chats: number }>(
+        `SELECT v.*, MAX(m.created_at) AS served_at,
+                (SELECT COUNT(*) FROM conversations cc WHERE cc.visitor_id = v.id) AS n_chats
+           FROM messages m
+           JOIN conversations c ON c.id = m.conversation_id
+           JOIN visitors v ON v.id = c.visitor_id
+          WHERE m.sender_type = 'AGENT'
+            AND c.website_id IN (${placeholders(scoped.length)})${cScope}
+          GROUP BY v.id
+          ORDER BY served_at DESC
+          LIMIT ?`,
+        [...scoped, ...scope.params, limit],
+      );
+
+      res.json({
+        visitors: rows.map((r) => ({
+          ...toVisitor(r),
+          online: deps.presence.isVisitorOnline(r.id),
+          chats: Number(r.n_chats),
+          lastSeenAt: r.served_at, // sort/display by when we last served them
+        })),
+      });
+    }),
+  );
+
   // GET /api/visitors/:id — profile, session path, stats
   router.get(
     '/api/visitors/:id',
