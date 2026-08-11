@@ -256,7 +256,26 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       if (message) showToast(message);
     });
 
+    // Closing the window/browser doesn't always flush the websocket close
+    // frame — without this the server only notices at ping-timeout (30s+).
+    // pagehide fires on close AND navigation: the beacon tells the server to
+    // drop our sockets now; a navigating tab simply reconnects within the
+    // presence grace, so nothing flickers.
+    const onPageHide = () => {
+      const token = lsGet(tokenKey);
+      if (token && navigator.sendBeacon) {
+        try {
+          navigator.sendBeacon(`${server}/api/widget/bye`, JSON.stringify({ token }));
+        } catch {
+          /* best effort */
+        }
+      }
+      socket.disconnect();
+    };
+    window.addEventListener('pagehide', onPageHide);
+
     return () => {
+      window.removeEventListener('pagehide', onPageHide);
       callRef.current?.session.leave(false);
       socket.removeAllListeners();
       socket.disconnect();
