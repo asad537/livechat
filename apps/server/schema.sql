@@ -188,3 +188,6 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages (conver
 CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages (conversation_id, sender_type, read_at);
 CREATE INDEX IF NOT EXISTS idx_visitors_site_seen ON visitors (website_id, last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_users_team_lead ON users (team_lead_id);
+
+-- Per-user IP allow-list (comma-separated IPs/CIDRs; empty = unrestricted)
+ALTER TABLE users ADD COLUMN allowed_ips TEXT;

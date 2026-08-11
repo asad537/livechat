@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { Role, UserPublic } from '@livechat/shared';
 import type { Db } from './db.js';
 import type { Config } from './config.js';
+import { ipAllowed, reqIp } from './ip.js';
 
 // ─── Passwords (scrypt, no external deps) ────────────────────
 export function hashPassword(password: string): string {
@@ -62,6 +63,7 @@ export interface UserRow {
   avatar_color: string;
   avatar_url?: string | null;
   team_lead_id?: string | null;
+  allowed_ips?: string | null;
   created_at: string;
 }
 
@@ -75,6 +77,7 @@ export function toUserPublic(row: UserRow): UserPublic {
     avatarColor: row.avatar_color,
     avatarUrl: row.avatar_url ?? null,
     teamLeadId: row.team_lead_id ?? null,
+    allowedIps: row.allowed_ips ?? null,
   };
 }
 
@@ -96,6 +99,11 @@ export function requireAgent(db: Db, config: Config) {
     const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [payload.sub]);
     if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    // Per-user IP allow-list: a token stolen to another network is useless.
+    if (!ipAllowed(user.allowed_ips, reqIp(req))) {
+      res.status(403).json({ error: 'Access is not allowed from your network.' });
       return;
     }
     req.user = user;

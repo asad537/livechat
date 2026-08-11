@@ -49,7 +49,8 @@ function Landing() {
       /* ignore */
     }
   }, []);
-  if (first && me && me.role !== 'CSR') return <Navigate to="/dashboard" replace />;
+  if (first && me && (me.role === 'ADMIN' || me.role === 'MANAGER'))
+    return <Navigate to="/dashboard" replace />;
   return <Inbox />;
 }
 
@@ -64,6 +65,7 @@ function Sidebar() {
   );
 
   const isLeadUp = me.role !== 'CSR'; // LEAD, MANAGER and ADMIN
+  const isDashboardRole = me.role === 'ADMIN' || me.role === 'MANAGER'; // Dashboard = admin + manager only
 
   const navItem = (icon: React.ReactNode, label: string, badge?: React.ReactNode) => (
     <>
@@ -86,7 +88,7 @@ function Sidebar() {
       </div>
       <div className="nav-section-label">Workspace</div>
       <nav className="sidebar-nav">
-        {isLeadUp && (
+        {isDashboardRole && (
           <NavLink to="/dashboard" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
             {navItem(<IconHome size={17} />, 'Dashboard')}
           </NavLink>
@@ -271,7 +273,7 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
-              <RequireRole roles={['LEAD', 'MANAGER', 'ADMIN']}>
+              <RequireRole roles={['MANAGER', 'ADMIN']}>
                 <Dashboard />
               </RequireRole>
             }

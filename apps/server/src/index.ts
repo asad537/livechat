@@ -21,6 +21,7 @@ async function main(): Promise<void> {
   const presence = createPresence();
 
   const app = express();
+  app.set('trust proxy', true); // honor X-Forwarded-For (nginx/Cloudflare) for real client IPs
   app.use(compression()); // gzip/brotli responses (widget.js 102KB → ~32KB on the wire)
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));

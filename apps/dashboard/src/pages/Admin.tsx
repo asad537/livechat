@@ -565,6 +565,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('CSR');
   const [teamLeadId, setTeamLeadId] = useState('');
+  const [allowedIps, setAllowedIps] = useState('');
   const [maxChats, setMaxChats] = useState(DEFAULT_MAX_CHATS);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<UserPublic | null>(null);
@@ -617,6 +618,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
         role,
         maxChats,
         teamLeadId: role === 'CSR' && teamLeadId ? teamLeadId : null,
+        allowedIps: allowedIps.trim() || null,
       });
       pushToast('User created', `${name.trim()} can now sign in.`, 'success');
       setShowForm(false);
@@ -625,6 +627,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
       setPassword('');
       setRole('CSR');
       setTeamLeadId('');
+      setAllowedIps('');
       setMaxChats(DEFAULT_MAX_CHATS);
       reload();
     } catch (err) {
@@ -642,8 +645,14 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
         </button>
       )}
       {showForm && (
-        <form className="card admin-form" onSubmit={submit}>
-          <h3>New user</h3>
+        <div className="modal-backdrop" onClick={() => setShowForm(false)}>
+        <form className="modal modal-wide admin-form" onSubmit={submit} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-head">
+            <h3>{isManager ? 'New agent' : 'New user'}</h3>
+            <button type="button" className="icon-btn" onClick={() => setShowForm(false)} aria-label="Close">
+              <IconX size={16} />
+            </button>
+          </div>
           <div className="form-grid">
             <label className="field">
               <span>Full name</span>
@@ -693,6 +702,19 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
                 onChange={(e) => setMaxChats(Math.max(1, Number(e.target.value) || 1))}
               />
             </label>
+            <label className="field field-wide">
+              <span>Allowed IP addresses (optional)</span>
+              <input
+                type="text"
+                value={allowedIps}
+                onChange={(e) => setAllowedIps(e.target.value)}
+                placeholder="e.g. 203.0.113.10, 203.0.113.0/24"
+              />
+              <small className="field-hint">
+                Leave blank for no restriction. If set, this user can ONLY sign in from these IPs
+                (comma-separated; ranges like 203.0.113.0/24 allowed).
+              </small>
+            </label>
           </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>
@@ -703,6 +725,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
             </button>
           </div>
         </form>
+        </div>
       )}
       {editing && (
         <EditUserForm
@@ -797,6 +820,7 @@ function EditUserForm({
   const [teamLeadId, setTeamLeadId] = useState(user.teamLeadId ?? '');
   const [maxChats, setMaxChats] = useState(user.maxChats);
   const [password, setPassword] = useState('');
+  const [allowedIps, setAllowedIps] = useState(user.allowedIps ?? '');
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -809,6 +833,7 @@ function EditUserForm({
         role,
         maxChats,
         teamLeadId: role === 'CSR' && teamLeadId ? teamLeadId : null,
+        allowedIps: allowedIps.trim() || null,
         ...(password ? { password } : {}),
       });
       pushToast('User updated', `${name.trim()} saved.`, 'success');
@@ -820,8 +845,14 @@ function EditUserForm({
   };
 
   return (
-    <form className="card admin-form" onSubmit={submit}>
-      <h3>Edit {user.name}</h3>
+    <div className="modal-backdrop" onClick={() => onDone(false)}>
+    <form className="modal modal-wide admin-form" onSubmit={submit} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-head">
+        <h3>Edit {user.name}</h3>
+        <button type="button" className="icon-btn" onClick={() => onDone(false)} aria-label="Close">
+          <IconX size={16} />
+        </button>
+      </div>
       <div className="form-grid">
         <label className="field">
           <span>Full name</span>
@@ -860,6 +891,18 @@ function EditUserForm({
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>
+        <label className="field field-wide">
+          <span>Allowed IP addresses</span>
+          <input
+            type="text"
+            value={allowedIps}
+            onChange={(e) => setAllowedIps(e.target.value)}
+            placeholder="e.g. 203.0.113.10, 203.0.113.0/24"
+          />
+          <small className="field-hint">
+            Blank = no restriction. If set, this user can ONLY sign in from these IPs.
+          </small>
+        </label>
       </div>
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={() => onDone(false)}>
@@ -870,6 +913,7 @@ function EditUserForm({
         </button>
       </div>
     </form>
+    </div>
   );
 }
 

@@ -12,6 +12,7 @@ import {
   verifyPassword,
   type UserRow,
 } from '../../core/auth.js';
+import { ipAllowed, reqIp } from '../../core/ip.js';
 import {
   HttpError,
   accessibleWebsiteRows,
@@ -44,6 +45,13 @@ export function buildAuthRouter(deps: AppDeps): Router {
       const user = await deps.db.get<UserRow>('SELECT * FROM users WHERE email = ?', [email]);
       if (!user || !verifyPassword(password, user.password_hash)) {
         res.status(401).json({ error: 'Invalid email or password' });
+        return;
+      }
+      // Per-user IP allow-list: block sign-in from a network not on the list.
+      if (!ipAllowed(user.allowed_ips, reqIp(req))) {
+        res.status(403).json({
+          error: 'Your account can only be used from an approved network. Contact your admin.',
+        });
         return;
       }
       const token = signAgentToken(deps.config, user.id, user.role);

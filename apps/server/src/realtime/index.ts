@@ -23,6 +23,7 @@ import { maybeBotReply } from '../features/aibot/index.js';
 import { sendTranscriptEmail } from '../features/email/index.js';
 import { captureVisitorInfo } from '../features/capture/index.js';
 import { clientIp, updateVisitorGeo } from '../features/geo/index.js';
+import { ipAllowed } from '../core/ip.js';
 import {
   activateConversation,
   closeConversation,
@@ -832,6 +833,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       if (!payload || payload.typ !== 'agent') return next(new Error('Unauthorized'));
       const user = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [payload.sub]);
       if (!user) return next(new Error('Unauthorized'));
+      // Per-user IP allow-list also gates the realtime socket.
+      if (!ipAllowed(user.allowed_ips, clientIp(socket) ?? '')) {
+        return next(new Error('Access is not allowed from your network.'));
+      }
 
       const data = socket.data as AgentSocketData;
       data.userId = user.id;

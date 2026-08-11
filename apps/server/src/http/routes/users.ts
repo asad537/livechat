@@ -3,6 +3,7 @@ import { API, DEFAULT_MAX_CHATS, type Role } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { hashPassword, requireAgent, requireRole, type UserRow } from '../../core/auth.js';
 import { newId, nowIso } from '../../core/db.js';
+import { sanitizeAllowedIps } from '../../core/ip.js';
 import { HttpError, agent, h, requireString, toUserWithPresence } from '../helpers.js';
 
 const ROLES: Role[] = ['ADMIN', 'MANAGER', 'LEAD', 'CSR'];
@@ -104,11 +105,12 @@ export function buildUsersRouter(deps: AppDeps): Router {
       if (existing) throw new HttpError(409, 'A user with this email already exists');
 
       const teamLeadId = await normalizeTeamLead(deps, role, req.body?.teamLeadId);
+      const allowedIps = sanitizeAllowedIps(req.body?.allowedIps);
 
       const id = newId();
       await deps.db.run(
-        `INSERT INTO users (id, email, name, password_hash, role, max_chats, avatar_color, team_lead_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO users (id, email, name, password_hash, role, max_chats, avatar_color, team_lead_id, allowed_ips, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           email,
@@ -118,6 +120,7 @@ export function buildUsersRouter(deps: AppDeps): Router {
           maxChats,
           pickAvatarColor(id),
           teamLeadId,
+          allowedIps,
           nowIso(),
         ],
       );
@@ -173,6 +176,11 @@ export function buildUsersRouter(deps: AppDeps): Router {
         if (password.length < 6) throw new HttpError(400, 'Password must be at least 6 characters');
         sets.push('password_hash = ?');
         args.push(hashPassword(password));
+      }
+
+      if (req.body?.allowedIps !== undefined) {
+        sets.push('allowed_ips = ?');
+        args.push(sanitizeAllowedIps(req.body.allowedIps));
       }
 
       if (sets.length === 0) throw new HttpError(400, 'Nothing to update');

@@ -24,6 +24,7 @@ export interface UserPublic {
   avatarColor: string;
   avatarUrl?: string | null; // server path, e.g. /api/users/:id/avatar?v=...
   teamLeadId?: string | null; // for CSRs: the Team Lead they report to
+  allowedIps?: string | null; // comma-separated IPs/CIDRs; empty = unrestricted
   online?: boolean;
   away?: boolean;
   activeChats?: number;

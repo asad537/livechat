@@ -227,6 +227,7 @@ export const api = {
     role: Role;
     maxChats: number;
     teamLeadId?: string | null;
+    allowedIps?: string | null;
   }) => request<unknown>(API.users, { method: 'POST', body: input }),
 
   updateUser: (
@@ -237,6 +238,7 @@ export const api = {
       maxChats?: number;
       teamLeadId?: string | null;
       password?: string;
+      allowedIps?: string | null;
     },
   ) => request<UserPublic>(`${API.users}/${id}`, { method: 'PATCH', body: patch }),
 
