@@ -71,7 +71,9 @@ export function loadConfig(): Config {
     jwtSecret: env.JWT_SECRET || 'dev-secret-do-not-use-in-production',
     databaseUrl: env.DATABASE_URL || 'mysql://root@127.0.0.1:3306/livechat',
     redisUrl: env.REDIS_URL || null,
-    dbPoolSize: Number(env.DB_POOL_SIZE || 20),
+    // Sized for ~60 concurrent agents bursting at once (MySQL default
+    // max_connections is 151, so 40 leaves plenty of headroom).
+    dbPoolSize: Number(env.DB_POOL_SIZE || 40),
     dailyApiKey: env.DAILY_API_KEY || null,
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
     ...resolveAi(env),
