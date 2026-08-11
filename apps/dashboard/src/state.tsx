@@ -381,9 +381,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener('visibilitychange', resync);
     window.addEventListener('focus', resync);
+    // Wall-screen dashboards stay focused for hours — also re-sync on a
+    // timer so a single missed broadcast can never stick around.
+    const interval = window.setInterval(resync, 60_000);
     return () => {
       document.removeEventListener('visibilitychange', resync);
       window.removeEventListener('focus', resync);
+      window.clearInterval(interval);
     };
   }, [token, refreshConversations]);
 

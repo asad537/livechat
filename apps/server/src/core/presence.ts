@@ -27,9 +27,10 @@ export interface PresenceStore {
 }
 
 // Page reloads / navigation close the widget socket for a moment — keep the
-// visitor "online" this long so they don't flicker into Recently Active.
-// Short enough that actually leaving the site shows offline quickly.
-const VISITOR_OFFLINE_GRACE_MS = 20_000;
+// visitor "online" just long enough to cover that reconnect (1-2s typical)
+// so they don't flicker into Recently Active. Kept tiny on purpose: closing
+// the site should read offline near-instantly.
+const VISITOR_OFFLINE_GRACE_MS = 5_000;
 
 export function createPresence(): PresenceStore {
   const agents = new Map<string, Set<string>>();
@@ -106,6 +107,8 @@ export function createPresence(): PresenceStore {
         entry.linger = setTimeout(() => {
           const s = visitors.get(websiteId);
           const e = s?.get(visitorId);
+          // The timer has fired — it must never block a future linger.
+          if (e) e.linger = null;
           if (!s || !e || e.sockets.size > 0) return;
           s.delete(visitorId);
           visitorIndex.delete(visitorId);
