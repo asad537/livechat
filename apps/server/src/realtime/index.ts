@@ -20,6 +20,7 @@ import {
 } from '../core/auth.js';
 import { hydrateMessages, postMessage, type MessageRow } from '../domain/messages.js';
 import { maybeBotReply } from '../features/aibot/index.js';
+import { sendTranscriptEmail } from '../features/email/index.js';
 import { captureVisitorInfo } from '../features/capture/index.js';
 import { clientIp, updateVisitorGeo } from '../features/geo/index.js';
 import {
@@ -562,6 +563,40 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
         if (conv.visitor_id !== data.visitorId) return;
         await closeConversation(deps, conv.id);
+      }),
+    );
+
+    // ── Visitor asks for the transcript by email (widget ⋯ menu) ──
+    let lastTranscriptAsk = 0;
+    socket.on(
+      EV.WidgetEmailTranscript,
+      safe(socket, async (_payload: unknown, ack?: unknown) => {
+        const reply = typeof ack === 'function' ? (ack as (r: unknown) => void) : () => {};
+        if (!deps.config.smtpHost) {
+          reply({ error: 'Email is not set up yet — please ask the agent for a copy.' });
+          return;
+        }
+        const now = Date.now();
+        if (now - lastTranscriptAsk < 60_000) {
+          reply({ error: 'Transcript already sent — check your inbox (and spam).' });
+          return;
+        }
+        const conv = await getConversation(deps, data.conversationId);
+        if (!conv || conv.visitor_id !== data.visitorId) {
+          reply({ error: 'Start a chat first, then request the transcript.' });
+          return;
+        }
+        const vis = await deps.db.get<{ email: string | null }>(
+          'SELECT email FROM visitors WHERE id = ?',
+          [data.visitorId],
+        );
+        if (!vis?.email) {
+          reply({ error: 'no-email' }); // widget opens the contact form
+          return;
+        }
+        lastTranscriptAsk = now;
+        void sendTranscriptEmail(deps, conv.id);
+        reply({ ok: true, email: vis.email });
       }),
     );
 

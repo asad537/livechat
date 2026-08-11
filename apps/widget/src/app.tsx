@@ -49,6 +49,38 @@ interface ActiveCall {
 
 const DEFAULT_PRIMARY = '#5865f2';
 
+// Soft two-note "message received" ping (WebAudio, no asset). Best-effort:
+// browsers only allow it after the visitor has interacted with the page.
+let audioCtx: AudioContext | null = null;
+function playPing(): void {
+  try {
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    if (!audioCtx) audioCtx = new Ctor();
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+    const ac = audioCtx;
+    const note = (freq: number, start: number, dur: number, peak: number) => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(peak, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      osc.connect(gain).connect(ac.destination);
+      osc.start(start);
+      osc.stop(start + dur + 0.02);
+    };
+    const t = ac.currentTime;
+    note(660, t, 0.18, 0.09);
+    note(880, t + 0.08, 0.22, 0.07);
+  } catch {
+    /* audio not available */
+  }
+}
+
 export function App({ server, widgetKey }: { server: string; widgetKey: string }): JSX.Element | null {
   const tokenKey = `livechat:token:${widgetKey}`;
   const infoDismissKey = `livechat:info-dismissed:${widgetKey}`;
@@ -88,6 +120,19 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [call, setCall] = useState<ActiveCall | null>(null);
   const [, setCallTick] = useState(0);
+  // ⋯ menu (Zendesk-style): sound toggle, email transcript, edit contact, end chat
+  const [menuOpen, setMenuOpen] = useState(false);
+  const soundKey = `livechat:sound:${widgetKey}`;
+  const [soundOn, setSoundOn] = useState(() => lsGet(soundKey) !== '0');
+  const soundOnRef = useRef(soundOn);
+  const toggleSound = () => {
+    setSoundOn((s) => {
+      soundOnRef.current = !s;
+      lsSet(soundKey, !s ? '1' : '0');
+      return !s;
+    });
+  };
+  const [forceInfoForm, setForceInfoForm] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const openRef = useRef(open);
@@ -186,6 +231,9 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
         return [...prev, message];
       });
       setConversation((prev) => prev ?? { id: message.conversationId, status: 'WAITING' });
+      if ((message.senderType === 'AGENT' || message.senderType === 'BOT') && soundOnRef.current) {
+        playPing();
+      }
       if (message.senderType === 'AGENT' && !openRef.current) {
         // Auto-open on an agent message — unless the visitor closed the
         // widget themselves, then just keep counting on the launcher badge.
@@ -415,11 +463,42 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     }
     lsSet(infoDismissKey, '1');
     setInfoDismissed(true);
+    setForceInfoForm(false);
+  };
+
+  // ── ⋯ menu actions ─────────────────────────────────────────
+  const emailTranscript = () => {
+    setMenuOpen(false);
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.emit(
+      EV.WidgetEmailTranscript,
+      {},
+      (ack: { ok?: boolean; email?: string; error?: string } | undefined) => {
+        if (ack?.ok) {
+          showToast(`Transcript sent to ${ack.email ?? 'your email'} 💌`);
+        } else if (ack?.error === 'no-email') {
+          // Ask for an email first, then they can request again.
+          setInfoDismissed(false);
+          setForceInfoForm(true);
+          showToast('Add your email so we can send the transcript.');
+        } else {
+          showToast(ack?.error ?? 'Could not send the transcript right now.');
+        }
+      },
+    );
+  };
+
+  const editContact = () => {
+    setMenuOpen(false);
+    setInfoDismissed(false);
+    setForceInfoForm(true);
   };
 
   const dismissInfo = () => {
     lsSet(infoDismissKey, '1');
     setInfoDismissed(true);
+    setForceInfoForm(false);
   };
 
   // ── Start new conversation after close ─────────────────────
@@ -494,7 +573,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const status = conversation?.status ?? null;
   const ended = status === 'CLOSED' || status === 'MISSED';
   const showInfoForm =
-    !infoDismissed && !!visitor && !visitor.name && !visitor.email && !ended;
+    forceInfoForm || (!infoDismissed && !!visitor && !visitor.name && !visitor.email && !ended);
   const selfLabel = visitor?.name || 'You';
 
   return (
@@ -528,18 +607,60 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 <div class="lc-subtitle">We're here to help</div>
               )}
             </div>
-            {conversation && status !== 'CLOSED' && status !== 'MISSED' && (
+            <div class="lc-menu-wrap">
               <button
                 type="button"
-                class="lc-iconbtn lc-endbtn"
-                onClick={() => setConfirmEnd(true)}
+                class="lc-iconbtn"
+                aria-label="More options"
+                onClick={() => setMenuOpen((m) => !m)}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                  <path d="M18.36 6.64a9 9 0 1 1-12.72 0" />
-                  <line x1="12" y1="2" x2="12" y2="11" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="5" cy="12" r="1.9" />
+                  <circle cx="12" cy="12" r="1.9" />
+                  <circle cx="19" cy="12" r="1.9" />
                 </svg>
               </button>
-            )}
+              {menuOpen && (
+                <>
+                  <div class="lc-menu-scrim" onClick={() => setMenuOpen(false)} />
+                  <div class="lc-menu" role="menu">
+                    <button type="button" class="lc-menu-item" onClick={toggleSound}>
+                      <span>Sound</span>
+                      {soundOn ? (
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+                        </svg>
+                      ) : (
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                          <line x1="22" y1="9" x2="16" y2="15" />
+                          <line x1="16" y1="9" x2="22" y2="15" />
+                        </svg>
+                      )}
+                    </button>
+                    <button type="button" class="lc-menu-item" onClick={emailTranscript}>
+                      Email transcript
+                    </button>
+                    <button type="button" class="lc-menu-item" onClick={editContact}>
+                      Edit contact details
+                    </button>
+                    <button
+                      type="button"
+                      class="lc-menu-item lc-menu-danger"
+                      disabled={!conversation || ended}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setConfirmEnd(true);
+                      }}
+                    >
+                      End chat
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               type="button"
               class="lc-iconbtn"
@@ -593,7 +714,15 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
             {messages.length === 0 && website.greeting && <div class="lc-greet">{website.greeting}</div>}
             {renderMessages(messages, { server, token: visitorToken, fallbackAgent: agent })}
             {agentTyping && !ended && <TypingRow agent={agent} server={server} />}
-            {showInfoForm && <InfoForm onSubmit={submitInfo} onDismiss={dismissInfo} />}
+            {showInfoForm && (
+              <InfoForm
+                onSubmit={submitInfo}
+                onDismiss={dismissInfo}
+                initialName={visitor?.name ?? ''}
+                initialEmail={visitor?.email ?? ''}
+                editing={forceInfoForm}
+              />
+            )}
           </div>
 
           {/* Composer / closed bar */}
@@ -707,20 +836,28 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 function InfoForm({
   onSubmit,
   onDismiss,
+  initialName = '',
+  initialEmail = '',
+  editing = false,
 }: {
   onSubmit: (name: string, email: string) => void;
   onDismiss: () => void;
+  initialName?: string;
+  initialEmail?: string;
+  editing?: boolean;
 }): JSX.Element {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
   const submit = (e: Event) => {
     e.preventDefault();
     onSubmit(name, email);
   };
   return (
     <form class="lc-form" onSubmit={submit}>
-      <div class="lc-form-title">Introduce yourself</div>
-      <div class="lc-form-sub">So we can follow up if you step away.</div>
+      <div class="lc-form-title">{editing ? 'Your contact details' : 'Introduce yourself'}</div>
+      <div class="lc-form-sub">
+        {editing ? 'Update your name or email below.' : 'So we can follow up if you step away.'}
+      </div>
       <input
         class="lc-input"
         type="text"
@@ -740,7 +877,7 @@ function InfoForm({
           Save
         </button>
         <button type="button" class="lc-btn lc-btn-ghost" onClick={onDismiss}>
-          No thanks
+          {editing ? 'Cancel' : 'No thanks'}
         </button>
       </div>
     </form>

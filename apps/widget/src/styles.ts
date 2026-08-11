@@ -132,6 +132,32 @@ export const WIDGET_CSS = `
 .lc-iconbtn:hover { opacity: 1; background: rgba(255, 255, 255, .22); transform: translateY(-1px); }
 .lc-iconbtn:active { transform: translateY(0) scale(.95); }
 
+/* ── ⋯ overflow menu ──────────────────────────────────────── */
+.lc-menu-wrap { position: relative; display: flex; }
+.lc-menu-scrim { position: fixed; inset: 0; z-index: 40; }
+.lc-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 41;
+  min-width: 208px; padding: 6px;
+  background: #ffffff; border: 1px solid #e6e8ee; border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, .18);
+  display: flex; flex-direction: column;
+  animation: lc-menu-in .13s ease;
+}
+@keyframes lc-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.lc-menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 11px 13px; border: 0; border-radius: 9px;
+  background: transparent; cursor: pointer;
+  font: inherit; font-size: 14.5px; font-weight: 600; color: #1e2430; text-align: left;
+  transition: background .12s ease;
+}
+.lc-menu-item:hover { background: #f4f6fb; }
+.lc-menu-item svg { color: #64748b; flex-shrink: 0; }
+.lc-menu-danger { color: #dc2626; }
+.lc-menu-danger svg { color: #dc2626; }
+.lc-menu-item:disabled { color: #b6bcc8; cursor: default; }
+.lc-menu-item:disabled:hover { background: transparent; }
+
 /* ── Status strips ────────────────────────────────────────── */
 .lc-strip {
   flex-shrink: 0; padding: 8px 14px; font-size: 12.5px;

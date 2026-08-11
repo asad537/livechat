@@ -573,6 +573,27 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   const leadName = (id: string | null | undefined) =>
     id ? (users.find((u) => u.id === id)?.name ?? '—') : '—';
 
+  // Hierarchy view: Admins → Managers → each Team Lead followed by their CSRs.
+  const sorted = React.useMemo(() => {
+    const byName = (a: UserPublic, b: UserPublic) => a.name.localeCompare(b.name);
+    const admins = users.filter((u) => u.role === 'ADMIN').sort(byName);
+    const managers = users.filter((u) => u.role === 'MANAGER').sort(byName);
+    const leadRows = users.filter((u) => u.role === 'LEAD').sort(byName);
+    const csrs = users.filter((u) => u.role === 'CSR');
+    const out: UserPublic[] = [...admins, ...managers];
+    for (const l of leadRows) {
+      out.push(l);
+      out.push(...csrs.filter((c) => c.teamLeadId === l.id).sort(byName));
+    }
+    // CSRs with no (or a deleted) team lead go last so admin spots them.
+    out.push(
+      ...csrs
+        .filter((c) => !c.teamLeadId || !leadRows.some((l) => l.id === c.teamLeadId))
+        .sort(byName),
+    );
+    return out;
+  }, [users]);
+
   const remove = async (u: UserPublic) => {
     if (!window.confirm(`Delete ${u.name} (${u.email})?\n\nTheir open chats return to the queue; closed chat history is kept.`)) return;
     try {
@@ -707,10 +728,11 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {sorted.map((u) => (
               <tr key={u.id}>
                 <td>
-                  <span className="cell-user">
+                  <span className={classNames('cell-user', u.role === 'CSR' && u.teamLeadId && 'cell-user-nested')}>
+                    {u.role === 'CSR' && u.teamLeadId && <span className="nest-arrow">↳</span>}
                     <Avatar name={u.name} color={u.avatarColor} url={u.avatarUrl} size="sm" />
                     {u.name}
                   </span>

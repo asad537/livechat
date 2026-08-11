@@ -5536,3 +5536,14 @@ img.avatar {
 .vt-card .vt-table {
   min-width: 720px;
 }
+
+/* Agents hierarchy: CSRs indent under their Team Lead */
+.cell-user-nested {
+  padding-left: 26px;
+}
+
+.nest-arrow {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-right: 2px;
+}
