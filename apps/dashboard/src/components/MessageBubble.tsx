@@ -122,11 +122,17 @@ export default function MessageBubble({ message }: Props) {
     );
   }
 
-  const own = message.senderType === 'AGENT';
+  const isAgent = message.senderType === 'AGENT';
+  const isBot = message.senderType === 'BOT';
+  // The AI assistant answers on behalf of the business, so its replies sit on
+  // the agent's side (right) — labelled "Assistant" so the CSR sees it wasn't
+  // them. Delivery ticks are only for real agent messages.
+  const own = isAgent || isBot;
   const media = isMediaFile(message);
   const bubbleClass = [
     'msg-bubble',
     own ? 'msg-bubble-own' : 'msg-bubble-other',
+    isBot ? 'msg-bubble-bot' : '',
     media ? 'msg-bubble-media' : '',
   ]
     .filter(Boolean)
@@ -144,7 +150,7 @@ export default function MessageBubble({ message }: Props) {
         )}
         <span className="msg-meta">
           <span className="msg-time">{formatTime(message.createdAt)}</span>
-          {own && <Ticks message={message} />}
+          {isAgent && <Ticks message={message} />}
         </span>
       </div>
     </div>

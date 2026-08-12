@@ -6594,6 +6594,15 @@ tr:hover .vt-open-hint {
   flex-shrink: 0;
 }
 
+/* AI assistant replies — agent side, but a distinct violet so the CSR can tell
+   them apart from their own messages. */
+.msg-bubble-bot {
+  background: #8b5cf6;
+}
+.msg-bubble-bot .msg-sender {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .msg-video {
   display: block;
   max-width: 300px;
