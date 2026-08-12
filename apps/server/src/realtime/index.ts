@@ -342,6 +342,27 @@ async function getConversation(
   return deps.db.get<ConversationRow>('SELECT * FROM conversations WHERE id = ?', [conversationId]);
 }
 
+/**
+ * Post "{name} has joined the chat" the first time an agent participates in a
+ * conversation they weren't already announced in — e.g. an admin / manager /
+ * team lead jumping into a chat someone else started. Idempotent: it skips if
+ * that exact join notice already exists (so the accept/claim flows, which
+ * announce explicitly, never double-post).
+ */
+async function announceAgentJoin(
+  deps: AppDeps,
+  conversationId: string,
+  name: string,
+): Promise<void> {
+  const body = `${name} has joined the chat`;
+  const already = await deps.db.get<{ id: string }>(
+    "SELECT id FROM messages WHERE conversation_id = ? AND kind = 'SYSTEM' AND body = ? LIMIT 1",
+    [conversationId, body],
+  );
+  if (already) return;
+  await postMessage(deps, { conversationId, senderType: 'SYSTEM', kind: 'SYSTEM', body });
+}
+
 // ─── attachRealtime ──────────────────────────────────────────
 
 export function attachRealtime(deps: AppDeps): void {
@@ -963,9 +984,15 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
             body: `${data.name} has joined the chat`,
           });
           await activateConversation(deps, conv.id);
-        } else if (!(await canSendAsAgent(deps, conv, data.userId, data.role))) {
-          socket.emit(EV.AppError, { message: 'Only the assigned agent can send messages here' });
-          return;
+        } else {
+          if (!(await canSendAsAgent(deps, conv, data.userId, data.role))) {
+            socket.emit(EV.AppError, { message: 'Only the assigned agent can send messages here' });
+            return;
+          }
+          // A new agent (admin/manager/lead) jumping into an ongoing chat gets
+          // announced the first time they speak here.
+          await socket.join(convRoom(conv.id));
+          await announceAgentJoin(deps, conv.id, data.name);
         }
         await postMessage(deps, {
           conversationId: conv.id,
@@ -1014,6 +1041,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           // hand its id back so the client opens that chat instead of erroring.
           await socket.join(convRoom(open.id));
           if (await canSendAsAgent(deps, open, data.userId, data.role)) {
+            await announceAgentJoin(deps, open.id, data.name);
             await postMessage(deps, {
               conversationId: open.id,
               senderType: 'AGENT',
