@@ -116,6 +116,15 @@ export function FileCard({ m, server, token }: { m: LocalMessage; server: string
   const file = m.file;
   if (!file) return <div class="lc-file">{m.body || 'File'}</div>;
   const href = file.downloadUrl ? `${server}${file.downloadUrl}?token=${encodeURIComponent(token)}` : null;
+  const isImage = /^image\//i.test(file.mime || '');
+
+  if (href && file.scanStatus === 'CLEAN' && isImage) {
+    return (
+      <a class="lc-image" href={href} target="_blank" rel="noopener noreferrer" title={file.originalName}>
+        <img src={href} alt={file.originalName} loading="lazy" />
+      </a>
+    );
+  }
   return (
     <div class="lc-file">
       <div class="lc-file-icon">

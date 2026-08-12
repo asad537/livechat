@@ -6469,3 +6469,37 @@ img.avatar {
 tr:hover .vt-open-hint {
   opacity: 1;
 }
+
+.dot-away {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.22);
+}
+
+/* Inline image messages */
+.msg-image {
+  display: block;
+  max-width: 260px;
+  border-radius: 12px;
+  overflow: hidden;
+  line-height: 0;
+}
+.msg-image img {
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
+/* Drag-and-drop file overlay in the chat */
+.chatpane { position: relative; }
+.chatpane-drag { outline: 2px dashed var(--accent); outline-offset: -8px; border-radius: 12px; }
+.chat-drop-overlay {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(88, 101, 242, 0.10);
+  color: var(--accent-strong);
+  font-weight: 700; font-size: 15px;
+  pointer-events: none;
+  backdrop-filter: blur(1px);
+}

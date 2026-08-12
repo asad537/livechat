@@ -28,6 +28,23 @@ function FileCard({ message }: { message: ChatMessage }) {
   if (!file) return <span className="msg-text">{message.body}</span>;
   const clean = file.scanStatus === 'CLEAN';
   const blocked = file.scanStatus === 'BLOCKED';
+  const isImage = /^image\//i.test(file.mime);
+
+  // Clean images render inline as a clickable thumbnail (opens full size).
+  if (clean && isImage) {
+    return (
+      <a
+        className="msg-image"
+        href={fileDownloadUrl(file)}
+        target="_blank"
+        rel="noreferrer"
+        title={file.originalName}
+      >
+        <img src={fileDownloadUrl(file)} alt={file.originalName} loading="lazy" />
+      </a>
+    );
+  }
+
   return (
     <div className="file-card">
       <div className="file-card-icon">

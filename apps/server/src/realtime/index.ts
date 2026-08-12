@@ -1348,6 +1348,7 @@ async function onAgentConnected(
         ...toUserPublic(m),
         isLead: Number(m.is_lead) === 1,
         online: deps.presence.isAgentOnline(m.id),
+        away: deps.presence.isAgentAway(m.id),
       })),
     });
   }

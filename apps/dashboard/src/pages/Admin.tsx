@@ -344,7 +344,7 @@ function WebsitesTab({ teams }: { teams: Team[] }) {
 
 // ─── Teams tab ───────────────────────────────────────────────
 function TeamsTab({ users }: { users: UserPublic[] }) {
-  const { pushToast, online, refreshDirectory, me } = useApp();
+  const { pushToast, online, awayMap, refreshDirectory, me } = useApp();
   const readOnly = me?.role === 'MANAGER';
   const [teams, setTeams] = useState<Team[]>([]);
   const [newName, setNewName] = useState('');
@@ -498,7 +498,13 @@ function TeamsTab({ users }: { users: UserPublic[] }) {
                     <Avatar name={m.name} color={m.avatarColor} url={m.avatarUrl} size="sm" />
                     <span className="team-member-name">
                       {m.name}
-                      <span className={classNames('dot', online[m.id] ? 'dot-online' : 'dot-offline')} />
+                      <span
+                        className={classNames(
+                          'dot',
+                          online[m.id] ? (awayMap[m.id] ? 'dot-away' : 'dot-online') : 'dot-offline',
+                        )}
+                        title={online[m.id] ? (awayMap[m.id] ? 'Away' : 'Online') : 'Offline'}
+                      />
                     </span>
                     <span className="team-member-role">{roleLabel(m.role)}</span>
                     <label className="check-field" title="Team lead">
@@ -568,7 +574,7 @@ function TeamLeadSelect({
 }
 
 function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
-  const { pushToast, online, me } = useApp();
+  const { pushToast, online, awayMap, me } = useApp();
   // Managers may ADD agents (team leads + CSRs only) but never edit anyone.
   const isManager = me?.role === 'MANAGER';
   const canEdit = me?.role === 'ADMIN';
@@ -768,8 +774,21 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
                 </td>
                 <td>{u.role === 'CSR' ? leadName(u.teamLeadId) : '—'}</td>
                 <td>
-                  <span className={classNames('dot', online[u.id] ? 'dot-online' : 'dot-offline')} />
-                  {online[u.id] ? ' Online' : ' Offline'}
+                  {online[u.id] ? (
+                    awayMap[u.id] ? (
+                      <>
+                        <span className="dot dot-away" /> Away
+                      </>
+                    ) : (
+                      <>
+                        <span className="dot dot-online" /> Online
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <span className="dot dot-offline" /> Offline
+                    </>
+                  )}
                 </td>
                 {canEdit && (
                   <td className="num">

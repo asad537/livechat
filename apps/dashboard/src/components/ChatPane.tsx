@@ -289,6 +289,21 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     }
   };
 
+  // Drag & drop a file anywhere over the chat to upload it.
+  const [dragOver, setDragOver] = useState(false);
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (!canSend) return;
+    const f = e.dataTransfer.files?.[0];
+    if (f) void attach(f);
+  };
+  const onDragOver = (e: React.DragEvent) => {
+    if (!canSend) return;
+    e.preventDefault();
+    if (!dragOver) setDragOver(true);
+  };
+
   // ─── Render ────────────────────────────────────────────────
   if (openError) {
     return (
@@ -321,7 +336,20 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   let lastDay = '';
 
   return (
-    <div className="chatpane">
+    <div
+      className={classNames('chatpane', dragOver && 'chatpane-drag')}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragOver(false);
+      }}
+    >
+      {dragOver && (
+        <div className="chat-drop-overlay">
+          <IconPaperclip size={28} />
+          <span>Drop the file to send</span>
+        </div>
+      )}
       <div className="chat-main">
         {/* Header */}
         <div className="chat-head">

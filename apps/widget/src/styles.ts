@@ -269,6 +269,11 @@ export const WIDGET_CSS = `
   padding: 10px 13px; min-width: 190px; max-width: 100%;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .07);
 }
+.lc-image {
+  display: block; max-width: 220px; border-radius: 14px; overflow: hidden; line-height: 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+}
+.lc-image img { width: 100%; height: auto; max-height: 280px; object-fit: cover; display: block; }
 .lc-file-icon {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
   background: var(--lc-soft); color: var(--lc-primary);
@@ -537,4 +542,13 @@ export const WIDGET_CSS = `
 @keyframes lc-fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 :where(.lc-root) .lc-avatar-img { object-fit: cover; padding: 0; border: none; }
+
+/* Drag & drop file overlay */
+.lc-drop {
+  position: absolute; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: var(--lc-soft); color: var(--lc-primary);
+  font-weight: 700; font-size: 15px; pointer-events: none;
+  border: 2px dashed var(--lc-primary); border-radius: 18px;
+}
 `;

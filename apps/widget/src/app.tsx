@@ -415,11 +415,8 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     }
   };
 
-  // ── File upload ────────────────────────────────────────────
-  const onPickFile = async (e: Event) => {
-    const input = e.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
+  // ── File upload (picker or drag & drop) ────────────────────
+  const uploadFile = async (file: File) => {
     const conv = convRef.current;
     if (!file || !conv) return;
     if (file.size > MAX_FILE_BYTES) {
@@ -451,6 +448,15 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       setUploading(false);
     }
   };
+
+  const onPickFile = (e: Event) => {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) void uploadFile(file);
+  };
+
+  const [dragOver, setDragOver] = useState(false);
 
   // ── Info mini-form ─────────────────────────────────────────
   const submitInfo = (name: string, email: string) => {
@@ -579,7 +585,29 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   return (
     <div class="lc-root" style={cssVars}>
       {open && (
-        <div class="lc-panel">
+        <div
+          class="lc-panel"
+          onDragOver={(e) => {
+            if (!conversation || ended) return;
+            e.preventDefault();
+            if (!dragOver) setDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget === e.target) setDragOver(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const f = (e as unknown as DragEvent).dataTransfer?.files?.[0];
+            if (f && conversation && !ended) void uploadFile(f);
+          }}
+        >
+          {dragOver && (
+            <div class="lc-drop">
+              <IconClip />
+              <span>Drop to send</span>
+            </div>
+          )}
           {/* Header */}
           <div class="lc-header">
             <div class="lc-logo">
