@@ -208,12 +208,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setWebsites(payload.websites);
       setTeams(payload.teams);
       setCsrIds(payload.csrIds ?? []);
-      // Seed presence from the roster's online flags.
+      // Seed presence from the roster's online + away flags.
       setOnline(() => {
         const next: Record<string, boolean> = { [payload.me.id]: true };
         for (const team of payload.teams) {
           for (const member of team.members ?? []) {
             if (member.online !== undefined) next[member.id] = !!member.online;
+          }
+        }
+        return next;
+      });
+      setAwayMap((prev) => {
+        const next = { ...prev, [payload.me.id]: !!payload.me.away };
+        for (const team of payload.teams) {
+          for (const member of team.members ?? []) {
+            if (member.away !== undefined) next[member.id] = !!member.away;
           }
         }
         return next;

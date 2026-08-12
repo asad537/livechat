@@ -20,6 +20,7 @@ import {
   asString,
   h,
   myCsrIds,
+  toUserWithPresence,
   requireString,
   toWebsite,
   visibleTeams,
@@ -71,7 +72,8 @@ export function buildAuthRouter(deps: AppDeps): Router {
         user.role === 'LEAD' ? myCsrIds(deps, user.id) : Promise.resolve([]),
       ]);
       res.json({
-        user: toUserPublic(user),
+        // Carry live online/away so the availability toggle survives reloads.
+        user: toUserWithPresence(deps, user),
         websites: websiteRows.map(toWebsite),
         teams,
         csrIds,

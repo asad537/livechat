@@ -1362,7 +1362,14 @@ async function onAgentConnected(
         ).map((r) => r.id)
       : [];
 
-  socket.emit(EV.AgentReady, { me: toUserPublic(ctx.user), websites, teams, csrIds });
+  // Include live online/away so the client's availability toggle is correct
+  // right after a (re)connect, not reset to "Online".
+  const me = {
+    ...toUserPublic(ctx.user),
+    online: deps.presence.isAgentOnline(ctx.user.id),
+    away: deps.presence.isAgentAway(ctx.user.id),
+  };
+  socket.emit(EV.AgentReady, { me, websites, teams, csrIds });
 
   // A newly-online agent may free up the queue.
   await drainQueue(deps);
