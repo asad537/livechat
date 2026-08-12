@@ -318,34 +318,16 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
         <td className="vt-num">{v.totalVisits ?? 0}</td>
         <td className="vt-num">{v.chats ?? 0}</td>
         <td className="vt-actions">
-          {v.activeConversation?.assignedUserId ? (
-            // Being served — show WHO has it; click opens that chat in the dock.
-            <button
-              className="btn btn-ghost btn-sm vt-assigned"
-              title="Open this chat"
-              onClick={(e) => {
-                e.stopPropagation();
-                openDockedChat(v.activeConversation!.id);
-              }}
-            >
-              <span className="dot dot-online" />
-              {v.activeConversation.agentName ?? 'Assigned'}
-            </button>
-          ) : (
-            // Nobody is handling this visitor yet (queued chat OR fresh visitor).
-            <button
-              className="btn btn-ghost btn-sm vt-unassigned"
-              title={v.activeConversation ? 'Open this chat' : 'Open visitor & start a chat'}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (v.activeConversation) openDockedChat(v.activeConversation.id);
-                else setDrawerId(v.id);
-              }}
-            >
-              <span className="dot dot-waiting" />
-              Unassigned
-            </button>
-          )}
+          <button
+            className="btn btn-ghost btn-sm"
+            title="Open visitor"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDrawerId(v.id);
+            }}
+          >
+            Chat
+          </button>
         </td>
       </tr>
     );
