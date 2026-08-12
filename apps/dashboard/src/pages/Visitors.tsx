@@ -175,13 +175,18 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   // Ids of visitors we've already served — they belong under "Recently served",
   // not "Online now" (which is for fresh, not-yet-served visitors).
   const servedIds = useMemo(() => new Set(servedVisitors.map((v) => v.id)), [servedVisitors]);
-  // A visitor stays in "Online now" until an agent is actually handling them —
-  // i.e. the chat is ACTIVE (agent accepted) or we've messaged them (served).
-  // A visitor who just sent their FIRST message sits in WAITING/OFFERED (nobody
-  // has picked it up yet), so they must remain visible here to be claimed —
-  // they should not vanish the moment a conversation row is created.
+  // "Online now" = fresh visitors nobody is handling yet. A visitor stays here
+  // only while they have NO conversation or a purely WAITING one (client sent the
+  // first message, still in the auto-queue). The moment an agent engages — they
+  // pick the visitor up (agent-initiated → OFFERED) or the chat goes ACTIVE, or
+  // we've messaged them (served) — they leave instantly via the live stream and
+  // move to "Recently served". This keeps a client's first message visible for
+  // pickup, yet drops a visitor the second an agent messages them.
   const onlineList = visitors.filter(
-    (v) => v.online && !servedIds.has(v.id) && v.activeConversation?.status !== 'ACTIVE',
+    (v) =>
+      v.online &&
+      !servedIds.has(v.id) &&
+      (!v.activeConversation || v.activeConversation.status === 'WAITING'),
   );
 
   // The moment serving starts OR a chat closes, pull the served list so the
