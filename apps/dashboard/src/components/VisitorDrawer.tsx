@@ -253,6 +253,114 @@ export default function VisitorDrawer({
       </div>
     ) : null;
 
+  // Profile info — shown beside the chat (wide) and under the Profile tab.
+  const profileContent = (
+    <>
+        {/* CRM fields */}
+        <section className="vd-section">
+          <h4 className="vd-section-title">Contact details</h4>
+          <div className="vd-form-grid">
+            {(
+              [
+                ['name', 'Name', 'text'],
+                ['email', 'Email', 'email'],
+                ['phone', 'Phone', 'tel'],
+              ] as const
+            ).map(([key, label, type]) => (
+              <label className="field" key={key}>
+                <span>{label}</span>
+                <input
+                  type={type}
+                  value={form[key]}
+                  placeholder={`Add ${label.toLowerCase()}…`}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, [key]: e.target.value }));
+                    setDirty(true);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <label className="field">
+            <span>Notes (internal)</span>
+            <textarea
+              rows={3}
+              value={form.notes}
+              placeholder="Add notes about this visitor — only agents can see these."
+              onChange={(e) => {
+                setForm((f) => ({ ...f, notes: e.target.value }));
+                setDirty(true);
+              }}
+            />
+          </label>
+          {me?.role !== 'MANAGER' && (
+            <div className="vd-form-actions">
+              {savedFlash && <span className="vd-saved">✓ Saved</span>}
+              <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
+                {saving ? 'Saving…' : 'Save details'}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Session path */}
+        <section className="vd-section">
+          <h4 className="vd-section-title">
+            <IconEye size={14} /> Visitor path
+          </h4>
+          {profile && profile.sessionPath.length > 0 ? (
+            <ol className="vd-path">
+              {[...profile.sessionPath].reverse().map((p, i) => (
+                <li
+                  key={`${p.at}_${i}`}
+                  className={classNames('vd-path-item', i === 0 && online && 'current')}
+                >
+                  <span className="vd-path-time">{formatWhen(p.at)}</span>
+                  <div className="vd-path-page">
+                    <span className="vd-path-title">{p.title || pageLabel(p.url)}</span>
+                    {p.url && (
+                      <a
+                        className="vd-path-url"
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={p.url}
+                      >
+                        {pageLabel(p.url)}
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="vd-muted">{profile ? 'No page views recorded yet.' : 'Loading…'}</p>
+          )}
+        </section>
+
+        {/* Technology / source */}
+        <section className="vd-section">
+          <h4 className="vd-section-title">
+            <IconGlobe size={14} /> Technology &amp; source
+          </h4>
+          <div className="vd-chips">
+            {v?.userAgent && <span className="vd-chip">{ua.browser}</span>}
+            {v?.userAgent && <span className="vd-chip">{ua.os}</span>}
+            {v?.userAgent && <span className="vd-chip">{ua.device}</span>}
+          </div>
+          {infoRow('IP address', v?.ip)}
+          {infoRow(
+            'Location',
+            v?.city || v?.country
+              ? `${flagEmoji(v?.countryCode)} ${[v?.city, v?.country].filter(Boolean).join(', ')}`
+              : null,
+          )}
+          {infoRow('Came from', v?.referrer ? referrerLabel(v.referrer) : 'Direct')}
+          {infoRow('User agent', v?.userAgent && <code className="vd-ua">{v.userAgent}</code>)}
+        </section>
+    </>
+  );
+
   return (
     <div className="vd-backdrop" onClick={onClose}>
       <div className="vd-panel" ref={panelRef} onClick={(e) => e.stopPropagation()}>
@@ -344,6 +452,7 @@ export default function VisitorDrawer({
         {error && <div className="vd-error">{error}</div>}
 
         {tab === 'chat' && (
+          <div className="vd-chat-split">
           <div className="vd-body-chat">
             {chatConvId ? (
               // Full live chat right here — reply, type-to-join, calls, everything.
@@ -412,114 +521,13 @@ export default function VisitorDrawer({
               </div>
             )}
           </div>
-        )}
-
-        {tab === 'profile' && (
-          <div className="vd-body">
-            {/* CRM fields */}
-            <section className="vd-section">
-              <h4 className="vd-section-title">Contact details</h4>
-              <div className="vd-form-grid">
-                {(
-                  [
-                    ['name', 'Name', 'text'],
-                    ['email', 'Email', 'email'],
-                    ['phone', 'Phone', 'tel'],
-                  ] as const
-                ).map(([key, label, type]) => (
-                  <label className="field" key={key}>
-                    <span>{label}</span>
-                    <input
-                      type={type}
-                      value={form[key]}
-                      placeholder={`Add ${label.toLowerCase()}…`}
-                      onChange={(e) => {
-                        setForm((f) => ({ ...f, [key]: e.target.value }));
-                        setDirty(true);
-                      }}
-                    />
-                  </label>
-                ))}
-              </div>
-              <label className="field">
-                <span>Notes (internal)</span>
-                <textarea
-                  rows={3}
-                  value={form.notes}
-                  placeholder="Add notes about this visitor — only agents can see these."
-                  onChange={(e) => {
-                    setForm((f) => ({ ...f, notes: e.target.value }));
-                    setDirty(true);
-                  }}
-                />
-              </label>
-              {me?.role !== 'MANAGER' && (
-                <div className="vd-form-actions">
-                  {savedFlash && <span className="vd-saved">✓ Saved</span>}
-                  <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
-                    {saving ? 'Saving…' : 'Save details'}
-                  </button>
-                </div>
-              )}
-            </section>
-
-            {/* Session path */}
-            <section className="vd-section">
-              <h4 className="vd-section-title">
-                <IconEye size={14} /> Visitor path
-              </h4>
-              {profile && profile.sessionPath.length > 0 ? (
-                <ol className="vd-path">
-                  {[...profile.sessionPath].reverse().map((p, i) => (
-                    <li
-                      key={`${p.at}_${i}`}
-                      className={classNames('vd-path-item', i === 0 && online && 'current')}
-                    >
-                      <span className="vd-path-time">{formatWhen(p.at)}</span>
-                      <div className="vd-path-page">
-                        <span className="vd-path-title">{p.title || pageLabel(p.url)}</span>
-                        {p.url && (
-                          <a
-                            className="vd-path-url"
-                            href={p.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={p.url}
-                          >
-                            {pageLabel(p.url)}
-                          </a>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="vd-muted">{profile ? 'No page views recorded yet.' : 'Loading…'}</p>
-              )}
-            </section>
-
-            {/* Technology / source */}
-            <section className="vd-section">
-              <h4 className="vd-section-title">
-                <IconGlobe size={14} /> Technology &amp; source
-              </h4>
-              <div className="vd-chips">
-                {v?.userAgent && <span className="vd-chip">{ua.browser}</span>}
-                {v?.userAgent && <span className="vd-chip">{ua.os}</span>}
-                {v?.userAgent && <span className="vd-chip">{ua.device}</span>}
-              </div>
-              {infoRow('IP address', v?.ip)}
-              {infoRow(
-                'Location',
-                v?.city || v?.country
-                  ? `${flagEmoji(v?.countryCode)} ${[v?.city, v?.country].filter(Boolean).join(', ')}`
-                  : null,
-              )}
-              {infoRow('Came from', v?.referrer ? referrerLabel(v.referrer) : 'Direct')}
-              {infoRow('User agent', v?.userAgent && <code className="vd-ua">{v.userAgent}</code>)}
-            </section>
+          {/* Profile info lives beside the chat on wide drawers */}
+          <aside className="vd-side">{profileContent}</aside>
           </div>
         )}
+
+        {tab === 'profile' && <div className="vd-body">{profileContent}</div>}
+
 
         {tab === 'chats' && (
           <div className="vd-body">
