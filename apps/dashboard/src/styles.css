@@ -6434,3 +6434,15 @@ img.avatar {
 .vd-side .vd-form-grid {
   grid-template-columns: 1fr;
 }
+
+/* Visitors table: assigned-agent pill in place of the Chat button */
+.vt-assigned {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}

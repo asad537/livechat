@@ -310,18 +310,33 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
         <td className="vt-num">{v.totalVisits ?? 0}</td>
         <td className="vt-num">{v.chats ?? 0}</td>
         <td className="vt-actions">
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Already in a live chat → open it in the dock; otherwise compose.
-              const openId = v.activeConversation?.id;
-              if (openId) openDockedChat(openId);
-              else setStartTarget(v);
-            }}
-          >
-            Chat
-          </button>
+          {v.activeConversation?.assignedUserId ? (
+            // Being served — show WHO has it; click opens that chat in the dock.
+            <button
+              className="btn btn-ghost btn-sm vt-assigned"
+              title="Open this chat"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDockedChat(v.activeConversation!.id);
+              }}
+            >
+              <span className="dot dot-online" />
+              {v.activeConversation.agentName ?? 'Assigned'}
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Queued chat → open it in the dock; otherwise compose a new one.
+                const openId = v.activeConversation?.id;
+                if (openId) openDockedChat(openId);
+                else setStartTarget(v);
+              }}
+            >
+              Chat
+            </button>
+          )}
         </td>
       </tr>
     );
