@@ -196,12 +196,31 @@ function Sidebar() {
 function AvailabilityToggle() {
   const { me, setAway, connected } = useApp();
   const [openMenu, setOpenMenu] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Close the menu on any click outside it, or on Escape.
+  React.useEffect(() => {
+    if (!openMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpenMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenu(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openMenu]);
+
   if (!me) return null;
   const away = !!me.away;
   const state = !connected ? 'offline' : away ? 'away' : 'online';
   const label = state === 'offline' ? 'Reconnecting…' : state === 'away' ? 'Away' : 'Online';
   return (
-    <div className="avail">
+    <div className="avail" ref={ref}>
       <button className="avail-current" onClick={() => setOpenMenu((v) => !v)} disabled={!connected}>
         <span className={classNames('avail-dot', `avail-${state}`)} />
         <span className="avail-label">{label}</span>
