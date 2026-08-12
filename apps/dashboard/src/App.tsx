@@ -12,6 +12,7 @@ import Admin from './pages/Admin';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import ChatHistory from './pages/ChatHistory';
+import TransferChats from './pages/TransferChats';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
@@ -27,6 +28,7 @@ import {
   IconLogout,
   IconMessage,
   IconPlug,
+  IconTransfer,
   IconUsers,
   IconWorkflow,
   LogoMark,
@@ -108,6 +110,9 @@ function Sidebar() {
         </NavLink>
         <NavLink to="/chat-history" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconMessage size={17} />, 'Chat History')}
+        </NavLink>
+        <NavLink to="/transfers" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(<IconTransfer size={17} />, 'Transfer Chats')}
         </NavLink>
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
@@ -251,6 +256,7 @@ export default function App() {
           <Route path="/visitors" element={<Visitors key="live" />} />
           <Route path="/history" element={<Visitors key="history" initialView="history" />} />
           <Route path="/chat-history" element={<ChatHistory />} />
+          <Route path="/transfers" element={<TransferChats />} />
           <Route path="/profile" element={<Profile />} />
           <Route
             path="/monitoring"

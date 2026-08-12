@@ -6490,6 +6490,18 @@ tr:hover .vt-open-hint {
   object-fit: cover;
   display: block;
 }
+/* Transfer Chats — "to" cell */
+.tc-to {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.tc-to svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .msg-video {
   display: block;
   max-width: 300px;

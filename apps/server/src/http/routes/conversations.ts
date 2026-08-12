@@ -342,6 +342,133 @@ export function buildConversationsRouter(deps: AppDeps): Router {
     }),
   );
 
+  // GET /api/chats/transfers — paginated list of transfer events (chats that
+  // were handed from one agent to another). Role-scoped:
+  //   ADMIN/MANAGER → all · LEAD → transfers involving self/own CSRs · CSR → own.
+  router.get(
+    '/api/chats/transfers',
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      const page = Math.max(1, Number(asString(req.query.page)) || 1);
+      const PER_PAGE = 20;
+
+      const where: string[] = ["h.reason = 'TRANSFER'"];
+      const params: unknown[] = [];
+
+      // Website scope
+      const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      const websiteId = asString(req.query.websiteId);
+      if (websiteId) {
+        if (user.role !== 'ADMIN' && user.role !== 'MANAGER' && !siteIds.includes(websiteId)) {
+          throw new HttpError(403, 'Forbidden');
+        }
+        where.push('c.website_id = ?');
+        params.push(websiteId);
+      } else if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+        if (siteIds.length === 0) {
+          res.json({ transfers: [], total: 0, page: 1, pages: 1 });
+          return;
+        }
+        where.push(`c.website_id IN (${placeholders(siteIds.length)})`);
+        params.push(...siteIds);
+      }
+
+      // People scope — a transfer counts if the user (or their CSR) was either
+      // the giver or the receiver.
+      if (user.role === 'CSR') {
+        where.push('(h.from_user_id = ? OR h.to_user_id = ?)');
+        params.push(user.id, user.id);
+      } else if (user.role === 'LEAD') {
+        const mine = [user.id, ...(await myCsrIds(deps, user.id))];
+        where.push(
+          `(h.from_user_id IN (${placeholders(mine.length)}) OR h.to_user_id IN (${placeholders(mine.length)}))`,
+        );
+        params.push(...mine, ...mine);
+      }
+
+      // Filters
+      const from = asString(req.query.from);
+      if (from) {
+        where.push('h.created_at >= ?');
+        params.push(`${from}T00:00:00.000Z`);
+      }
+      const to = asString(req.query.to);
+      if (to) {
+        where.push('h.created_at <= ?');
+        params.push(`${to}T23:59:59.999Z`);
+      }
+      const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
+      if (q.length >= 2) {
+        where.push('(v.name LIKE ? OR v.email LIKE ?)');
+        params.push(`%${q}%`, `%${q}%`);
+      }
+
+      const whereSql = `WHERE ${where.join(' AND ')}`;
+      const totalRow = await deps.db.get<{ n: number }>(
+        `SELECT COUNT(*) AS n
+           FROM assignment_history h
+           JOIN conversations c ON c.id = h.conversation_id
+           JOIN visitors v ON v.id = c.visitor_id
+          ${whereSql}`,
+        params,
+      );
+      const total = Number(totalRow?.n ?? 0);
+      const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+
+      const rows = await deps.db.all<{
+        transfer_id: string;
+        transferred_at: string;
+        from_name: string | null;
+        to_name: string | null;
+        id: string;
+        status: string;
+        website_id: string;
+        website_name: string;
+        website_color: string;
+        visitor_id: string;
+        visitor_name: string | null;
+        visitor_email: string | null;
+      }>(
+        `SELECT h.id AS transfer_id, h.created_at AS transferred_at,
+                fu.name AS from_name, tu.name AS to_name,
+                c.id, c.status, c.website_id,
+                COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
+                v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email
+           FROM assignment_history h
+           JOIN conversations c ON c.id = h.conversation_id
+           JOIN visitors v ON v.id = c.visitor_id
+           JOIN websites w ON w.id = c.website_id
+           LEFT JOIN users fu ON fu.id = h.from_user_id
+           LEFT JOIN users tu ON tu.id = h.to_user_id
+          ${whereSql}
+          ORDER BY h.created_at DESC
+          LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
+        params,
+      );
+
+      res.json({
+        transfers: rows.map((r) => ({
+          transferId: r.transfer_id,
+          conversationId: r.id,
+          status: r.status,
+          transferredAt: r.transferred_at,
+          from: r.from_name,
+          to: r.to_name,
+          websiteId: r.website_id,
+          website: r.website_name,
+          websiteColor: r.website_color,
+          visitorId: r.visitor_id,
+          visitor: r.visitor_name || r.visitor_email || null,
+          visitorEmail: r.visitor_email,
+        })),
+        total,
+        page,
+        pages,
+      });
+    }),
+  );
+
   // GET /api/conversations/:id/messages — hydrated ChatMessage[]
   router.get(
     `${API.conversations}/:id/messages`,

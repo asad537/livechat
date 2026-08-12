@@ -150,6 +150,21 @@ export interface ChatHistoryRow {
   messages: number;
 }
 
+export interface TransferRow {
+  transferId: string;
+  conversationId: string;
+  status: string;
+  transferredAt: string;
+  from: string | null;
+  to: string | null;
+  websiteId: string;
+  website: string;
+  websiteColor: string;
+  visitorId: string;
+  visitor: string | null;
+  visitorEmail: string | null;
+}
+
 export interface ReportRecord {
   id: string;
   createdAt: string;
@@ -260,6 +275,22 @@ export const api = {
     }
     return request<{ chats: ChatHistoryRow[]; total: number; page: number; pages: number }>(
       `/api/chats/history?${params.toString()}`,
+    );
+  },
+
+  transferChats: (opts: {
+    page?: number;
+    websiteId?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(opts)) {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+    }
+    return request<{ transfers: TransferRow[]; total: number; page: number; pages: number }>(
+      `/api/chats/transfers?${params.toString()}`,
     );
   },
 
