@@ -71,7 +71,9 @@ const convRoom = (id: string): string => `conv:${id}`;
 const userRoom = (id: string): string => `user:${id}`;
 const websiteRoom = (id: string): string => `website:${id}`;
 
-const MISSED_TIMEOUT_MS = 10 * 60 * 1000;
+// A chat auto-ends only after this long with NO message from EITHER side.
+const INACTIVITY_CLOSE_MS = 12 * 60 * 60 * 1000; // 12 hours
+const INACTIVITY_SWEEP_MS = 15 * 60 * 1000; // re-check every 15 minutes
 const QUEUE_MESSAGE = "You're in the queue — an agent will be with you shortly.";
 
 // Scale/abuse guards
@@ -128,44 +130,51 @@ function hostnameOf(origin: string | undefined): string | null {
   }
 }
 
-// ─── Missed-conversation timers (OFFERED → MISSED) ───────────
+// ─── Inactivity auto-close (12h) ─────────────────────────────
+// A conversation ends on its own ONLY after 12 hours with no message from either
+// side (agent/CSR or client). At close we label it by who spoke last: if the
+// CLIENT sent the last message they were left unanswered → MISSED; otherwise
+// (agent/AI had the last word, or there were no messages) → a normal CLOSED.
+// A periodic sweep is used instead of per-chat timers so it survives restarts.
 
-const missedTimers = new Map<string, NodeJS.Timeout>();
-
-function cancelMissedTimer(conversationId: string): void {
-  const timer = missedTimers.get(conversationId);
-  if (timer) {
-    clearTimeout(timer);
-    missedTimers.delete(conversationId);
+async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
+  const cutoff = new Date(Date.now() - INACTIVITY_CLOSE_MS).toISOString();
+  const stale = await deps.db.all<{ id: string; website_id: string }>(
+    `SELECT c.id, c.website_id
+       FROM conversations c
+      WHERE c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+        AND c.created_at < ?
+        AND NOT EXISTS (
+          SELECT 1 FROM messages m
+           WHERE m.conversation_id = c.id AND m.created_at >= ?
+        )
+      LIMIT 500`,
+    [cutoff, cutoff],
+  );
+  for (const conv of stale) {
+    const last = await deps.db.get<{ sender_type: string }>(
+      'SELECT sender_type FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+      [conv.id],
+    );
+    const status = last?.sender_type === 'VISITOR' ? 'MISSED' : 'CLOSED';
+    await deps.db.run('UPDATE conversations SET status = ?, closed_at = ? WHERE id = ?', [
+      status,
+      nowIso(),
+      conv.id,
+    ]);
+    await emitConversationStatus(deps, conv.id);
+    await emitInboxUpdate(deps, conv.id);
   }
 }
 
-/** OFFERED + visitor gone: after 10 minutes without a reply or reconnect, mark MISSED. */
-function scheduleMissedTimer(deps: AppDeps, conversationId: string): void {
-  cancelMissedTimer(conversationId);
-  const timer = setTimeout(() => {
-    missedTimers.delete(conversationId);
-    void (async () => {
-      const conv = await deps.db.get<ConversationRow>(
-        'SELECT * FROM conversations WHERE id = ?',
-        [conversationId],
-      );
-      if (!conv || conv.status !== 'OFFERED') return;
-      if (deps.presence.isVisitorOnline(conv.visitor_id)) return;
-      const replied = await deps.db.get<{ id: string }>(
-        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
-        [conversationId],
-      );
-      if (replied) return;
-      await deps.db.run("UPDATE conversations SET status = 'MISSED', closed_at = ? WHERE id = ?", [
-        nowIso(),
-        conversationId,
-      ]);
-      await emitConversationStatus(deps, conversationId);
-      await emitInboxUpdate(deps, conversationId);
-    })().catch((err: unknown) => console.error('[realtime] missed-timer', err));
-  }, MISSED_TIMEOUT_MS);
-  missedTimers.set(conversationId, timer);
+function startInactivitySweeper(deps: AppDeps): void {
+  const run = () =>
+    void sweepInactiveConversations(deps).catch((err) =>
+      console.error('[realtime] inactivity sweep', err),
+    );
+  const t = setInterval(run, INACTIVITY_SWEEP_MS);
+  t.unref?.();
+  run(); // sweep once at startup too
 }
 
 // ─── Visitor list broadcast ──────────────────────────────────
@@ -368,6 +377,7 @@ async function announceAgentJoin(
 export function attachRealtime(deps: AppDeps): void {
   attachWidgetNamespace(deps, deps.io.of(WIDGET_NAMESPACE));
   attachAgentNamespace(deps, deps.io.of(AGENT_NAMESPACE));
+  startInactivitySweeper(deps); // auto-close chats after 12h of total silence
 
   // Assignment/status changes → refresh the live visitor list for that site
   // (coalesced per website so a burst produces one broadcast).
@@ -393,20 +403,8 @@ export function attachRealtime(deps: AppDeps): void {
         visitorId,
       ]);
       await broadcastVisitors(deps, websiteId);
-
-      // Visitor left during an OFFERED conversation they never replied to →
-      // give them 10 minutes to come back before marking it MISSED.
-      const offered = await deps.db.get<ConversationRow>(
-        "SELECT * FROM conversations WHERE visitor_id = ? AND status = 'OFFERED' ORDER BY created_at DESC LIMIT 1",
-        [visitorId],
-      );
-      if (offered) {
-        const replied = await deps.db.get<{ id: string }>(
-          "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
-          [offered.id],
-        );
-        if (!replied) scheduleMissedTimer(deps, offered.id);
-      }
+      // A chat is no longer auto-missed when the visitor leaves — it stays open
+      // and only auto-ends after 12h of total silence (see the inactivity sweep).
     })().catch((err: unknown) => console.error('[realtime] visitor offline', err));
   });
 }
@@ -587,7 +585,6 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
 
         data.conversationId = conv.id;
         await socket.join(convRoom(conv.id));
-        cancelMissedTimer(conv.id);
 
         const wasOffered = conv.status === 'OFFERED';
         await postMessage(deps, {
@@ -821,7 +818,6 @@ async function onWidgetConnected(
   if (conv) {
     data.conversationId = conv.id;
     await socket.join(convRoom(conv.id));
-    if (conv.status === 'OFFERED') cancelMissedTimer(conv.id);
     conversation = (await loadSummary(deps, conv.id)) ?? null;
     // Bounded: only the latest 150 messages ride the widget handshake.
     const rows = await deps.db.all<MessageRow>(
@@ -1080,8 +1076,8 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         await emitConversationStatus(deps, conversationId);
         await emitConversationAgent(deps, conversationId);
 
-        // Visitor not around? Start the 10-minute missed countdown right away.
-        if (!deps.presence.isVisitorOnline(visitorId)) scheduleMissedTimer(deps, conversationId);
+        // Agent-initiated outreach the visitor never answers is NOT counted as
+        // missed — it just stays open until the 12h inactivity sweep closes it.
         reply?.({ conversationId });
       }),
     );
@@ -1149,7 +1145,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           socket.emit(EV.AppError, { message: 'You cannot close this conversation' });
           return;
         }
-        cancelMissedTimer(conv.id);
         await closeConversation(deps, conv.id);
       }),
     );
