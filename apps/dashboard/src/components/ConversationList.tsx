@@ -7,6 +7,8 @@ import { classNames, formatWhen, initials, siteLabel } from '../util';
 interface Props {
   selectedId: string | null;
   onSelect(id: string): void;
+  /** Offline Chats view: show only the unassigned queue, no tab switcher. */
+  queueOnly?: boolean;
 }
 
 type Tab = 'mine' | 'queue' | 'all';
@@ -29,9 +31,10 @@ function preview(c: ConversationSummary): string {
   return m.body;
 }
 
-export default function ConversationList({ selectedId, onSelect }: Props) {
+export default function ConversationList({ selectedId, onSelect, queueOnly }: Props) {
   const { me, conversations } = useApp();
-  const [tab, setTab] = useState<Tab>('mine');
+  const [tab, setTab] = useState<Tab>(queueOnly ? 'queue' : 'mine');
+  const effectiveTab: Tab = queueOnly ? 'queue' : tab;
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ConversationSummary[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -62,7 +65,7 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
 
   const items = useMemo(() => {
     if (!me) return [];
-    switch (tab) {
+    switch (effectiveTab) {
       case 'mine':
         return all.filter((c) => c.assignedUserId === me.id && c.status !== 'CLOSED' && c.status !== 'MISSED');
       case 'queue':
@@ -71,7 +74,7 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
       default:
         return all;
     }
-  }, [all, tab, me]);
+  }, [all, effectiveTab, me]);
 
   const mineCount = useMemo(
     () =>
@@ -108,7 +111,7 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
           </button>
         )}
       </div>
-      {searchResults === null && (
+      {searchResults === null && !queueOnly && (
       <div className="conv-tabs">
         <button
           className={classNames('conv-tab', tab === 'mine' && 'active')}
@@ -144,8 +147,10 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
               ? searching
                 ? ''
                 : 'No matches found.'
-              : tab === 'queue'
-                ? 'Queue is empty.'
+              : effectiveTab === 'queue'
+                ? queueOnly
+                  ? 'No offline chats waiting.'
+                  : 'Queue is empty.'
                 : 'No conversations here yet.'}
           </div>
         )}

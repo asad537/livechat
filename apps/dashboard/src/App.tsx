@@ -98,7 +98,7 @@ function Sidebar() {
         <NavLink to="/" end className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(
             <IconInbox size={17} />,
-            'Inbox',
+            'Offline Chats',
             unread > 0 ? <span className="badge nav-badge">{unread}</span> : undefined,
           )}
         </NavLink>

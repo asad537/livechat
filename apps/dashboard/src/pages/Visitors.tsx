@@ -175,10 +175,13 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   // Ids of visitors we've already served — they belong under "Recently served",
   // not "Online now" (which is for fresh, not-yet-served visitors).
   const servedIds = useMemo(() => new Set(servedVisitors.map((v) => v.id)), [servedVisitors]);
-  // A visitor being served RIGHT NOW (assigned to any agent) leaves Online now
-  // instantly — this rides the live socket stream, no REST refresh needed.
+  // A visitor stays in "Online now" until an agent is actually handling them —
+  // i.e. the chat is ACTIVE (agent accepted) or we've messaged them (served).
+  // A visitor who just sent their FIRST message sits in WAITING/OFFERED (nobody
+  // has picked it up yet), so they must remain visible here to be claimed —
+  // they should not vanish the moment a conversation row is created.
   const onlineList = visitors.filter(
-    (v) => v.online && !servedIds.has(v.id) && !v.activeConversation?.assignedUserId,
+    (v) => v.online && !servedIds.has(v.id) && v.activeConversation?.status !== 'ACTIVE',
   );
 
   // The moment serving starts OR a chat closes, pull the served list so the

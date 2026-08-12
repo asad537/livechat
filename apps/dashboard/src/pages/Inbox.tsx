@@ -33,14 +33,14 @@ export default function Inbox() {
 
   return (
     <div className="inbox-layout">
-      <ConversationList selectedId={selectedId} onSelect={setSelectedId} />
+      <ConversationList selectedId={selectedId} onSelect={setSelectedId} queueOnly />
       {selectedId ? (
         <ChatPane conversationId={selectedId} showSidebar />
       ) : (
         <div className="chat-empty chat-empty-page">
           <IconInbox size={40} className="chat-empty-icon" />
-          <p>Select a conversation</p>
-          <p className="chat-empty-sub">Pick a chat from the list to read and reply.</p>
+          <p>Offline chats</p>
+          <p className="chat-empty-sub">Chats waiting in the queue appear here — pick one to reply.</p>
         </div>
       )}
     </div>
