@@ -61,12 +61,9 @@ function Sidebar() {
   const navigate = useNavigate();
   if (!me) return null;
 
-  // Offline Chats lists the waiting queue, so the badge counts the same thing:
-  // chats not yet accepted (WAITING/OFFERED). These carry a tentative assignee,
-  // so it's a status check, not an unassigned check.
-  const queueCount = Object.values(conversations).filter(
-    (c) => c.status === 'WAITING' || c.status === 'OFFERED',
-  ).length;
+  // Offline Chats lists the truly-waiting queue (OFFERED chats are already being
+  // rung to an agent), so the badge counts WAITING chats to match the list.
+  const queueCount = Object.values(conversations).filter((c) => c.status === 'WAITING').length;
 
   const isLeadUp = me.role !== 'CSR'; // LEAD, MANAGER and ADMIN
   const isDashboardRole = me.role === 'ADMIN' || me.role === 'MANAGER'; // Dashboard = admin + manager only

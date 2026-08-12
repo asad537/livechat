@@ -69,10 +69,10 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
       case 'mine':
         return all.filter((c) => c.assignedUserId === me.id && c.status !== 'CLOSED' && c.status !== 'MISSED');
       case 'queue':
-        // Queue = chats waiting to be picked up / not yet accepted. WAITING and
-        // OFFERED chats carry a tentative assignee (the offer target), so filter
-        // by status only — an unassigned-only check would hide the whole queue.
-        return all.filter((c) => c.status === 'WAITING' || c.status === 'OFFERED');
+        // Queue = chats truly waiting, nobody handling them yet. OFFERED chats
+        // are already ringing a specific agent (being picked up), so they don't
+        // belong here — only WAITING.
+        return all.filter((c) => c.status === 'WAITING');
       case 'all':
       default:
         return all;
@@ -86,10 +86,7 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
         : 0,
     [all, me],
   );
-  const queueCount = useMemo(
-    () => all.filter((c) => c.status === 'WAITING' || c.status === 'OFFERED').length,
-    [all],
-  );
+  const queueCount = useMemo(() => all.filter((c) => c.status === 'WAITING').length, [all]);
 
   const showAllTab = me != null && me.role !== 'CSR';
 
