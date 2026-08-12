@@ -9,16 +9,29 @@ import { IconEye } from '../icons';
 // Live Monitor shows only conversations happening right now.
 const LIVE_STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE'];
 
+// A chat only counts as "live" if it has had activity recently — this keeps
+// stale, never-closed conversations (still flagged ACTIVE/WAITING from hours or
+// days ago) out of the monitor. A live chat keeps refreshing this timestamp.
+const LIVE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
 export default function Monitoring() {
   const { conversations, websites, teams, refreshConversations } = useApp();
   const [websiteFilter, setWebsiteFilter] = useState('');
   const [agentFilter, setAgentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     void refreshConversations();
   }, [refreshConversations]);
+
+  // Re-evaluate the recency window every minute so chats that go idle drop off
+  // even when no new socket traffic arrives.
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const agents = useMemo(() => {
     const seen = new Map<string, string>();
@@ -29,17 +42,18 @@ export default function Monitoring() {
   }, [teams]);
 
   const items = useMemo(() => {
+    const now = Date.now();
+    const lastActivity = (c: (typeof conversations)[string]) =>
+      new Date(c.lastMessage?.createdAt ?? c.createdAt).getTime();
     return Object.values(conversations)
-      .filter((c) => LIVE_STATUSES.includes(c.status)) // live chats only
+      .filter((c) => LIVE_STATUSES.includes(c.status)) // live statuses only
+      .filter((c) => now - lastActivity(c) <= LIVE_WINDOW_MS) // active recently
       .filter((c) => (websiteFilter ? c.websiteId === websiteFilter : true))
       .filter((c) => (agentFilter ? c.assignedUserId === agentFilter : true))
       .filter((c) => (statusFilter ? c.status === statusFilter : true))
-      .sort((a, b) => {
-        const ta = new Date(a.lastMessage?.createdAt ?? a.createdAt).getTime();
-        const tb = new Date(b.lastMessage?.createdAt ?? b.createdAt).getTime();
-        return tb - ta;
-      });
-  }, [conversations, websiteFilter, agentFilter, statusFilter]);
+      .sort((a, b) => lastActivity(b) - lastActivity(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, websiteFilter, agentFilter, statusFilter, tick]);
 
   return (
     <div className="page monitoring-page">
