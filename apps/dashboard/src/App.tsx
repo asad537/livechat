@@ -61,10 +61,11 @@ function Sidebar() {
   const navigate = useNavigate();
   if (!me) return null;
 
-  const unread = Object.values(conversations).reduce(
-    (sum, c) => (c.status === 'CLOSED' || c.status === 'MISSED' ? sum : sum + (c.unreadCount ?? 0)),
-    0,
-  );
+  // Offline Chats shows only the unassigned queue, so the badge must count the
+  // same thing (waiting/offered, nobody assigned) — not total unread messages.
+  const queueCount = Object.values(conversations).filter(
+    (c) => !c.assignedUserId && (c.status === 'WAITING' || c.status === 'OFFERED'),
+  ).length;
 
   const isLeadUp = me.role !== 'CSR'; // LEAD, MANAGER and ADMIN
   const isDashboardRole = me.role === 'ADMIN' || me.role === 'MANAGER'; // Dashboard = admin + manager only
@@ -99,7 +100,7 @@ function Sidebar() {
           {navItem(
             <IconInbox size={17} />,
             'Offline Chats',
-            unread > 0 ? <span className="badge nav-badge">{unread}</span> : undefined,
+            queueCount > 0 ? <span className="badge nav-badge">{queueCount}</span> : undefined,
           )}
         </NavLink>
         <NavLink to="/visitors" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
