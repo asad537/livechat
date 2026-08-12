@@ -457,9 +457,13 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       const newVisit = !visitorRow.session_started_at || gapMs > 30 * 60 * 1000;
       // …but the live "On site" timer restarts whenever the visitor actually
       // went offline and came back (page navigation keeps them online via the
-      // presence grace, so the timer keeps running across pages).
+      // presence grace, so the timer keeps running across pages). The 30-min
+      // idle gap is a belt: even if presence somehow says "online", a visitor
+      // idle that long starts a fresh session — no absurd hours-long timers.
       const newSession =
-        !visitorRow.session_started_at || !deps.presence.isVisitorOnline(visitorRow.id);
+        !visitorRow.session_started_at ||
+        !deps.presence.isVisitorOnline(visitorRow.id) ||
+        gapMs > 30 * 60 * 1000;
       await deps.db.run(
         `UPDATE visitors SET
            last_seen_at = ?,

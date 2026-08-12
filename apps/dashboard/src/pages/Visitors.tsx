@@ -166,7 +166,23 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   // Ids of visitors we've already served — they belong under "Recently served",
   // not "Online now" (which is for fresh, not-yet-served visitors).
   const servedIds = useMemo(() => new Set(servedVisitors.map((v) => v.id)), [servedVisitors]);
-  const onlineList = visitors.filter((v) => v.online && !servedIds.has(v.id));
+  // A visitor being served RIGHT NOW (assigned to any agent) leaves Online now
+  // instantly — this rides the live socket stream, no REST refresh needed.
+  const onlineList = visitors.filter(
+    (v) => v.online && !servedIds.has(v.id) && !v.activeConversation?.assignedUserId,
+  );
+
+  // The moment someone starts serving a visitor, pull the served list so they
+  // pop into "Recently served" immediately instead of on the next 60s poll.
+  const assignedFingerprint = visitors
+    .filter((v) => v.activeConversation?.assignedUserId)
+    .map((v) => v.id)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (!assignedFingerprint) return;
+    void api.servedVisitors(40).then(setServedVisitors).catch(() => undefined);
+  }, [assignedFingerprint]);
 
   // "Recently served" — visitors an agent messaged, enriched with live online
   // state, filtered by the same search box, capped at 12.
