@@ -40,7 +40,7 @@ export default function VisitorDrawer({
   onStartChat,
   onOpenConversation,
 }: Props) {
-  const { me, csrIds } = useApp();
+  const { me, csrIds, openChatTab, openDockedChat } = useApp();
   const [profile, setProfile] = useState<VisitorProfile | null>(null);
   const [chats, setChats] = useState<VisitorChat[] | null>(null);
   const [tab, setTab] = useState<Tab>('chat');
@@ -231,6 +231,9 @@ export default function VisitorDrawer({
       (ack: { conversationId?: string } | undefined) => {
         if (!ack?.conversationId) return;
         setStartedId(ack.conversationId);
+        // Also dock it at the bottom so the chat stays reachable from any page,
+        // even after this drawer is closed.
+        openChatTab(ack.conversationId);
         // Refresh the past-chats list so counts stay honest.
         void api.visitorConversations(visitorId).then(setChats).catch(() => undefined);
       },
@@ -408,6 +411,21 @@ export default function VisitorDrawer({
                 </button>
               ) : null;
             })()}
+            {chatConvId && (
+              <button
+                className="icon-btn"
+                title="Minimize to docked chat"
+                aria-label="Minimize"
+                onClick={() => {
+                  openDockedChat(chatConvId);
+                  onClose();
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            )}
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <IconX size={16} />
             </button>
