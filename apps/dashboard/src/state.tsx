@@ -196,7 +196,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const onConnect = () => setConnected(true);
     const onDisconnect = () => setConnected(false);
-    const onConnectError = () => setConnected(false);
+    let authFailures = 0;
+    const onConnectError = (err: Error) => {
+      setConnected(false);
+      // A repeatedly-rejected handshake usually means the 12h token expired
+      // during a long sleep. Verify via REST; a 401 bounces to login instead
+      // of spinning on "Reconnecting…" forever.
+      const looksAuth = /unauthor|forbidden|token|auth/i.test(err?.message ?? '');
+      if (looksAuth && ++authFailures >= 2) {
+        authFailures = 0;
+        void api.me().catch((e: unknown) => {
+          const status = (e as { status?: number })?.status;
+          if (status === 401 || status === 403) {
+            clearToken();
+            setTokenState(null);
+          }
+        });
+      }
+    };
 
     const onReady = (payload: {
       me: UserPublic;
@@ -382,6 +399,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const resync = () => {
       if (document.visibilityState !== 'visible') return;
       const socket = getSocket();
+      // After sleep/lock the socket often thinks it's "connecting" but the
+      // transport is dead and its backoff is stuck — force an immediate
+      // reconnect so we don't hang on "Reconnecting…".
+      if (socket && !socket.connected) {
+        try {
+          socket.connect();
+        } catch {
+          /* ignore */
+        }
+        return; // onConnect (below) will re-sync once it's back
+      }
       if (!socket?.connected) return;
       for (const site of websitesRef.current) {
         socket.emit(EV.AgentWatchWebsite, { websiteId: site.id });
@@ -390,12 +418,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener('visibilitychange', resync);
     window.addEventListener('focus', resync);
+    window.addEventListener('online', resync); // network came back
     // Wall-screen dashboards stay focused for hours — also re-sync on a
-    // timer so a single missed broadcast can never stick around.
-    const interval = window.setInterval(resync, 60_000);
+    // timer so a single missed broadcast (or a wedged socket) can't stick.
+    const interval = window.setInterval(resync, 30_000);
     return () => {
       document.removeEventListener('visibilitychange', resync);
       window.removeEventListener('focus', resync);
+      window.removeEventListener('online', resync);
       window.clearInterval(interval);
     };
   }, [token, refreshConversations]);

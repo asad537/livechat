@@ -70,7 +70,7 @@ function Tile({
 }
 
 export default function Dashboard() {
-  const { websites, me } = useApp();
+  const { websites, me, connected } = useApp();
   const navigate = useNavigate();
   const [websiteId, setWebsiteId] = useState('');
   const [range, setRange] = useState<ReportRange>('today');
@@ -91,6 +91,23 @@ export default function Dashboard() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // After a sleep/reconnect the initial fetch may have failed while offline —
+  // reload once the socket is back and whenever the tab regains focus so the
+  // dashboard can't get stuck on "Loading…".
+  useEffect(() => {
+    if (!connected) return;
+    void load();
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [connected, load]);
 
   const today = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   const y = data?.yesterday;
