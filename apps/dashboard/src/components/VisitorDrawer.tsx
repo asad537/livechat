@@ -30,7 +30,7 @@ interface Props {
   onOpenConversation(conversationId: string): void;
 }
 
-type Tab = 'chat' | 'profile' | 'chats';
+type Tab = 'chat' | 'chats';
 
 export default function VisitorDrawer({
   visitorId,
@@ -436,12 +436,6 @@ export default function VisitorDrawer({
             {chatConvId && <span className="vd-tab-live" />}
           </button>
           <button
-            className={classNames('vd-tab', tab === 'profile' && 'active')}
-            onClick={() => setTab('profile')}
-          >
-            Profile
-          </button>
-          <button
             className={classNames('vd-tab', tab === 'chats' && 'active')}
             onClick={() => setTab('chats')}
           >
@@ -526,7 +520,6 @@ export default function VisitorDrawer({
           </div>
         )}
 
-        {tab === 'profile' && <div className="vd-body">{profileContent}</div>}
 
 
         {tab === 'chats' && (

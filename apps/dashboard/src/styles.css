@@ -2709,7 +2709,7 @@ th.vt-num {
 }
 
 .vd-panel {
-  width: min(740px, 96vw);
+  width: min(650px, 96vw);
   height: 100%;
   background: var(--surface);
   box-shadow: var(--shadow-lg);
@@ -2744,9 +2744,15 @@ th.vt-num {
   background: var(--bg);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
+  /* Narrow screens: stack the profile info below the chat instead of hiding it */
+  .vd-chat-split {
+    flex-direction: column;
+  }
   .vd-side {
-    display: none; /* narrow screens: Profile tab still has everything */
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
   }
 }
 
