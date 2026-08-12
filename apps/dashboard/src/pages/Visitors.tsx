@@ -172,15 +172,15 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     (v) => v.online && !servedIds.has(v.id) && !v.activeConversation?.assignedUserId,
   );
 
-  // The moment someone starts serving a visitor, pull the served list so they
-  // pop into "Recently served" immediately instead of on the next 60s poll.
+  // The moment serving starts OR a chat closes, pull the served list so the
+  // visitor moves between "Online now" and "Recently served" immediately
+  // instead of on the next 60s poll (the fingerprint changes both ways).
   const assignedFingerprint = visitors
     .filter((v) => v.activeConversation?.assignedUserId)
     .map((v) => v.id)
     .sort()
     .join(',');
   useEffect(() => {
-    if (!assignedFingerprint) return;
     void api.servedVisitors(40).then(setServedVisitors).catch(() => undefined);
   }, [assignedFingerprint]);
 
