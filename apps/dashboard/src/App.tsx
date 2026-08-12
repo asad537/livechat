@@ -111,7 +111,7 @@ function Sidebar() {
         </NavLink>
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            {navItem(<IconEye size={17} />, 'Monitoring')}
+            {navItem(<IconEye size={17} />, 'Live Monitor')}
           </NavLink>
         )}
         {isLeadUp && (

@@ -6,7 +6,8 @@ import { StatusPill } from '../components/ConversationList';
 import { classNames, formatWhen, initials } from '../util';
 import { IconEye } from '../icons';
 
-const STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE', 'CLOSED', 'MISSED'];
+// Live Monitor shows only conversations happening right now.
+const LIVE_STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE'];
 
 export default function Monitoring() {
   const { conversations, websites, teams, refreshConversations } = useApp();
@@ -29,6 +30,7 @@ export default function Monitoring() {
 
   const items = useMemo(() => {
     return Object.values(conversations)
+      .filter((c) => LIVE_STATUSES.includes(c.status)) // live chats only
       .filter((c) => (websiteFilter ? c.websiteId === websiteFilter : true))
       .filter((c) => (agentFilter ? c.assignedUserId === agentFilter : true))
       .filter((c) => (statusFilter ? c.status === statusFilter : true))
@@ -43,8 +45,10 @@ export default function Monitoring() {
     <div className="page monitoring-page">
       <div className="page-head">
         <div>
-          <h2>Monitoring</h2>
-          <p className="page-sub">Watch every conversation across your teams, live.</p>
+          <h2>Live Monitor</h2>
+          <p className="page-sub">
+            Chats happening right now — Team Leads see their own CSRs&apos; chats, admins see everything.
+          </p>
         </div>
         <div className="filters">
           <select value={websiteFilter} onChange={(e) => setWebsiteFilter(e.target.value)}>
@@ -64,8 +68,8 @@ export default function Monitoring() {
             ))}
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All statuses</option>
-            {STATUSES.map((s) => (
+            <option value="">All live statuses</option>
+            {LIVE_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.toLowerCase()}
               </option>
@@ -76,7 +80,7 @@ export default function Monitoring() {
 
       <div className="monitoring-layout">
         <div className="monitoring-list">
-          {items.length === 0 && <div className="empty-hint">No conversations match these filters.</div>}
+          {items.length === 0 && <div className="empty-hint">No live chats right now.</div>}
           {items.map((c) => {
             const name = c.visitor?.name || `Visitor ${c.visitorId.slice(0, 6)}`;
             return (
