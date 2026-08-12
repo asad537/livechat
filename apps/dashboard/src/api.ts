@@ -150,6 +150,14 @@ export interface ChatHistoryRow {
   messages: number;
 }
 
+export interface BlockRule {
+  id: string;
+  type: 'IP' | 'COUNTRY';
+  value: string;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface TransferRow {
   transferId: string;
   conversationId: string;
@@ -259,6 +267,13 @@ export const api = {
   ) => request<UserPublic>(`${API.users}/${id}`, { method: 'PATCH', body: patch }),
 
   deleteUser: (id: string) => request<{ ok: boolean }>(`${API.users}/${id}`, { method: 'DELETE' }),
+
+  // ── Admin blocklist (IP / country) ──
+  blocklist: () => request<{ rules: BlockRule[] }>('/api/blocklist'),
+  addBlock: (type: 'IP' | 'COUNTRY', value: string, note?: string) =>
+    request<{ added: BlockRule[] }>('/api/blocklist', { method: 'POST', body: { type, value, note } }),
+  removeBlock: (id: string) =>
+    request<{ ok: boolean }>(`/api/blocklist/${id}`, { method: 'DELETE' }),
 
   chatHistory: (opts: {
     page?: number;

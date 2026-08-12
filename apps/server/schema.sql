@@ -194,3 +194,13 @@ ALTER TABLE users ADD COLUMN allowed_ips TEXT;
 
 -- Optional short label agents see in the website chip (idempotent)
 ALTER TABLE websites ADD COLUMN label VARCHAR(255);
+
+-- Admin blocklist: deny widget access by IP/CIDR or country code (idempotent)
+CREATE TABLE IF NOT EXISTS blocklist (
+  id VARCHAR(36) PRIMARY KEY,
+  type VARCHAR(16) NOT NULL,          -- 'IP' | 'COUNTRY'
+  value VARCHAR(64) NOT NULL,         -- IP/CIDR, or ISO-3166 alpha-2 country code
+  note VARCHAR(255),
+  created_at VARCHAR(40) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_blocklist_type ON blocklist (type);

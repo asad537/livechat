@@ -22,7 +22,7 @@ import { hydrateMessages, postMessage, type MessageRow } from '../domain/message
 import { maybeBotReply } from '../features/aibot/index.js';
 import { sendTranscriptEmail } from '../features/email/index.js';
 import { captureVisitorInfo } from '../features/capture/index.js';
-import { clientIp, updateVisitorGeo } from '../features/geo/index.js';
+import { clientIp, lookupCountry, updateVisitorGeo } from '../features/geo/index.js';
 import { ipAllowed } from '../core/ip.js';
 import {
   activateConversation,
@@ -416,6 +416,11 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         if (!host || !domains.includes(host)) return next(new Error('Domain not allowed'));
       }
 
+      // Admin blocklist — deny before we create/track a visitor. IP is known
+      // synchronously; block here so a blocked address never opens a chat.
+      const cip = clientIp(socket);
+      if (deps.blocklist.isIpBlocked(cip)) return next(new Error('Access blocked'));
+
       // Resolve or create the visitor.
       let visitorRow: VisitorRow | undefined;
       const rawToken = asString(auth.visitorToken);
@@ -492,6 +497,14 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           [newId(), visitorRow.id, pageUrl, asString(auth.pageTitle)?.slice(0, 500) ?? null, now],
         );
       }
+      // Country blocklist — use the cached country when we have it, else resolve
+      // it now (only when country rules exist, to avoid the lookup otherwise).
+      if (deps.blocklist.hasCountryBlocks()) {
+        let cc = visitorRow.geo_cc ?? null;
+        if (!cc && cip) cc = await lookupCountry(cip);
+        if (deps.blocklist.isCountryBlocked(cc)) return next(new Error('Access blocked'));
+      }
+
       // Capture IP + city/country (best-effort, non-blocking).
       updateVisitorGeo(deps, visitorRow.id, clientIp(socket));
       next();

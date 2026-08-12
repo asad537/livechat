@@ -13,6 +13,7 @@ import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import ChatHistory from './pages/ChatHistory';
 import TransferChats from './pages/TransferChats';
+import BlockList from './pages/BlockList';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
@@ -23,6 +24,7 @@ import {
   IconChart,
   IconClock,
   IconEye,
+  IconGlobe,
   IconHome,
   IconInbox,
   IconLogout,
@@ -150,6 +152,14 @@ function Sidebar() {
             >
               {navItem(<IconPlug size={17} />, 'Integrations')}
             </NavLink>
+            {me.role === 'ADMIN' && (
+              <NavLink
+                to="/admin/blocking"
+                className={({ isActive }) => classNames('nav-item', isActive && 'active')}
+              >
+                {navItem(<IconGlobe size={17} />, 'Blocking')}
+              </NavLink>
+            )}
           </nav>
         </>
       )}
@@ -275,6 +285,14 @@ export default function App() {
             }
           />
           <Route path="/admin" element={<Navigate to="/admin/agents" replace />} />
+          <Route
+            path="/admin/blocking"
+            element={
+              <RequireRole roles={['ADMIN']}>
+                <BlockList />
+              </RequireRole>
+            }
+          />
           <Route
             path="/admin/:section"
             element={

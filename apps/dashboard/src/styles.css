@@ -6490,6 +6490,98 @@ tr:hover .vt-open-hint {
   object-fit: cover;
   display: block;
 }
+/* ── Access Blocking (admin) ── */
+.bl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.bl-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bl-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.bl-card-title svg {
+  color: var(--accent);
+}
+.bl-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bl-add input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font: inherit;
+  color: inherit;
+}
+.bl-add input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.bl-add .btn {
+  flex: 0 0 auto;
+}
+.bl-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.bl-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.bl-flag {
+  font-size: 18px;
+  line-height: 1;
+}
+.bl-item-value {
+  font-weight: 600;
+}
+.bl-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.bl-item-code {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-soft, rgba(0, 0, 0, 0.05));
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.bl-item-note,
+.bl-item-when {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Transfer Chats — "to" cell */
 .tc-to {
   display: inline-flex;

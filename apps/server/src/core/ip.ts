@@ -68,6 +68,13 @@ export function ipAllowed(allowedIps: string | null | undefined, clientIp: strin
   return list.some((entry) => matchesEntry(entry, ip));
 }
 
+/** Does `clientIp` match ANY entry (exact IP or CIDR) in the list? */
+export function ipMatchesList(entries: string[], clientIp: string): boolean {
+  const ip = normalizeIp(clientIp);
+  if (!ip) return false;
+  return entries.some((e) => matchesEntry(e, ip));
+}
+
 /** Validate + normalize an admin-supplied allow-list; throws on a bad entry. */
 export function sanitizeAllowedIps(input: unknown): string | null {
   if (input == null || input === '') return null;

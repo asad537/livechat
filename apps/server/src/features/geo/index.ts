@@ -15,7 +15,7 @@ export function clientIp(socket: Socket): string | null {
   return ip.length > 0 ? ip.slice(0, 64) : null;
 }
 
-function isPrivateIp(ip: string): boolean {
+export function isPrivateIp(ip: string): boolean {
   return (
     ip === '::1' ||
     ip === 'localhost' ||
@@ -23,6 +23,27 @@ function isPrivateIp(ip: string): boolean {
     /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
     /^f[cd][0-9a-f]{2}:/i.test(ip)
   );
+}
+
+/**
+ * Blocking country lookup for a public IP (ISO-3166 alpha-2, uppercased).
+ * Returns null for private IPs, failures or timeouts. Used by the blocklist so
+ * a brand-new visitor (no cached geo yet) can still be geo-blocked on connect.
+ */
+export async function lookupCountry(ip: string): Promise<string | null> {
+  if (isPrivateIp(ip)) return null;
+  try {
+    const res = await fetch(
+      `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,countryCode`,
+      { signal: AbortSignal.timeout(4000) },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { status?: string; countryCode?: string };
+    if (data.status !== 'success') return null;
+    return (data.countryCode ?? '').slice(0, 4).toUpperCase() || null;
+  } catch {
+    return null;
+  }
 }
 
 const inFlight = new Set<string>();

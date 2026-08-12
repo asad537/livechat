@@ -11,6 +11,7 @@ import { buildWebsitesRouter } from './routes/websites.js';
 import { buildConversationsRouter } from './routes/conversations.js';
 import { buildVisitorsRouter } from './routes/visitors.js';
 import { buildReportsRouter } from './routes/reports.js';
+import { buildBlocklistRouter } from './routes/blocklist.js';
 import { buildWidgetRouter } from './routes/widget.js';
 
 /**
@@ -28,6 +29,7 @@ export function buildApiRouter(deps: AppDeps): Router {
   router.use(buildConversationsRouter(deps)); // /api/conversations
   router.use(buildVisitorsRouter(deps)); // /api/visitors/:id (profile, CRM, past chats)
   router.use(buildReportsRouter(deps)); // /api/reports/overview
+  router.use(buildBlocklistRouter(deps)); // /api/blocklist (ADMIN)
 
   router.use(buildFilesRouter(deps)); // /api/uploads, /api/files/:id/download
   router.use(buildCallsRouter(deps)); // /api/calls/daily-webhook
