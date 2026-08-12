@@ -482,7 +482,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
           const ratings = wClosed.filter((r) => r.rating != null).map((r) => Number(r.rating));
           return {
             id: w.id,
-            name: w.name,
+            name: w.label?.trim() || w.name, // show the agent-facing chip label
             color: w.primary_color,
             chats: wStarted.length,
             missed: wMissed,
@@ -661,7 +661,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         msgs: number;
       }>(
         `SELECT c.id, c.created_at, c.activated_at, c.closed_at, c.status, c.rating, c.rating_comment,
-                w.name AS website_name,
+                COALESCE(NULLIF(w.label, ''), w.name) AS website_name,
                 u.name AS agent_name,
                 v.name AS visitor_name, v.email AS visitor_email,
                 (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msgs

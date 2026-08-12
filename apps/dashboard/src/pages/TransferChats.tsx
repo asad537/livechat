@@ -4,7 +4,7 @@ import { api, type TransferRow } from '../api';
 import { useApp } from '../state';
 import { StatusPill } from '../components/ConversationList';
 import { IconSearch, IconTransfer, IconUsers } from '../icons';
-import { classNames, formatWhen, initials } from '../util';
+import { classNames, formatWhen, initials, siteLabel } from '../util';
 
 function pageNumbers(total: number, current: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i);
@@ -98,7 +98,7 @@ export default function TransferChats() {
             <option value="">All websites</option>
             {websites.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name}
+                {siteLabel(w)}
               </option>
             ))}
           </select>

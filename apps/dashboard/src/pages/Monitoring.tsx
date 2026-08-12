@@ -3,7 +3,7 @@ import type { ConversationStatus } from '@livechat/shared';
 import { useApp } from '../state';
 import ChatPane from '../components/ChatPane';
 import { StatusPill } from '../components/ConversationList';
-import { classNames, formatWhen, initials } from '../util';
+import { classNames, formatWhen, initials, siteLabel } from '../util';
 import { IconEye } from '../icons';
 
 // Live Monitor shows only conversations happening right now.
@@ -69,7 +69,7 @@ export default function Monitoring() {
             <option value="">All websites</option>
             {websites.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name}
+                {siteLabel(w)}
               </option>
             ))}
           </select>
@@ -118,7 +118,7 @@ export default function Monitoring() {
                   </span>
                   <span className="conv-item-tags">
                     <StatusPill status={c.status} />
-                    {c.website?.name && <span className="chip">{c.website.name}</span>}
+                    {c.website?.name && <span className="chip">{siteLabel(c.website)}</span>}
                     <span className="chip">{c.assignedUser?.name ?? 'Unassigned'}</span>
                   </span>
                 </span>

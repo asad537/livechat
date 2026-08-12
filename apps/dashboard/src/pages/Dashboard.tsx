@@ -16,7 +16,7 @@ import {
   IconUser,
   IconUsers,
 } from '../icons';
-import { classNames, formatSeconds } from '../util';
+import { classNames, formatSeconds, siteLabel } from '../util';
 
 const RANGE_HINT: Record<ReportRange, string> = {
   today: 'today',
@@ -181,7 +181,7 @@ export default function Dashboard() {
             <option value="">All websites</option>
             {websites.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name}
+                {siteLabel(w)}
               </option>
             ))}
           </select>

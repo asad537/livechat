@@ -14,7 +14,7 @@ import {
   IconUsers,
 } from '../icons';
 import { OutcomeDonut, TrendLines, dayFull, dayLabel, hourLabel } from '../components/charts';
-import { classNames, flagEmoji, formatSeconds } from '../util';
+import { classNames, flagEmoji, formatSeconds, siteLabel } from '../util';
 
 const RANGES: { key: ReportRange; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -217,7 +217,7 @@ export default function Reports() {
                 <option value="">All websites</option>
                 {websites.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name}
+                    {siteLabel(w)}
                   </option>
                 ))}
               </select>
@@ -794,7 +794,7 @@ function RecordsView({
             <option value="">All websites</option>
             {websites.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name}
+                {siteLabel(w)}
               </option>
             ))}
           </select>

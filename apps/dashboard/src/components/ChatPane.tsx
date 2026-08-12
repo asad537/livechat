@@ -564,7 +564,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               <span className="side-k">
                 <IconGlobe size={13} /> Website
               </span>
-              <span className="side-v">{conversation.website?.name ?? '—'}</span>
+              <span className="side-v">{conversation.website ? siteLabel(conversation.website) : '—'}</span>
             </div>
             {conversation.visitor?.currentPage && (
               <div className="side-kv">

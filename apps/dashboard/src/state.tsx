@@ -264,7 +264,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         (!prev || prev.assignedUserId !== user.id)
       ) {
         const who = conv.visitor?.name || 'A visitor';
-        const where = conv.website?.name ?? 'your site';
+        const where = conv.website?.label?.trim() || conv.website?.name || 'your site';
         pushToast('New chat assigned', `${who} is waiting on ${where}.`, 'info');
         playChime('new-chat');
         desktopNotify('New chat assigned', `${who} is waiting on ${where}.`, `chat-${conv.id}`);

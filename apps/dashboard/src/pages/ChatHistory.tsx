@@ -4,7 +4,7 @@ import { api, type ChatHistoryRow } from '../api';
 import { useApp } from '../state';
 import { StatusPill } from '../components/ConversationList';
 import { IconClock, IconSearch, IconStar, IconUsers } from '../icons';
-import { classNames, formatSeconds, formatWhen, initials } from '../util';
+import { classNames, formatSeconds, formatWhen, initials, siteLabel } from '../util';
 
 function pageNumbers(total: number, current: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i);
@@ -109,7 +109,7 @@ export default function ChatHistory() {
             <option value="">All websites</option>
             {websites.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.name}
+                {siteLabel(w)}
               </option>
             ))}
           </select>
