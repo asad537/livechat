@@ -61,10 +61,11 @@ function Sidebar() {
   const navigate = useNavigate();
   if (!me) return null;
 
-  // Offline Chats shows only the unassigned queue, so the badge must count the
-  // same thing (waiting/offered, nobody assigned) — not total unread messages.
+  // Offline Chats lists the waiting queue, so the badge counts the same thing:
+  // chats not yet accepted (WAITING/OFFERED). These carry a tentative assignee,
+  // so it's a status check, not an unassigned check.
   const queueCount = Object.values(conversations).filter(
-    (c) => !c.assignedUserId && (c.status === 'WAITING' || c.status === 'OFFERED'),
+    (c) => c.status === 'WAITING' || c.status === 'OFFERED',
   ).length;
 
   const isLeadUp = me.role !== 'CSR'; // LEAD, MANAGER and ADMIN
