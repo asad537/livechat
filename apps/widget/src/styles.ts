@@ -274,6 +274,10 @@ export const WIDGET_CSS = `
   box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
 }
 .lc-image img { width: 100%; height: auto; max-height: 280px; object-fit: cover; display: block; }
+.lc-video {
+  display: block; width: 100%; max-width: 240px; max-height: 300px;
+  border-radius: 14px; background: #000; box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+}
 .lc-file-icon {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
   background: var(--lc-soft); color: var(--lc-primary);

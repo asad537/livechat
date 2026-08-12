@@ -23,12 +23,19 @@ function Ticks({ message }: { message: ChatMessage }) {
   return <IconSingleCheck className="tick tick-sent" />;
 }
 
+function isMediaFile(message: ChatMessage): boolean {
+  const file = message.file;
+  if (!file || message.kind !== 'FILE' || file.scanStatus !== 'CLEAN') return false;
+  return /^image\//i.test(file.mime) || /^video\//i.test(file.mime);
+}
+
 function FileCard({ message }: { message: ChatMessage }) {
   const file = message.file;
   if (!file) return <span className="msg-text">{message.body}</span>;
   const clean = file.scanStatus === 'CLEAN';
   const blocked = file.scanStatus === 'BLOCKED';
   const isImage = /^image\//i.test(file.mime);
+  const isVideo = /^video\//i.test(file.mime);
 
   // Clean images render inline as a clickable thumbnail (opens full size).
   if (clean && isImage) {
@@ -42,6 +49,13 @@ function FileCard({ message }: { message: ChatMessage }) {
       >
         <img src={fileDownloadUrl(file)} alt={file.originalName} loading="lazy" />
       </a>
+    );
+  }
+
+  // Clean videos render inline with native controls.
+  if (clean && isVideo) {
+    return (
+      <video className="msg-video" src={fileDownloadUrl(file)} controls preload="metadata" title={file.originalName} />
     );
   }
 
@@ -109,9 +123,17 @@ export default function MessageBubble({ message }: Props) {
   }
 
   const own = message.senderType === 'AGENT';
+  const media = isMediaFile(message);
+  const bubbleClass = [
+    'msg-bubble',
+    own ? 'msg-bubble-own' : 'msg-bubble-other',
+    media ? 'msg-bubble-media' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return (
     <div className={own ? 'msg-row msg-row-own' : 'msg-row msg-row-other'}>
-      <div className={own ? 'msg-bubble msg-bubble-own' : 'msg-bubble msg-bubble-other'}>
+      <div className={bubbleClass}>
         {own && message.sender?.name && <span className="msg-sender">{message.sender.name}</span>}
         {message.kind === 'FILE' ? (
           <FileCard message={message} />

@@ -117,6 +117,7 @@ export function FileCard({ m, server, token }: { m: LocalMessage; server: string
   if (!file) return <div class="lc-file">{m.body || 'File'}</div>;
   const href = file.downloadUrl ? `${server}${file.downloadUrl}?token=${encodeURIComponent(token)}` : null;
   const isImage = /^image\//i.test(file.mime || '');
+  const isVideo = /^video\//i.test(file.mime || '');
 
   if (href && file.scanStatus === 'CLEAN' && isImage) {
     return (
@@ -124,6 +125,10 @@ export function FileCard({ m, server, token }: { m: LocalMessage; server: string
         <img src={href} alt={file.originalName} loading="lazy" />
       </a>
     );
+  }
+
+  if (href && file.scanStatus === 'CLEAN' && isVideo) {
+    return <video class="lc-video" src={href} controls preload="metadata" />;
   }
   return (
     <div class="lc-file">

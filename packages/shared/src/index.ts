@@ -234,5 +234,5 @@ export const API = {
 export const DEFAULT_MAX_CHATS = 3;
 
 // File limits (diagram: quarantine → scan → compress → private download)
-export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 export const BLOCKED_EXTENSIONS = ['exe', 'bat', 'cmd', 'sh', 'msi', 'scr', 'com', 'pif', 'jar'];
