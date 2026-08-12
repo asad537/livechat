@@ -6458,3 +6458,14 @@ img.avatar {
   font-weight: 700;
   color: #b45309;
 }
+
+.vt-open-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+tr:hover .vt-open-hint {
+  opacity: 1;
+}

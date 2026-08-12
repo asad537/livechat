@@ -337,15 +337,8 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
               Unassigned
             </button>
           ) : (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setStartTarget(v);
-              }}
-            >
-              Chat
-            </button>
+            // Fresh visitor — click the row to open their profile & start a chat.
+            <span className="vt-open-hint">Open →</span>
           )}
         </td>
       </tr>
