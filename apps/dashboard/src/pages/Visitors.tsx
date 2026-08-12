@@ -323,15 +323,25 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
               <span className="dot dot-online" />
               {v.activeConversation.agentName ?? 'Assigned'}
             </button>
+          ) : v.activeConversation ? (
+            // Open chat but nobody has taken it yet — waiting in the queue.
+            <button
+              className="btn btn-ghost btn-sm vt-unassigned"
+              title="Open this chat"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDockedChat(v.activeConversation!.id);
+              }}
+            >
+              <span className="dot dot-waiting" />
+              Unassigned
+            </button>
           ) : (
             <button
               className="btn btn-primary btn-sm"
               onClick={(e) => {
                 e.stopPropagation();
-                // Queued chat → open it in the dock; otherwise compose a new one.
-                const openId = v.activeConversation?.id;
-                if (openId) openDockedChat(openId);
-                else setStartTarget(v);
+                setStartTarget(v);
               }}
             >
               Chat

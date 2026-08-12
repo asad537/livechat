@@ -6446,3 +6446,15 @@ img.avatar {
   text-overflow: ellipsis;
   font-weight: 700;
 }
+
+.dot-waiting {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+}
+.vt-unassigned {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #b45309;
+}
