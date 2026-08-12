@@ -205,7 +205,15 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     let list = servedVisitors
       .map((v) => {
         const live = liveById.get(v.id);
-        if (live) return { ...v, online: live.online, currentPage: live.currentPage };
+        // Pull the LIVE open-conversation (assignee + agent name) so the row's
+        // pill shows who's serving them, not a stale "Unassigned".
+        if (live)
+          return {
+            ...v,
+            online: live.online,
+            currentPage: live.currentPage,
+            activeConversation: live.activeConversation,
+          };
         // Not in the live snapshot of a watched site → they left (stale REST flag).
         return liveSites.has(v.websiteId) ? { ...v, online: false } : v;
       })

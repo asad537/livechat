@@ -148,17 +148,28 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       // "Served" = an agent has messaged them in a conversation that is STILL
       // OPEN. The moment the chat closes they drop out — back to "Online now"
       // if they're still browsing, or simply into Chat History if they left.
-      const rows = await deps.db.all<VisitorRow & { served_at: string; n_chats: number }>(
-        `SELECT v.*, MAX(m.created_at) AS served_at,
+      const rows = await deps.db.all<
+        VisitorRow & {
+          served_at: string;
+          n_chats: number;
+          conv_id: string;
+          conv_status: string;
+          conv_assignee: string | null;
+          conv_agent: string | null;
+        }
+      >(
+        `SELECT v.*, x.served_at, c.id AS conv_id, c.status AS conv_status,
+                c.assigned_user_id AS conv_assignee, u.name AS conv_agent,
                 (SELECT COUNT(*) FROM conversations cc WHERE cc.visitor_id = v.id) AS n_chats
-           FROM messages m
-           JOIN conversations c ON c.id = m.conversation_id
+           FROM conversations c
            JOIN visitors v ON v.id = c.visitor_id
-          WHERE m.sender_type = 'AGENT'
-            AND c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+           LEFT JOIN users u ON u.id = c.assigned_user_id
+           JOIN (SELECT conversation_id, MAX(created_at) AS served_at
+                   FROM messages WHERE sender_type = 'AGENT' GROUP BY conversation_id) x
+             ON x.conversation_id = c.id
+          WHERE c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
             AND c.website_id IN (${placeholders(scoped.length)})${cScope}
-          GROUP BY v.id
-          ORDER BY served_at DESC
+          ORDER BY x.served_at DESC
           LIMIT ?`,
         [...scoped, ...scope.params, limit],
       );
@@ -169,6 +180,12 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
           online: deps.presence.isVisitorOnline(r.id),
           chats: Number(r.n_chats),
           lastSeenAt: r.served_at, // sort/display by when we last served them
+          activeConversation: {
+            id: r.conv_id,
+            status: r.conv_status as NonNullable<Visitor['activeConversation']>['status'],
+            assignedUserId: r.conv_assignee,
+            agentName: r.conv_agent,
+          },
         })),
       });
     }),
