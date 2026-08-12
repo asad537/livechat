@@ -124,6 +124,16 @@ export function buildUsersRouter(deps: AppDeps): Router {
           nowIso(),
         ],
       );
+
+      // Auto-assign new agents/leads to teams so they can immediately access websites & visitors
+      const teams = await deps.db.all<{ id: string }>('SELECT id FROM teams');
+      for (const t of teams) {
+        await deps.db.run(
+          'INSERT INTO team_members (id, team_id, user_id, is_lead) VALUES (?, ?, ?, ?)',
+          [newId(), t.id, id, role === 'LEAD' ? 1 : 0],
+        );
+      }
+
       const created = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [id]);
       if (!created) throw new HttpError(500, 'Failed to create user');
       res.status(201).json(toUserWithPresence(deps, created));
