@@ -145,6 +145,9 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const scope = await conversationScope(deps, user); // ' AND assigned_user_id …'
       const cScope = scope.sql.replace('assigned_user_id', 'c.assigned_user_id');
 
+      // Only serves from the visitor's CURRENT session count: when a chat ends
+      // and the visitor leaves, their next visit starts a fresh session — they
+      // show under "Online now" again, not "Recently served".
       const rows = await deps.db.all<VisitorRow & { served_at: string; n_chats: number }>(
         `SELECT v.*, MAX(m.created_at) AS served_at,
                 (SELECT COUNT(*) FROM conversations cc WHERE cc.visitor_id = v.id) AS n_chats
@@ -154,6 +157,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
           WHERE m.sender_type = 'AGENT'
             AND c.website_id IN (${placeholders(scoped.length)})${cScope}
           GROUP BY v.id
+          HAVING MAX(m.created_at) >= COALESCE(v.session_started_at, v.created_at)
           ORDER BY served_at DESC
           LIMIT ?`,
         [...scoped, ...scope.params, limit],

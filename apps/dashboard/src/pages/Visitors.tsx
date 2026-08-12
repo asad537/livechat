@@ -184,15 +184,18 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     void api.servedVisitors(40).then(setServedVisitors).catch(() => undefined);
   }, [assignedFingerprint]);
 
-  // "Recently served" — visitors an agent messaged, enriched with live online
-  // state, filtered by the same search box, capped at 12.
+  // "Recently served" — visitors an agent messaged who are STILL ONLINE,
+  // enriched with live state and filtered by the same search box. Once they
+  // leave the site they drop off (their chats live on in Chat History).
   const servedList = useMemo(() => {
     const liveById = new Map<string, Visitor>();
     for (const w of websites) for (const v of visitorsByWebsite[w.id] ?? []) liveById.set(v.id, v);
-    let list = servedVisitors.map((v) => {
-      const live = liveById.get(v.id);
-      return live ? { ...v, online: live.online, currentPage: live.currentPage } : v;
-    });
+    let list = servedVisitors
+      .map((v) => {
+        const live = liveById.get(v.id);
+        return live ? { ...v, online: live.online, currentPage: live.currentPage } : v;
+      })
+      .filter((v) => v.online);
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((v) =>
