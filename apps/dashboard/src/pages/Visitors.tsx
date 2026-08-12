@@ -137,7 +137,18 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     const byId = new Map<string, Visitor>();
     for (const v of restVisitors) byId.set(v.id, v);
     for (const v of liveList) byId.set(v.id, { ...byId.get(v.id), ...v });
-    let list = [...byId.values()];
+    // The live stream is authoritative: for any site we have a snapshot of,
+    // a visitor NOT in that snapshot is offline — even if a stale REST row
+    // (fetched while they were still browsing) says online. This makes a
+    // leaver disappear from "Online now" ~seconds after closing the site,
+    // no reload needed.
+    const liveSites = new Set(websites.filter((w) => visitorsByWebsite[w.id]).map((w) => w.id));
+    const liveIds = new Set(liveList.map((v) => v.id));
+    let list = [...byId.values()].map((v) =>
+      v.online && liveSites.has(v.websiteId) && !liveIds.has(v.id)
+        ? { ...v, online: false, activeConversation: null }
+        : v,
+    );
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((v) =>
@@ -190,10 +201,13 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   const servedList = useMemo(() => {
     const liveById = new Map<string, Visitor>();
     for (const w of websites) for (const v of visitorsByWebsite[w.id] ?? []) liveById.set(v.id, v);
+    const liveSites = new Set(websites.filter((w) => visitorsByWebsite[w.id]).map((w) => w.id));
     let list = servedVisitors
       .map((v) => {
         const live = liveById.get(v.id);
-        return live ? { ...v, online: live.online, currentPage: live.currentPage } : v;
+        if (live) return { ...v, online: live.online, currentPage: live.currentPage };
+        // Not in the live snapshot of a watched site → they left (stale REST flag).
+        return liveSites.has(v.websiteId) ? { ...v, online: false } : v;
       })
       .filter((v) => v.online);
     const q = query.trim().toLowerCase();
