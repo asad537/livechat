@@ -66,7 +66,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
   router.get(
     API.reports,
     auth,
-    requireRole('ADMIN', 'MANAGER', 'LEAD'),
+    requireRole('ADMIN', 'MANAGER', 'LEAD', 'CSR'),
     h(async (req, res) => {
       const user = agent(req);
       const siteRows = await accessibleWebsiteRows(deps, user);
@@ -81,9 +81,12 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const range = asString(req.query.range) ?? 'today';
       const since = rangeStart(range);
 
-      // Agents in scope: ADMIN/MANAGER → everyone; Team Lead → self + own CSRs.
+      // Agents in scope: ADMIN/MANAGER → everyone; Team Lead → self + own CSRs;
+      // CSR → only themselves.
       let agents: UserRow[];
-      if (user.role === 'LEAD') {
+      if (user.role === 'CSR') {
+        agents = await deps.db.all<UserRow>('SELECT * FROM users WHERE id = ?', [user.id]);
+      } else if (user.role === 'LEAD') {
         agents = await deps.db.all<UserRow>(
           'SELECT * FROM users WHERE id = ? OR team_lead_id = ? ORDER BY name',
           [user.id, user.id],
@@ -92,17 +95,22 @@ export function buildReportsRouter(deps: AppDeps): Router {
         agents = await deps.db.all<UserRow>('SELECT * FROM users ORDER BY name');
       }
 
-      // A Team Lead's numbers cover only their own CSRs' chats (unassigned
-      // queue/missed chats stay visible — they belong to the website, not an
-      // agent). ADMIN/MANAGER see everything.
-      const leadScope = user.role === 'LEAD' ? agents.map((a) => a.id) : null;
-      const agentFilter = leadScope
-        ? ` AND (assigned_user_id IN (${placeholders(leadScope.length)}) OR assigned_user_id IS NULL)`
+      // Scope conversation metrics to the agents in view. A Team Lead's numbers
+      // also cover unassigned queue/missed chats (they belong to the website, not
+      // an agent); a CSR sees strictly their own assigned chats. ADMIN/MANAGER
+      // see everything (no filter).
+      const scopeIds =
+        user.role === 'CSR' || user.role === 'LEAD' ? agents.map((a) => a.id) : null;
+      const includeUnassigned = user.role === 'LEAD';
+      const unassignedClause = includeUnassigned ? ' OR assigned_user_id IS NULL' : '';
+      const cUnassignedClause = includeUnassigned ? ' OR c.assigned_user_id IS NULL' : '';
+      const agentFilter = scopeIds
+        ? ` AND (assigned_user_id IN (${placeholders(scopeIds.length)})${unassignedClause})`
         : '';
-      const cAgentFilter = leadScope
-        ? ` AND (c.assigned_user_id IN (${placeholders(leadScope.length)}) OR c.assigned_user_id IS NULL)`
+      const cAgentFilter = scopeIds
+        ? ` AND (c.assigned_user_id IN (${placeholders(scopeIds.length)})${cUnassignedClause})`
         : '';
-      const agentParams: string[] = leadScope ?? [];
+      const agentParams: string[] = scopeIds ?? [];
 
       const empty = {
         range,
@@ -578,7 +586,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
   router.get(
     '/api/reports/records',
     auth,
-    requireRole('ADMIN', 'MANAGER', 'LEAD'),
+    requireRole('ADMIN', 'MANAGER', 'LEAD', 'CSR'),
     h(async (req, res) => {
       const user = agent(req);
       const scoped = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
@@ -606,25 +614,31 @@ export function buildReportsRouter(deps: AppDeps): Router {
         where += ' AND c.created_at <= ?';
         params.push(`${to}T23:59:59.999Z`);
       }
-      // A Team Lead may only pull records for self + own CSRs.
-      const leadScope =
-        user.role === 'LEAD'
-          ? (
-              await deps.db.all<{ id: string }>(
-                'SELECT id FROM users WHERE id = ? OR team_lead_id = ?',
-                [user.id, user.id],
-              )
-            ).map((r) => r.id)
-          : null;
-
-      const agentId = asString(req.query.agentId);
-      if (agentId) {
-        if (leadScope && !leadScope.includes(agentId)) throw new HttpError(403, 'Forbidden');
+      // A CSR may only pull their own records. A Team Lead may pull records for
+      // self + own CSRs (plus unassigned queue).
+      if (user.role === 'CSR') {
         where += ' AND c.assigned_user_id = ?';
-        params.push(agentId);
-      } else if (leadScope) {
-        where += ` AND (c.assigned_user_id IN (${placeholders(leadScope.length)}) OR c.assigned_user_id IS NULL)`;
-        params.push(...leadScope);
+        params.push(user.id);
+      } else {
+        const leadScope =
+          user.role === 'LEAD'
+            ? (
+                await deps.db.all<{ id: string }>(
+                  'SELECT id FROM users WHERE id = ? OR team_lead_id = ?',
+                  [user.id, user.id],
+                )
+              ).map((r) => r.id)
+            : null;
+
+        const agentId = asString(req.query.agentId);
+        if (agentId) {
+          if (leadScope && !leadScope.includes(agentId)) throw new HttpError(403, 'Forbidden');
+          where += ' AND c.assigned_user_id = ?';
+          params.push(agentId);
+        } else if (leadScope) {
+          where += ` AND (c.assigned_user_id IN (${placeholders(leadScope.length)}) OR c.assigned_user_id IS NULL)`;
+          params.push(...leadScope);
+        }
       }
       const status = asString(req.query.status);
       if (status) {

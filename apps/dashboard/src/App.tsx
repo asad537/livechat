@@ -114,11 +114,9 @@ function Sidebar() {
             {navItem(<IconEye size={17} />, 'Live Monitor')}
           </NavLink>
         )}
-        {isLeadUp && (
-          <NavLink to="/reports" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            {navItem(<IconChart size={17} />, 'Reports')}
-          </NavLink>
-        )}
+        <NavLink to="/reports" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(<IconChart size={17} />, 'Reports')}
+        </NavLink>
       </nav>
       {(me.role === 'ADMIN' || me.role === 'MANAGER') && (
         <>
@@ -262,14 +260,7 @@ export default function App() {
               </RequireRole>
             }
           />
-          <Route
-            path="/reports"
-            element={
-              <RequireRole roles={['LEAD', 'MANAGER', 'ADMIN']}>
-                <Reports />
-              </RequireRole>
-            }
-          />
+          <Route path="/reports" element={<Reports />} />
           <Route
             path="/dashboard"
             element={

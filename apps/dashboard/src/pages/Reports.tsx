@@ -90,7 +90,8 @@ function CardHead({ title, hint, right }: { title: string; hint?: string; right?
 }
 
 export default function Reports() {
-  const { websites, online } = useApp();
+  const { websites, online, me } = useApp();
+  const isCsr = me?.role === 'CSR';
   const [view, setView] = useState<'overview' | 'records'>('overview');
   const [websiteId, setWebsiteId] = useState('');
   const [range, setRange] = useState<ReportRange>('today');
@@ -228,7 +229,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {view === 'records' && <RecordsView websites={websites} />}
+      {view === 'records' && <RecordsView websites={websites} hideAgentFilter={isCsr} />}
       {view === 'overview' && (
         <>
       {error && <div className="form-error">{error}</div>}
@@ -429,7 +430,7 @@ export default function Reports() {
           <SectionLabel>Team &amp; websites</SectionLabel>
           <div className="rp-cards2 db-stretch">
             <div className="card report-card">
-              <CardHead title="Agent leaderboard" hint={RANGE_HINT[range]} />
+              <CardHead title={isCsr ? 'Your performance' : 'Agent leaderboard'} hint={RANGE_HINT[range]} />
               <div className="rp-scroll-x">
                 <table className="table lb-table">
                   <thead>
@@ -667,7 +668,13 @@ function fmtSecs(s: number | null): string {
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
-function RecordsView({ websites }: { websites: { id: string; name: string }[] }) {
+function RecordsView({
+  websites,
+  hideAgentFilter,
+}: {
+  websites: { id: string; name: string }[];
+  hideAgentFilter?: boolean;
+}) {
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 6 * 24 * 3600_000).toISOString().slice(0, 10);
   const [from, setFrom] = useState(weekAgo);
@@ -680,8 +687,9 @@ function RecordsView({ websites }: { websites: { id: string; name: string }[] })
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (hideAgentFilter) return;
     void api.users().then(setAgents).catch(() => setAgents([]));
-  }, []);
+  }, [hideAgentFilter]);
 
   const run = useCallback(() => {
     setLoading(true);
@@ -767,17 +775,19 @@ function RecordsView({ websites }: { websites: { id: string; name: string }[] })
           <span>To</span>
           <input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} />
         </label>
-        <label className="rec-field">
-          <span>Agent</span>
-          <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            <option value="">All agents</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!hideAgentFilter && (
+          <label className="rec-field">
+            <span>Agent</span>
+            <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+              <option value="">All agents</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="rec-field">
           <span>Website</span>
           <select value={websiteId} onChange={(e) => setWebsiteId(e.target.value)}>
