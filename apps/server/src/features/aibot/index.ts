@@ -64,8 +64,11 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
         'SELECT id, website_id, visitor_id, status, assigned_user_id FROM conversations WHERE id = ?',
         [conversationId],
       );
-      // Bot only speaks while the visitor is genuinely waiting in the queue.
-      if (!conv || conv.status !== 'WAITING' || conv.assigned_user_id !== null) return;
+      // Bot speaks while the visitor is still WAITING — i.e. no human has ACCEPTED
+      // the chat yet. Incoming chats get pre-assigned to a CSR (still WAITING)
+      // before that CSR accepts, so we must NOT gate on assigned_user_id here or
+      // the bot would never fire. Once the agent accepts (→ ACTIVE) the bot stops.
+      if (!conv || conv.status !== 'WAITING') return;
 
       const [website, visitor, history] = await Promise.all([
         deps.db.get<WebsiteRow>(
@@ -81,6 +84,9 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
         ),
       ]);
       if (!website) return;
+      // Respect the per-website AI toggle — only skip when explicitly disabled
+      // (NULL/undefined defaults to on).
+      if (website.ai_enabled === 0) return;
       history.reverse();
 
       // "AI is typing…" on the customer side while we generate.
@@ -110,12 +116,12 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
       }
       if (!reply) return;
 
-      // Re-check: a human may have been assigned while we were generating.
+      // Re-check: a human may have accepted (→ ACTIVE) while we were generating.
       const fresh = await deps.db.get<ConvRow>(
         'SELECT id, website_id, visitor_id, status, assigned_user_id FROM conversations WHERE id = ?',
         [conversationId],
       );
-      if (!fresh || fresh.status !== 'WAITING' || fresh.assigned_user_id !== null) return;
+      if (!fresh || fresh.status !== 'WAITING') return;
 
       await postMessage(deps, {
         conversationId,
