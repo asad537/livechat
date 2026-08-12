@@ -137,17 +137,15 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     const byId = new Map<string, Visitor>();
     for (const v of restVisitors) byId.set(v.id, v);
     for (const v of liveList) byId.set(v.id, { ...byId.get(v.id), ...v });
-    // The live stream is authoritative: for any site we have a snapshot of,
-    // a visitor NOT in that snapshot is offline — even if a stale REST row
-    // (fetched while they were still browsing) says online. This makes a
-    // leaver disappear from "Online now" ~seconds after closing the site,
-    // no reload needed.
-    const liveSites = new Set(websites.filter((w) => visitorsByWebsite[w.id]).map((w) => w.id));
+    // Online status is authoritative from the live socket stream ONLY. A REST
+    // row carries a stale `online` flag (it may have been fetched up to 24h ago
+    // while the visitor was still browsing) — never trust it. A visitor counts
+    // as online only if the live stream currently includes them. This both makes
+    // a leaver disappear seconds after closing the site AND prevents the whole
+    // stale list from flashing "online" on reload before the socket connects.
     const liveIds = new Set(liveList.map((v) => v.id));
     let list = [...byId.values()].map((v) =>
-      v.online && liveSites.has(v.websiteId) && !liveIds.has(v.id)
-        ? { ...v, online: false, activeConversation: null }
-        : v,
+      v.online && !liveIds.has(v.id) ? { ...v, online: false, activeConversation: null } : v,
     );
     const q = query.trim().toLowerCase();
     if (q) {
@@ -201,7 +199,6 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   const servedList = useMemo(() => {
     const liveById = new Map<string, Visitor>();
     for (const w of websites) for (const v of visitorsByWebsite[w.id] ?? []) liveById.set(v.id, v);
-    const liveSites = new Set(websites.filter((w) => visitorsByWebsite[w.id]).map((w) => w.id));
     let list = servedVisitors
       .map((v) => {
         const live = liveById.get(v.id);
@@ -214,8 +211,8 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
             currentPage: live.currentPage,
             activeConversation: live.activeConversation,
           };
-        // Not in the live snapshot of a watched site → they left (stale REST flag).
-        return liveSites.has(v.websiteId) ? { ...v, online: false } : v;
+        // Not in the live stream → offline (the REST online flag is stale).
+        return { ...v, online: false };
       })
       .filter((v) => v.online);
     const q = query.trim().toLowerCase();
