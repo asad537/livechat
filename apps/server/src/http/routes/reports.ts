@@ -255,22 +255,23 @@ export function buildReportsRouter(deps: AppDeps): Router {
 
       const inRange = (iso: string | null) => iso != null && (!since || iso >= since);
 
-      // Live engagement split: open chats where the CLIENT has messaged vs
-      // ones where a CSR/agent has messaged (dashboard tiles).
+      // Engagement split for the selected date range: chats where the CLIENT
+      // has messaged vs ones where a CSR/agent has messaged (dashboard tiles).
+      // Follows the range picker (today/7d/30d/all) like the other tiles.
       const [clientLiveRow, csrLiveRow] = await Promise.all([
         deps.db.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM conversations c
-            WHERE ${cSiteFilter} AND c.status IN ('WAITING','OFFERED','ACTIVE')${cAgentFilter}
+            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter}
               AND EXISTS (SELECT 1 FROM messages m
                            WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')`,
-          [...siteIds, ...agentParams],
+          [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM conversations c
-            WHERE ${cSiteFilter} AND c.status IN ('WAITING','OFFERED','ACTIVE')${cAgentFilter}
+            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter}
               AND EXISTS (SELECT 1 FROM messages m
                            WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')`,
-          [...siteIds, ...agentParams],
+          [...siteIds, ...rangeParams, ...agentParams],
         ),
       ]);
 

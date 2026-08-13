@@ -4584,7 +4584,10 @@ img.avatar {
 
 @media (min-width: 1150px) {
   .db-tiles {
-    grid-template-columns: repeat(6, 1fr);
+    /* One column per tile — no empty slot at the end of the row. */
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    grid-template-columns: none;
   }
   .db-tile-value {
     font-size: 23px;
