@@ -232,7 +232,7 @@ function scheduleOutreachClose(deps: AppDeps, conversationId: string, visitorId:
 // The client sent a message and no human replied for a few minutes → post an
 // automated "our team is busy" note and ask the widget to open the contact
 // form (email/phone) so we can follow up. Sent at most once per conversation.
-const BUSY_NOTICE_AFTER_MS = 3 * 60 * 1000;
+const BUSY_NOTICE_AFTER_MS = 5 * 60 * 1000;
 const BUSY_NOTICE_TEXT =
   'Our support team is a bit busy right now — sorry for the wait! ' +
   'Please share your email and phone number and we will get back to you as soon as possible.';
