@@ -311,6 +311,19 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       if (!dismissedRef.current) setOpen(true);
     });
 
+    // Busy fallback: the team hasn't replied, the server asks us to collect
+    // contact details — open the form only if email or phone is still missing.
+    socket.on(EV.ChatRequestInfo, () => {
+      setVisitor((v) => {
+        if (!v || !v.email || !v.phone) {
+          setInfoDismissed(false);
+          setForceInfoForm(true);
+          if (!dismissedRef.current) setOpen(true);
+        }
+        return v;
+      });
+    });
+
     // Closing the window/browser doesn't always flush the websocket close
     // frame — without this the server only notices at ping-timeout (30s+).
     // pagehide fires on close AND navigation: the beacon tells the server to
@@ -506,13 +519,23 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [dragOver, setDragOver] = useState(false);
 
   // ── Info mini-form ─────────────────────────────────────────
-  const submitInfo = (name: string, email: string) => {
-    const payload: { name?: string; email?: string } = {};
+  const submitInfo = (name: string, email: string, phone: string) => {
+    const payload: { name?: string; email?: string; phone?: string } = {};
     if (name.trim()) payload.name = name.trim();
     if (email.trim()) payload.email = email.trim();
-    if (payload.name || payload.email) {
+    if (phone.trim()) payload.phone = phone.trim();
+    if (payload.name || payload.email || payload.phone) {
       socketRef.current?.emit(EV.WidgetInfo, payload);
-      setVisitor((v) => (v ? { ...v, name: payload.name ?? v.name, email: payload.email ?? v.email } : v));
+      setVisitor((v) =>
+        v
+          ? {
+              ...v,
+              name: payload.name ?? v.name,
+              email: payload.email ?? v.email,
+              phone: payload.phone ?? v.phone,
+            }
+          : v,
+      );
     }
     lsSet(infoDismissKey, '1');
     setInfoDismissed(true);
@@ -795,6 +818,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 onDismiss={dismissInfo}
                 initialName={visitor?.name ?? ''}
                 initialEmail={visitor?.email ?? ''}
+                initialPhone={visitor?.phone ?? ''}
                 editing={forceInfoForm}
               />
             )}
@@ -913,25 +937,28 @@ function InfoForm({
   onDismiss,
   initialName = '',
   initialEmail = '',
+  initialPhone = '',
   editing = false,
 }: {
-  onSubmit: (name: string, email: string) => void;
+  onSubmit: (name: string, email: string, phone: string) => void;
   onDismiss: () => void;
   initialName?: string;
   initialEmail?: string;
+  initialPhone?: string;
   editing?: boolean;
 }): JSX.Element {
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
+  const [phone, setPhone] = useState(initialPhone);
   const submit = (e: Event) => {
     e.preventDefault();
-    onSubmit(name, email);
+    onSubmit(name, email, phone);
   };
   return (
     <form class="lc-form" onSubmit={submit}>
       <div class="lc-form-title">{editing ? 'Your contact details' : 'Introduce yourself'}</div>
       <div class="lc-form-sub">
-        {editing ? 'Update your name or email below.' : 'So we can follow up if you step away.'}
+        {editing ? 'Update your details below.' : 'So we can follow up if you step away.'}
       </div>
       <input
         class="lc-input"
@@ -947,8 +974,15 @@ function InfoForm({
         value={email}
         onInput={(e) => setEmail((e.currentTarget as HTMLInputElement).value)}
       />
+      <input
+        class="lc-input"
+        type="tel"
+        placeholder="Phone number"
+        value={phone}
+        onInput={(e) => setPhone((e.currentTarget as HTMLInputElement).value)}
+      />
       <div class="lc-form-row">
-        <button type="submit" class="lc-btn" disabled={!name.trim() && !email.trim()}>
+        <button type="submit" class="lc-btn" disabled={!name.trim() && !email.trim() && !phone.trim()}>
           Save
         </button>
         <button type="button" class="lc-btn lc-btn-ghost" onClick={onDismiss}>

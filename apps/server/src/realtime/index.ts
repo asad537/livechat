@@ -74,6 +74,8 @@ const websiteRoom = (id: string): string => `website:${id}`;
 // A chat auto-ends only after this long with NO message from EITHER side.
 const INACTIVITY_CLOSE_MS = 12 * 60 * 60 * 1000; // 12 hours
 const INACTIVITY_SWEEP_MS = 15 * 60 * 1000; // re-check every 15 minutes
+// Client's last message unanswered by any AGENT for this long → close as MISSED.
+const UNANSWERED_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 const QUEUE_MESSAGE = "You're in the queue — an agent will be with you shortly.";
 
 // Scale/abuse guards
@@ -138,6 +140,39 @@ function hostnameOf(origin: string | undefined): string | null {
 // A periodic sweep is used instead of per-chat timers so it survives restarts.
 
 async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
+  const closeAs = async (conversationId: string, status: 'MISSED' | 'CLOSED') => {
+    await deps.db.run('UPDATE conversations SET status = ?, closed_at = ? WHERE id = ?', [
+      status,
+      nowIso(),
+      conversationId,
+    ]);
+    await emitConversationStatus(deps, conversationId);
+    await emitInboxUpdate(deps, conversationId);
+  };
+
+  // Rule 1 — unanswered client: the client's last message has had no AGENT
+  // reply for an hour → the chat was missed; end it as MISSED. (BOT/SYSTEM
+  // chatter after the client's message doesn't count as an answer.)
+  const unansweredCutoff = new Date(Date.now() - UNANSWERED_CLOSE_MS).toISOString();
+  const unanswered = await deps.db.all<{ id: string }>(
+    `SELECT c.id
+       FROM conversations c
+       JOIN (SELECT conversation_id, MAX(created_at) AS last_v FROM messages
+              WHERE sender_type = 'VISITOR' GROUP BY conversation_id) v
+         ON v.conversation_id = c.id
+      WHERE c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+        AND v.last_v < ?
+        AND NOT EXISTS (
+          SELECT 1 FROM messages m
+           WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT' AND m.created_at >= v.last_v
+        )
+      LIMIT 500`,
+    [unansweredCutoff],
+  );
+  for (const conv of unanswered) await closeAs(conv.id, 'MISSED');
+
+  // Rule 2 — total silence: nothing from either side for 12 hours → close,
+  // labelled by whoever spoke last.
   const cutoff = new Date(Date.now() - INACTIVITY_CLOSE_MS).toISOString();
   const stale = await deps.db.all<{ id: string; website_id: string }>(
     `SELECT c.id, c.website_id
@@ -156,14 +191,7 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
       'SELECT sender_type FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
       [conv.id],
     );
-    const status = last?.sender_type === 'VISITOR' ? 'MISSED' : 'CLOSED';
-    await deps.db.run('UPDATE conversations SET status = ?, closed_at = ? WHERE id = ?', [
-      status,
-      nowIso(),
-      conv.id,
-    ]);
-    await emitConversationStatus(deps, conv.id);
-    await emitInboxUpdate(deps, conv.id);
+    await closeAs(conv.id, last?.sender_type === 'VISITOR' ? 'MISSED' : 'CLOSED');
   }
 }
 
@@ -195,6 +223,59 @@ function scheduleOutreachClose(deps: AppDeps, conversationId: string, visitorId:
   }, OUTREACH_CLOSE_MS);
   t.unref?.();
   outreachTimers.set(conversationId, t);
+}
+
+// ─── Busy notice (client waiting, no agent reply) ────────────────────────────
+// The client sent a message and no human replied for a few minutes → post an
+// automated "our team is busy" note and ask the widget to open the contact
+// form (email/phone) so we can follow up. Sent at most once per conversation.
+const BUSY_NOTICE_AFTER_MS = 3 * 60 * 1000;
+const BUSY_NOTICE_TEXT =
+  'Our support team is a bit busy right now — sorry for the wait! ' +
+  'Please share your email and phone number and we will get back to you as soon as possible.';
+const busyTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
+  if (busyTimers.has(conversationId)) return;
+  const t = setTimeout(() => {
+    busyTimers.delete(conversationId);
+    void (async () => {
+      const conv = await deps.db.get<ConversationRow>(
+        'SELECT * FROM conversations WHERE id = ?',
+        [conversationId],
+      );
+      if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
+      // Still unanswered? (an AGENT reply after the client's last message cancels this)
+      const lastVisitor = await deps.db.get<{ created_at: string }>(
+        "SELECT created_at FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' ORDER BY created_at DESC LIMIT 1",
+        [conversationId],
+      );
+      if (!lastVisitor) return;
+      const agentReply = await deps.db.get<{ id: string }>(
+        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' AND created_at >= ? LIMIT 1",
+        [conversationId, lastVisitor.created_at],
+      );
+      if (agentReply) return;
+      // Only once per conversation.
+      const already = await deps.db.get<{ id: string }>(
+        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'BOT' AND body = ? LIMIT 1",
+        [conversationId, BUSY_NOTICE_TEXT],
+      );
+      if (already) return;
+      await postMessage(deps, {
+        conversationId,
+        senderType: 'BOT',
+        body: BUSY_NOTICE_TEXT,
+      });
+      // Ask the visitor's widget to open the contact form (it self-checks
+      // whether email/phone are already on file).
+      deps.io.of(WIDGET_NAMESPACE).to(convRoom(conversationId)).emit(EV.ChatRequestInfo, {
+        conversationId,
+      });
+    })().catch((err: unknown) => console.error('[realtime] busy notice', err));
+  }, BUSY_NOTICE_AFTER_MS);
+  t.unref?.();
+  busyTimers.set(conversationId, t);
 }
 
 function startInactivitySweeper(deps: AppDeps): void {
@@ -689,6 +770,9 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         // AI greeter keeps queued visitors company until an agent joins
         // (it re-checks WAITING + unassigned internally, so always safe).
         maybeBotReply(deps, conv.id);
+
+        // No human reply in a few minutes → automated busy notice + contact form.
+        scheduleBusyNotice(deps, conv.id);
       }),
     );
 
@@ -837,12 +921,16 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         const p = (payload ?? {}) as Record<string, unknown>;
         const name = asString(p.name)?.trim();
         const email = asString(p.email)?.trim();
-        if (!name && !email) return;
+        const phone = asString(p.phone)?.trim().slice(0, 32);
+        if (!name && !email && !phone) return;
         if (name) {
           await deps.db.run('UPDATE visitors SET name = ? WHERE id = ?', [name, data.visitorId]);
         }
         if (email) {
           await deps.db.run('UPDATE visitors SET email = ? WHERE id = ?', [email, data.visitorId]);
+        }
+        if (phone) {
+          await deps.db.run('UPDATE visitors SET phone = ? WHERE id = ?', [phone, data.visitorId]);
         }
         await broadcastVisitors(deps, data.websiteId);
         if (data.conversationId) await emitInboxUpdate(deps, data.conversationId);
