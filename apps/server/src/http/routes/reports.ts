@@ -270,14 +270,12 @@ export function buildReportsRouter(deps: AppDeps): Router {
                            WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')`,
           [...siteIds, ...startedParams, ...agentParams],
         ),
-        // CSR chats = the subset of client chats a CSR actually handled (both a
-        // client message AND an agent message) — always <= Total chats. Pure
-        // outreach the client never answered doesn't count.
+        // CSR chats = every range-started chat a CSR sent a message in —
+        // regardless of status (open, closed or missed) and regardless of
+        // whether the client replied (proactive outreach counts too).
         deps.db.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM conversations c
             WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
-              AND EXISTS (SELECT 1 FROM messages m
-                           WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')
               AND EXISTS (SELECT 1 FROM messages m
                            WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')`,
           [...siteIds, ...startedParams, ...agentParams],
