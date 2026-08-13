@@ -18,6 +18,7 @@ import {
   myCsrIds,
   placeholders,
   toVisitor,
+  visitorNumberSql,
   type VisitorRow,
 } from '../helpers.js';
 
@@ -215,10 +216,11 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
                 (SELECT COUNT(*) FROM conversations cc WHERE cc.visitor_id = v.id) AS n_chats
            FROM visitors v
           WHERE v.website_id IN (${placeholders(scoped.length)})
-            AND (v.name LIKE ? OR v.email LIKE ? OR v.phone LIKE ? OR v.ip LIKE ?)
+            AND (v.name LIKE ? OR v.email LIKE ? OR v.phone LIKE ? OR v.ip LIKE ?
+                 OR ${visitorNumberSql('v.id')} LIKE ?)
           ORDER BY v.last_seen_at DESC
           LIMIT 20`,
-        [...scoped, like, like, like, like],
+        [...scoped, like, like, like, like, like],
       );
       res.json({
         visitors: rows.map((r) => ({

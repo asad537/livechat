@@ -33,6 +33,16 @@ export function agent(req: AuthedRequest): UserRow {
 
 // ─── Small utilities ─────────────────────────────────────────
 
+/**
+ * SQL for the anonymous visitor's display number ("Visitor 343434") — must
+ * mirror the dashboard's visitorNumber(): first 8 hex chars of the uuid,
+ * parsed base-16, mod 1e6, zero-padded to 6 digits. Lets searches match the
+ * number agents actually see on screen.
+ */
+export function visitorNumberSql(idColumn: string): string {
+  return `LPAD(CAST(CONV(SUBSTRING(REPLACE(${idColumn}, '-', ''), 1, 8), 16, 10) AS UNSIGNED) % 1000000, 6, '0')`;
+}
+
 export function placeholders(n: number): string {
   return Array.from({ length: n }, () => '?').join(', ');
 }

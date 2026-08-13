@@ -19,6 +19,7 @@ import {
   h,
   myCsrIds,
   placeholders,
+  visitorNumberSql,
 } from '../helpers.js';
 
 const STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE', 'CLOSED', 'MISSED'];
@@ -92,11 +93,11 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         }
       }
       where.push(
-        `(v.name LIKE ? OR v.email LIKE ? OR EXISTS (
+        `(v.name LIKE ? OR v.email LIKE ? OR ${visitorNumberSql('v.id')} LIKE ? OR EXISTS (
             SELECT 1 FROM messages m
              WHERE m.conversation_id = c.id AND m.body LIKE ?))`,
       );
-      params.push(like, like, like);
+      params.push(like, like, like, like);
 
       const rows = await deps.db.all<{ id: string }>(
         `SELECT c.id FROM conversations c
@@ -280,8 +281,8 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       }
       const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
       if (q.length >= 2) {
-        where.push('(v.name LIKE ? OR v.email LIKE ?)');
-        params.push(`%${q}%`, `%${q}%`);
+        where.push(`(v.name LIKE ? OR v.email LIKE ? OR ${visitorNumberSql('v.id')} LIKE ?)`);
+        params.push(`%${q}%`, `%${q}%`, `%${q}%`);
       }
 
       const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
@@ -408,8 +409,8 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       }
       const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
       if (q.length >= 2) {
-        where.push('(v.name LIKE ? OR v.email LIKE ?)');
-        params.push(`%${q}%`, `%${q}%`);
+        where.push(`(v.name LIKE ? OR v.email LIKE ? OR ${visitorNumberSql('v.id')} LIKE ?)`);
+        params.push(`%${q}%`, `%${q}%`, `%${q}%`);
       }
 
       const whereSql = `WHERE ${where.join(' AND ')}`;
