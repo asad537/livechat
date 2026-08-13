@@ -22,7 +22,6 @@ import DockedChatWindow from './components/DockedChatWindow';
 import {
   IconBriefcase,
   IconChart,
-  IconClock,
   IconEye,
   IconGlobe,
   IconHome,
@@ -105,9 +104,6 @@ function Sidebar() {
         </NavLink>
         <NavLink to="/visitors" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconUsers size={17} />, 'Visitors')}
-        </NavLink>
-        <NavLink to="/history" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-          {navItem(<IconClock size={17} />, 'Visitor History')}
         </NavLink>
         <NavLink to="/chat-history" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconMessage size={17} />, 'Chat History')}
@@ -282,7 +278,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/visitors" element={<Visitors key="live" />} />
-          <Route path="/history" element={<Visitors key="history" initialView="history" />} />
+          <Route path="/history" element={<Navigate to="/visitors" replace />} />
           <Route path="/chat-history" element={<ChatHistory />} />
           <Route path="/transfers" element={<TransferChats />} />
           <Route path="/profile" element={<Profile />} />

@@ -371,20 +371,6 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
           </p>
         </div>
         <div className="vt-head-tools">
-          <div className="range-pills">
-            <button
-              className={classNames('range-pill', view === 'live' && 'active')}
-              onClick={() => navigate('/visitors')}
-            >
-              Live
-            </button>
-            <button
-              className={classNames('range-pill', view === 'history' && 'active')}
-              onClick={() => navigate('/history')}
-            >
-              History
-            </button>
-          </div>
           <div className="vt-search-wrap">
             <IconSearch size={15} className="vt-search-icon" />
             <input
