@@ -197,8 +197,20 @@ export default function Dashboard() {
         <>
           {/* ── Tiles ── */}
           <div className="db-tiles">
-            <Tile label="Active chats" value={data.totals.active} icon={<IconMessage size={17} />} tint="#dcfce7" color="#16a34a" />
-            <Tile label="In queue" value={data.totals.waiting} icon={<IconUsers size={17} />} tint="#ffedd5" color="#ea580c" />
+            <Tile
+              label="Client chats"
+              value={data.totals.clientChats ?? 0}
+              icon={<IconMessage size={17} />}
+              tint="#dcfce7"
+              color="#16a34a"
+            />
+            <Tile
+              label="CSR chats"
+              value={data.totals.csrChats ?? 0}
+              icon={<IconUsers size={17} />}
+              tint="#ffedd5"
+              color="#ea580c"
+            />
             <Tile
               label="Closed chats"
               value={data.totals.closed}
@@ -214,18 +226,6 @@ export default function Dashboard() {
               tint="#fee2e2"
               color="#dc2626"
               delta={y ? <Delta now={data.totals.missed} before={y.missed} invert /> : undefined}
-            />
-            <Tile
-              label="Avg first response"
-              value={formatSeconds(data.avgFirstResponseSeconds)}
-              icon={<IconClock size={17} />}
-              tint="#ede9fe"
-              color="#5865f2"
-              delta={
-                data.avgFirstResponseSeconds != null && y?.frtSeconds != null ? (
-                  <Delta now={data.avgFirstResponseSeconds} before={y.frtSeconds} invert />
-                ) : undefined
-              }
             />
             <Tile
               label="Total visitors"

@@ -106,7 +106,14 @@ export interface WebsitePerfRow {
 
 export interface ReportsOverview {
   range?: string;
-  totals: { active: number; waiting: number; closed: number; missed: number };
+  totals: {
+    active: number;
+    waiting: number;
+    closed: number;
+    missed: number;
+    clientChats?: number;
+    csrChats?: number;
+  };
   avgFirstResponseSeconds: number | null;
   csat: { average: number | null; count: number };
   perAgent: AgentReportRow[];

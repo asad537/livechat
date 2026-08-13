@@ -114,7 +114,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
 
       const empty = {
         range,
-        totals: { active: 0, waiting: 0, closed: 0, missed: 0 },
+        totals: { active: 0, waiting: 0, closed: 0, missed: 0, clientChats: 0, csrChats: 0 },
         avgFirstResponseSeconds: null,
         csat: { average: null, count: 0 },
         perAgent: agents.map((a) => ({
@@ -255,6 +255,25 @@ export function buildReportsRouter(deps: AppDeps): Router {
 
       const inRange = (iso: string | null) => iso != null && (!since || iso >= since);
 
+      // Live engagement split: open chats where the CLIENT has messaged vs
+      // ones where a CSR/agent has messaged (dashboard tiles).
+      const [clientLiveRow, csrLiveRow] = await Promise.all([
+        deps.db.get<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM conversations c
+            WHERE ${cSiteFilter} AND c.status IN ('WAITING','OFFERED','ACTIVE')${cAgentFilter}
+              AND EXISTS (SELECT 1 FROM messages m
+                           WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')`,
+          [...siteIds, ...agentParams],
+        ),
+        deps.db.get<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM conversations c
+            WHERE ${cSiteFilter} AND c.status IN ('WAITING','OFFERED','ACTIVE')${cAgentFilter}
+              AND EXISTS (SELECT 1 FROM messages m
+                           WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')`,
+          [...siteIds, ...agentParams],
+        ),
+      ]);
+
       // ── Totals + open pipeline ──
       let activeNow = 0;
       let waitingNow = 0;
@@ -276,6 +295,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
         waiting: waitingNow,
         closed: closedRows.length,
         missed: missedCount,
+        clientChats: Number(clientLiveRow?.n ?? 0),
+        csrChats: Number(csrLiveRow?.n ?? 0),
       };
 
       // ── First response + CSAT ──
