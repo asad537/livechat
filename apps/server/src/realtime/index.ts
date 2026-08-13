@@ -633,6 +633,31 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       }),
     );
 
+    // ── Tab idle/active (presence only — the socket stays connected) ──
+    socket.on(
+      EV.WidgetActivity,
+      safe(socket, async (payload: unknown) => {
+        const p = (payload ?? {}) as Record<string, unknown>;
+        const active = p.active === true;
+        const { changed, idleMs } = deps.presence.setVisitorSocketIdle(
+          data.websiteId,
+          data.visitorId,
+          socket.id,
+          !active,
+        );
+        if (!changed) return;
+        // Coming back from a long idle (30+ min) starts a fresh on-site session
+        // so the timer doesn't read "20 hours" after an overnight background tab.
+        if (active && idleMs > 30 * 60 * 1000) {
+          await deps.db.run('UPDATE visitors SET session_started_at = ? WHERE id = ?', [
+            nowIso(),
+            data.visitorId,
+          ]);
+        }
+        await broadcastVisitors(deps, data.websiteId);
+      }),
+    );
+
     // ── Visitor ends the chat ──
     socket.on(
       EV.WidgetEndChat,

@@ -24,6 +24,21 @@ export interface PresenceStore {
   onlineVisitors(websiteId: string): VisitorPresence[];
   /** Fired when a visitor REALLY goes offline (after the reconnect grace). */
   setVisitorOfflineListener(cb: (websiteId: string, visitorId: string) => void): void;
+
+  /**
+   * Idle tracking: a tab reports itself idle (backgrounded / no activity) or
+   * active again. A visitor is idle when EVERY connected tab is idle — they
+   * stay connected (messages still arrive) but drop out of "Online now".
+   * Returns { changed, idleMs }: changed = the visitor's overall idle state
+   * flipped; idleMs = how long they had been idle (on the idle→active flip).
+   */
+  setVisitorSocketIdle(
+    websiteId: string,
+    visitorId: string,
+    socketId: string,
+    idle: boolean,
+  ): { changed: boolean; idleMs: number };
+  isVisitorIdle(visitorId: string): boolean;
 }
 
 // Page reloads / navigation close the widget socket for a moment — keep the
@@ -37,7 +52,16 @@ export function createPresence(): PresenceStore {
   const away = new Set<string>(); // userIds who set themselves Away
   const visitors = new Map<
     string,
-    Map<string, { sockets: Set<string>; page: string | null; linger: NodeJS.Timeout | null }>
+    Map<
+      string,
+      {
+        sockets: Set<string>;
+        idleSockets: Set<string>;
+        idleSince: number | null;
+        page: string | null;
+        linger: NodeJS.Timeout | null;
+      }
+    >
   >();
   const visitorIndex = new Map<string, string>(); // visitorId → websiteId
   let offlineListener: ((websiteId: string, visitorId: string) => void) | null = null;
@@ -80,7 +104,17 @@ export function createPresence(): PresenceStore {
     addVisitor(websiteId, visitorId, socketId, page = null) {
       const site = visitors.get(websiteId) ?? new Map();
       const entry =
-        site.get(visitorId) ?? { sockets: new Set<string>(), page: null, linger: null };
+        site.get(visitorId) ??
+        {
+          sockets: new Set<string>(),
+          idleSockets: new Set<string>(),
+          idleSince: null,
+          page: null,
+          linger: null,
+        };
+      // A fresh tab is active by definition → the visitor is no longer idle.
+      entry.idleSockets.delete(socketId);
+      entry.idleSince = null;
       // Reconnected within the grace window → still the same online session,
       // so this does NOT count as "came online" (no duplicate knock sounds).
       const wasLingering = entry.linger !== null;
@@ -101,6 +135,7 @@ export function createPresence(): PresenceStore {
       const entry = site?.get(visitorId);
       if (!site || !entry) return false;
       entry.sockets.delete(socketId);
+      entry.idleSockets.delete(socketId);
       if (entry.sockets.size === 0 && !entry.linger) {
         // Last socket gone — keep them online for the grace period; a page
         // reload/navigation reconnects long before it expires.
@@ -128,10 +163,38 @@ export function createPresence(): PresenceStore {
     onlineVisitors(websiteId) {
       const site = visitors.get(websiteId);
       if (!site) return [];
-      return [...site.entries()].map(([visitorId, e]) => ({ visitorId, page: e.page }));
+      // Idle visitors (every tab idle) are hidden from the live list — they're
+      // still connected (chat keeps working) but not "online now".
+      return [...site.entries()]
+        .filter(([, e]) => e.idleSince === null)
+        .map(([visitorId, e]) => ({ visitorId, page: e.page }));
     },
     setVisitorOfflineListener(cb) {
       offlineListener = cb;
+    },
+
+    setVisitorSocketIdle(websiteId, visitorId, socketId, idle) {
+      const entry = visitors.get(websiteId)?.get(visitorId);
+      if (!entry || !entry.sockets.has(socketId)) return { changed: false, idleMs: 0 };
+      const wasIdle = entry.idleSince !== null;
+      if (idle) entry.idleSockets.add(socketId);
+      else entry.idleSockets.delete(socketId);
+      const nowIdle = entry.sockets.size > 0 && entry.idleSockets.size >= entry.sockets.size;
+      if (nowIdle && !wasIdle) {
+        entry.idleSince = Date.now();
+        return { changed: true, idleMs: 0 };
+      }
+      if (!nowIdle && wasIdle) {
+        const idleMs = Date.now() - (entry.idleSince ?? Date.now());
+        entry.idleSince = null;
+        return { changed: true, idleMs };
+      }
+      return { changed: false, idleMs: 0 };
+    },
+    isVisitorIdle(visitorId) {
+      const websiteId = visitorIndex.get(visitorId);
+      if (!websiteId) return false;
+      return (visitors.get(websiteId)?.get(visitorId)?.idleSince ?? null) !== null;
     },
   };
 }

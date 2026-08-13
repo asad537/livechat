@@ -329,8 +329,55 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     };
     window.addEventListener('pagehide', onPageHide);
 
+    // ── Idle detection (Zendesk-style) ──
+    // Backgrounded tab (2 min) or no mouse/key/scroll/touch for 15 min →
+    // report idle: the socket stays connected (messages still arrive) but the
+    // visitor drops out of the agents' "Online now" list. Any activity or
+    // refocusing the tab flips them back to online instantly — no reload.
+    const IDLE_AFTER_MS = 15 * 60 * 1000;
+    const HIDDEN_AFTER_MS = 2 * 60 * 1000;
+    let lastActivity = Date.now();
+    let reportedActive = true;
+    let hiddenTimer: number | null = null;
+    const report = (active: boolean) => {
+      if (reportedActive === active) return;
+      reportedActive = active;
+      socket.emit(EV.WidgetActivity, { active });
+    };
+    const onActivity = () => {
+      lastActivity = Date.now();
+      if (!document.hidden) report(true);
+    };
+    const onVisibility = () => {
+      if (hiddenTimer != null) {
+        clearTimeout(hiddenTimer);
+        hiddenTimer = null;
+      }
+      if (document.hidden) {
+        hiddenTimer = window.setTimeout(() => report(false), HIDDEN_AFTER_MS);
+      } else {
+        lastActivity = Date.now();
+        report(true);
+      }
+    };
+    const idleCheck = window.setInterval(() => {
+      if (!document.hidden && Date.now() - lastActivity > IDLE_AFTER_MS) report(false);
+    }, 60_000);
+    const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart'] as const;
+    for (const ev of activityEvents) window.addEventListener(ev, onActivity, { passive: true });
+    document.addEventListener('visibilitychange', onVisibility);
+    // A reconnect resets server-side state to active — mirror it locally.
+    socket.on('connect', () => {
+      reportedActive = true;
+      lastActivity = Date.now();
+    });
+
     return () => {
       window.removeEventListener('pagehide', onPageHide);
+      for (const ev of activityEvents) window.removeEventListener(ev, onActivity);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(idleCheck);
+      if (hiddenTimer != null) clearTimeout(hiddenTimer);
       callRef.current?.session.leave(false);
       socket.removeAllListeners();
       socket.disconnect();

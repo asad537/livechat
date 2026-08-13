@@ -170,6 +170,7 @@ export const EV = {
   WidgetInfo: 'widget:info',                 // { name?: string, email?: string }
   WidgetCallAccept: 'widget:call:accept',    // { callId: string }
   WidgetCallDecline: 'widget:call:decline',  // { callId: string }
+  WidgetActivity: 'widget:activity',         // { active: boolean } — tab idle/active (presence only)
   WidgetEndChat: 'widget:end-chat',          // {} — visitor closes the conversation
   WidgetEmailTranscript: 'widget:email-transcript', // {} → ack {ok} | {error} — email me this chat
   WidgetRate: 'widget:rate',                 // { rating: 1-5, comment?: string } — CSAT after close
