@@ -94,7 +94,7 @@ function Sidebar() {
       <nav className="sidebar-nav">
         {isDashboardRole && (
           <NavLink to="/dashboard" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            {navItem(<IconHome size={17} />, 'Dashboard')}
+            {navItem(<IconHome size={17} />, 'Performance')}
           </NavLink>
         )}
         <NavLink to="/" end className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
