@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard';
 import ChatHistory from './pages/ChatHistory';
 import TransferChats from './pages/TransferChats';
 import BlockList from './pages/BlockList';
+import Queries from './pages/Queries';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
@@ -30,6 +31,7 @@ import {
   IconMessage,
   IconPlug,
   IconTransfer,
+  IconUser,
   IconUsers,
   IconWorkflow,
   LogoMark,
@@ -111,6 +113,11 @@ function Sidebar() {
         <NavLink to="/transfers" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconTransfer size={17} />, 'Transfer Chats')}
         </NavLink>
+        {(me.role === 'ADMIN' || me.role === 'MANAGER') && (
+          <NavLink to="/queries" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+            {navItem(<IconUser size={17} />, 'Queries')}
+          </NavLink>
+        )}
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
             {navItem(<IconEye size={17} />, 'Live Monitor')}
@@ -281,6 +288,14 @@ export default function App() {
           <Route path="/history" element={<Navigate to="/visitors" replace />} />
           <Route path="/chat-history" element={<ChatHistory />} />
           <Route path="/transfers" element={<TransferChats />} />
+          <Route
+            path="/queries"
+            element={
+              <RequireRole roles={['ADMIN', 'MANAGER']}>
+                <Queries />
+              </RequireRole>
+            }
+          />
           <Route path="/profile" element={<Profile />} />
           <Route
             path="/monitoring"

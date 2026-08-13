@@ -290,10 +290,12 @@ export const api = {
     q?: string;
     from?: string;
     to?: string;
+    contact?: boolean; // Queries view: visitor shared name/email (ADMIN/MANAGER)
   }) => {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(opts)) {
-      if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+      if (v === undefined || v === null || v === '') continue;
+      params.set(k, v === true ? '1' : String(v));
     }
     return request<{ chats: ChatHistoryRow[]; total: number; page: number; pages: number }>(
       `/api/chats/history?${params.toString()}`,
