@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../state';
-import { classNames, initials } from '../util';
+import { classNames, initials, visitorNumber } from '../util';
 import { IconX } from '../icons';
 
 /** Zendesk-style bottom dock: every opened chat gets a tab you can switch to from any page. */
@@ -22,7 +22,7 @@ export default function ChatDock() {
   return (
     <div className="chat-dock">
       {tabs.map((c) => {
-        const name = c.visitor?.name || `Visitor ${c.visitorId.slice(0, 6)}`;
+        const name = c.visitor?.name || `Visitor ${visitorNumber(c.visitorId)}`;
         const unread = c.unreadCount ?? 0;
         const closed = c.status === 'CLOSED' || c.status === 'MISSED';
         return (

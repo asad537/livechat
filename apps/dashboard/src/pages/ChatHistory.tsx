@@ -5,7 +5,7 @@ import { api, type ChatHistoryRow } from '../api';
 import { useApp } from '../state';
 import { StatusPill } from '../components/ConversationList';
 import { IconClock, IconSearch, IconStar, IconUsers } from '../icons';
-import { classNames, formatSeconds, formatWhen, initials, siteLabel } from '../util';
+import { classNames, formatSeconds, formatWhen, initials, siteLabel, visitorNumber } from '../util';
 
 function pageNumbers(total: number, current: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i);
@@ -184,7 +184,7 @@ export default function ChatHistory() {
                         {initials(c.visitor || 'V')}
                       </span>
                       <div className="vt-who-meta">
-                        <span className="vt-name">{c.visitor || `Visitor ${c.visitorId.slice(0, 6)}`}</span>
+                        <span className="vt-name">{c.visitor || `Visitor ${visitorNumber(c.visitorId)}`}</span>
                         {c.visitorEmail && <span className="vt-sub">{c.visitorEmail}</span>}
                       </div>
                     </div>

@@ -17,6 +17,7 @@ import {
   pageLabel,
   referrerLabel,
   uaParse,
+  visitorNumber,
 } from '../util';
 import { IconClock, IconDownload, IconEye, IconGlobe, IconMessage, IconSend, IconX } from '../icons';
 
@@ -130,7 +131,7 @@ export default function VisitorDrawer({
     return { ...profile.visitor, ...(live ?? {}), notes: profile.visitor.notes };
   }, [profile, live]);
 
-  const name = v?.name || (v ? `Visitor ${v.id.slice(0, 6)}` : 'Visitor');
+  const name = v?.name || (v ? `Visitor ${visitorNumber(v.id)}` : 'Visitor');
   const ua = uaParse(v?.userAgent);
 
   const save = async () => {

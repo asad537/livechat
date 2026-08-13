@@ -9,7 +9,7 @@ import { EV } from '@livechat/shared';
 import { useApp } from '../state';
 import { getSocket } from '../socket';
 import { uploadFile } from '../api';
-import { classNames, formatDay, formatTime, initials, newTempId, siteLabel } from '../util';
+import { classNames, formatDay, formatTime, initials, newTempId, siteLabel, visitorNumber } from '../util';
 import MessageBubble from './MessageBubble';
 import HistoryTimeline from './HistoryTimeline';
 import TransferModal from './TransferModal';
@@ -320,7 +320,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     );
   }
 
-  const visitorName = conversation?.visitor?.name || `Visitor ${conversation?.visitorId.slice(0, 6) ?? ''}`;
+  const visitorName = conversation?.visitor?.name || `Visitor ${visitorNumber(conversation?.visitorId)}`;
   const showAccept =
     !!conversation &&
     conversation.status === 'WAITING' &&

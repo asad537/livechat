@@ -16,6 +16,7 @@ import {
   referrerLabel,
   siteLabel,
   uaParse,
+  visitorNumber,
 } from '../util';
 import VisitorDrawer from '../components/VisitorDrawer';
 import {
@@ -256,7 +257,7 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   };
 
   const row = (v: Visitor, served = false) => {
-    const name = v.name || `Visitor ${v.id.slice(0, 6)}`;
+    const name = v.name || `Visitor ${visitorNumber(v.id)}`;
     const ua = uaParse(v.userAgent);
     const site = siteById.get(v.websiteId);
     return (
@@ -550,7 +551,7 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
               <div>
                 <div className="modal-row-name">
                   {flagEmoji(startTarget.countryCode)}{' '}
-                  {startTarget.name || `Visitor ${startTarget.id.slice(0, 6)}`}
+                  {startTarget.name || `Visitor ${visitorNumber(startTarget.id)}`}
                 </div>
                 <div className="modal-row-sub">
                   {startTarget.email || 'No email'}

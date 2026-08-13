@@ -4,7 +4,7 @@ import { api, type TransferRow } from '../api';
 import { useApp } from '../state';
 import { StatusPill } from '../components/ConversationList';
 import { IconSearch, IconTransfer, IconUsers } from '../icons';
-import { classNames, formatWhen, initials, siteLabel } from '../util';
+import { classNames, formatWhen, initials, siteLabel, visitorNumber } from '../util';
 
 function pageNumbers(total: number, current: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i);
@@ -144,7 +144,7 @@ export default function TransferChats() {
                         {initials(r.visitor || 'V')}
                       </span>
                       <div className="vt-who-meta">
-                        <span className="vt-name">{r.visitor || `Visitor ${r.visitorId.slice(0, 6)}`}</span>
+                        <span className="vt-name">{r.visitor || `Visitor ${visitorNumber(r.visitorId)}`}</span>
                         {r.visitorEmail && <span className="vt-sub">{r.visitorEmail}</span>}
                       </div>
                     </div>

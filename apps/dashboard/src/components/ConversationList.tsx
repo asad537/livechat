@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ConversationStatus, ConversationSummary } from '@livechat/shared';
 import { useApp } from '../state';
 import { api } from '../api';
-import { classNames, formatWhen, initials, siteLabel } from '../util';
+import { classNames, formatWhen, initials, siteLabel, visitorNumber } from '../util';
 
 interface Props {
   selectedId: string | null;
@@ -155,7 +155,7 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
           </div>
         )}
         {displayItems.map((c) => {
-          const name = c.visitor?.name || `Visitor ${c.visitorId.slice(0, 6)}`;
+          const name = c.visitor?.name || `Visitor ${visitorNumber(c.visitorId)}`;
           const unread = c.unreadCount ?? 0;
           return (
             <button

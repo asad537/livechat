@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Visitor } from '@livechat/shared';
-import { classNames, formatWhen, initials } from '../util';
+import { classNames, formatWhen, initials, visitorNumber } from '../util';
 import { IconMessage } from '../icons';
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function VisitorCard({ visitor, accentColor, onStartChat }: Props) {
-  const name = visitor.name || `Visitor ${visitor.id.slice(0, 6)}`;
+  const name = visitor.name || `Visitor ${visitorNumber(visitor.id)}`;
   return (
     <div className="visitor-card card">
       <div className="visitor-card-top">

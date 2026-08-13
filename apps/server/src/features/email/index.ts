@@ -80,6 +80,14 @@ export interface TranscriptData {
 }
 
 /** Pure HTML renderer (exported for previews/tests). Email-client-safe: tables + inline styles. */
+
+/** Digits-only anonymous visitor label (matches the dashboard's numbering). */
+function visitorNumber(id: string): string {
+  const hex = id.replace(/[^0-9a-f]/gi, '').slice(0, 8);
+  if (!hex) return '';
+  return String(parseInt(hex, 16) % 1_000_000).padStart(6, '0');
+}
+
 export function renderTranscriptHtml(d: TranscriptData): string {
   const rows = d.lines
     .map((l) => {
@@ -175,7 +183,7 @@ async function buildTranscriptData(
   ]);
   if (!website || !visitor?.email) return null;
 
-  const visitorLabel = visitor.name || `Visitor ${conv.visitor_id.slice(0, 6)}`;
+  const visitorLabel = visitor.name || `Visitor ${visitorNumber(conv.visitor_id)}`;
 
   const lines: TranscriptData['lines'] = [
     {

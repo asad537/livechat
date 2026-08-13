@@ -205,3 +205,11 @@ export function siteLabel(w: { label?: string | null; name?: string | null } | n
   return (w?.label?.trim() || w?.name || '') as string;
 }
 
+
+/** Stable digits-only label for anonymous visitors — "Visitor 428913".
+    Derived from the visitor id so the same visitor always gets the same number. */
+export function visitorNumber(id: string | null | undefined): string {
+  const hex = (id ?? '').replace(/[^0-9a-f]/gi, '').slice(0, 8);
+  if (!hex) return '';
+  return String(parseInt(hex, 16) % 1_000_000).padStart(6, '0');
+}

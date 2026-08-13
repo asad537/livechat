@@ -3,7 +3,7 @@ import type { ConversationStatus } from '@livechat/shared';
 import { useApp } from '../state';
 import ChatPane from '../components/ChatPane';
 import { StatusPill } from '../components/ConversationList';
-import { classNames, formatWhen, initials, siteLabel } from '../util';
+import { classNames, formatWhen, initials, siteLabel, visitorNumber } from '../util';
 import { IconEye } from '../icons';
 
 // Live Monitor shows only conversations happening right now.
@@ -99,7 +99,7 @@ export default function Monitoring() {
         <div className="monitoring-list">
           {items.length === 0 && <div className="empty-hint">No live chats right now.</div>}
           {items.map((c) => {
-            const name = c.visitor?.name || `Visitor ${c.visitorId.slice(0, 6)}`;
+            const name = c.visitor?.name || `Visitor ${visitorNumber(c.visitorId)}`;
             return (
               <button
                 key={c.id}

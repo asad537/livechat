@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../state';
-import { initials } from '../util';
+import { initials, visitorNumber } from '../util';
 import { IconExpand, IconX } from '../icons';
 import ChatPane from './ChatPane';
 
@@ -15,7 +15,7 @@ export default function DockedChatWindow() {
   if (!dockedChatId) return null;
 
   const conv = conversations[dockedChatId];
-  const name = conv?.visitor?.name || `Visitor ${conv?.visitorId.slice(0, 6) ?? ''}`;
+  const name = conv?.visitor?.name || `Visitor ${visitorNumber(conv?.visitorId)}`;
 
   return (
     <div className="docked-chat">
