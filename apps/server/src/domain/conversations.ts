@@ -135,7 +135,8 @@ export async function loadSummaries(
   const convIds = convs.map((c) => c.id);
   const cPh = placeholders(convIds.length);
 
-  const [visitorRows, websiteRows, userRows, lastMsgRows, unreadRows] = await Promise.all([
+  const [visitorRows, websiteRows, userRows, lastMsgRows, unreadRows, visitorSpokeRows] =
+    await Promise.all([
     deps.db.all<VisitorRow>(
       `SELECT * FROM visitors WHERE id IN (${placeholders(visitorIds.length)})`,
       visitorIds,
@@ -164,12 +165,19 @@ export async function loadSummaries(
         GROUP BY conversation_id`,
       convIds,
     ),
+    // Which conversations the visitor has actually spoken in (any message).
+    deps.db.all<{ conversation_id: string }>(
+      `SELECT DISTINCT conversation_id FROM messages
+        WHERE conversation_id IN (${cPh}) AND sender_type = 'VISITOR'`,
+      convIds,
+    ),
   ]);
 
   const visitors = new Map(visitorRows.map((r) => [r.id, r]));
   const websites = new Map(websiteRows.map((r) => [r.id, r]));
   const users = new Map(userRows.map((r) => [r.id, r]));
   const unread = new Map(unreadRows.map((r) => [r.conversation_id, Number(r.n)]));
+  const visitorSpoke = new Set(visitorSpokeRows.map((r) => r.conversation_id));
   const lastByConv = new Map<string, MessageRow>();
   for (const m of lastMsgRows) {
     const prev = lastByConv.get(m.conversation_id);
@@ -203,6 +211,7 @@ export async function loadSummaries(
       assignedUser: assignedRow ? toUserPublic(assignedRow) : null,
       lastMessage: lastHydrated.get(conv.id) ?? null,
       unreadCount: unread.get(conv.id) ?? 0,
+      hasVisitorMessage: visitorSpoke.has(conv.id),
     });
   }
   return summaries;

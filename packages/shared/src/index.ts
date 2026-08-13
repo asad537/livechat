@@ -143,6 +143,7 @@ export interface ConversationSummary {
   assignedUser?: UserPublic | null;
   lastMessage?: ChatMessage | null;
   unreadCount?: number;
+  hasVisitorMessage?: boolean; // the visitor has sent at least one message
 }
 
 export interface AssignmentRecord {

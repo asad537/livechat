@@ -48,6 +48,9 @@ export default function Monitoring() {
     return Object.values(conversations)
       .filter((c) => LIVE_STATUSES.includes(c.status)) // live statuses only
       .filter((c) => now - lastActivity(c) <= LIVE_WINDOW_MS) // active recently
+      // Only real two-way chats: the client must have replied at least once.
+      // Agent-only outreach the visitor hasn't answered stays out of the monitor.
+      .filter((c) => c.hasVisitorMessage !== false)
       .filter((c) => (websiteFilter ? c.websiteId === websiteFilter : true))
       .filter((c) => (agentFilter ? c.assignedUserId === agentFilter : true))
       .filter((c) => (statusFilter ? c.status === statusFilter : true))
