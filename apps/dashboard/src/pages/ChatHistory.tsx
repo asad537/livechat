@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { ConversationStatus, UserPublic } from '@livechat/shared';
 import { api, type ChatHistoryRow } from '../api';
 import { useApp } from '../state';
@@ -21,6 +22,10 @@ function pageNumbers(total: number, current: number): (number | '…')[] {
 
 export default function ChatHistory() {
   const { me, websites, openDockedChat } = useApp();
+  // Arriving from the Dashboard's agent-performance table pre-filters that
+  // agent's chats (any status).
+  const location = useLocation();
+  const presetAgentId = (location.state as { agentId?: string } | null)?.agentId ?? '';
   const [rows, setRows] = useState<ChatHistoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -29,8 +34,8 @@ export default function ChatHistory() {
 
   const [q, setQ] = useState('');
   const [websiteId, setWebsiteId] = useState('');
-  const [agentId, setAgentId] = useState('');
-  const [status, setStatus] = useState('');
+  const [agentId, setAgentId] = useState(presetAgentId);
+  const [status, setStatus] = useState(presetAgentId ? 'ALL' : '');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [agents, setAgents] = useState<UserPublic[]>([]);

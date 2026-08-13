@@ -389,7 +389,12 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {perAgent.map((row) => (
-                      <tr key={row.user.id}>
+                      <tr
+                        key={row.user.id}
+                        className="ch-row"
+                        title={`Open ${row.user.name}'s chats`}
+                        onClick={() => navigate('/chat-history', { state: { agentId: row.user.id } })}
+                      >
                         <td>
                           <span className="cell-user">
                             <Avatar name={row.user.name} color={row.user.avatarColor} url={row.user.avatarUrl} size="sm" />
