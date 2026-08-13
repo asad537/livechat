@@ -33,6 +33,8 @@ export function isPrivateIp(ip: string): boolean {
  */
 export async function lookupCountry(ip: string): Promise<string | null> {
   if (isPrivateIp(ip)) return null;
+  const cached = ipGeoCache.get(ip);
+  if (cached) return cached.cc?.toUpperCase() ?? null;
   try {
     const res = await fetch(
       `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,countryCode`,
@@ -48,6 +50,45 @@ export async function lookupCountry(ip: string): Promise<string | null> {
 }
 
 const inFlight = new Set<string>();
+
+// ip-api.com's free tier allows ~45 lookups/minute — cache per IP so repeat
+// visitors (and multi-tab loads) never spend a lookup, and retry a couple of
+// times when the API throttles so the flag still lands moments later.
+interface GeoResult {
+  country: string | null;
+  city: string | null;
+  cc: string | null;
+}
+const ipGeoCache = new Map<string, GeoResult>();
+const IP_CACHE_MAX = 5000;
+
+async function fetchGeo(ip: string): Promise<GeoResult | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 2000 * attempt));
+    try {
+      const res = await fetch(
+        `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,countryCode,city`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      if (!res.ok) continue; // throttled (429) or transient — retry
+      const data = (await res.json()) as {
+        status?: string;
+        country?: string;
+        countryCode?: string;
+        city?: string;
+      };
+      if (data.status !== 'success') return null; // invalid IP — retrying won't help
+      return {
+        country: (data.country ?? '').slice(0, 64) || null,
+        city: (data.city ?? '').slice(0, 64) || null,
+        cc: (data.countryCode ?? '').slice(0, 4) || null,
+      };
+    } catch {
+      /* timeout/network — retry */
+    }
+  }
+  return null;
+}
 
 /** Store the visitor's IP; look up country/city when new (fire-and-forget). */
 export function updateVisitorGeo(deps: AppDeps, visitorId: string, ip: string | null): void {
@@ -69,26 +110,22 @@ export function updateVisitorGeo(deps: AppDeps, visitorId: string, ip: string | 
 
       inFlight.add(visitorId);
       try {
-        const res = await fetch(
-          `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,countryCode,city`,
-          { signal: AbortSignal.timeout(5000) },
-        );
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          status?: string;
-          country?: string;
-          countryCode?: string;
-          city?: string;
-        };
-        if (data.status !== 'success') return;
+        // Same IP seen before? No API call at all — instant flag.
+        let geo = ipGeoCache.get(ip) ?? null;
+        if (!geo) {
+          geo = await fetchGeo(ip);
+          if (geo) {
+            if (ipGeoCache.size >= IP_CACHE_MAX) {
+              const first = ipGeoCache.keys().next().value;
+              if (first) ipGeoCache.delete(first);
+            }
+            ipGeoCache.set(ip, geo);
+          }
+        }
+        if (!geo) return;
         await deps.db.run(
           'UPDATE visitors SET geo_country = ?, geo_city = ?, geo_cc = ? WHERE id = ?',
-          [
-            (data.country ?? '').slice(0, 64) || null,
-            (data.city ?? '').slice(0, 64) || null,
-            (data.countryCode ?? '').slice(0, 4) || null,
-            visitorId,
-          ],
+          [geo.country, geo.city, geo.cc, visitorId],
         );
         // Country just resolved — push the visitor list again so the agent sees
         // the flag right away instead of a globe until the next broadcast.
