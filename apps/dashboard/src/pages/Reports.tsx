@@ -180,7 +180,7 @@ export default function Reports() {
     <div className="page rp-page">
       <div className="page-head">
         <div>
-          <h2>Reports</h2>
+          <h2>Performance</h2>
           <p className="page-sub">
             {view === 'overview' ? `Team performance — ${RANGE_HINT[range]}.` : 'Filter and export raw chat records.'}
           </p>

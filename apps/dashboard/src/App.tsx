@@ -94,7 +94,7 @@ function Sidebar() {
       <nav className="sidebar-nav">
         {isDashboardRole && (
           <NavLink to="/dashboard" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            {navItem(<IconHome size={17} />, 'Performance')}
+            {navItem(<IconHome size={17} />, 'Dashboard')}
           </NavLink>
         )}
         <NavLink to="/" end className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
@@ -124,7 +124,7 @@ function Sidebar() {
           </NavLink>
         )}
         <NavLink to="/reports" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-          {navItem(<IconChart size={17} />, 'Reports')}
+          {navItem(<IconChart size={17} />, 'Performance')}
         </NavLink>
       </nav>
       {(me.role === 'ADMIN' || me.role === 'MANAGER') && (

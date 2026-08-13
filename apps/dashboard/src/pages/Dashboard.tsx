@@ -158,7 +158,7 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-head">
         <div>
-          <h2>Performance</h2>
+          <h2>Dashboard</h2>
           <p className="page-sub">
             Salaam {me?.name?.split(' ')[0]} — overview of your live chat performance.
           </p>
