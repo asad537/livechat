@@ -6516,6 +6516,30 @@ tr:hover .vt-open-hint {
   object-fit: cover;
   display: block;
 }
+/* ── Master search ── */
+.ms-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.ms-box svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.ms-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: inherit;
+}
+.ms-box input:focus {
+  outline: none;
+}
+
 /* Visitors — collapsible section headers + served Assigned cell */
 .vt-group-toggle {
   cursor: pointer;

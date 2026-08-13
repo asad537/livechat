@@ -364,6 +364,13 @@ export const api = {
     ),
 
   // Visitors an agent has actually messaged (role-scoped), most recent first.
+  searchVisitors: async (q: string): Promise<Visitor[]> =>
+    (
+      await request<{ visitors: Visitor[] }>(
+        `/api/visitors/search?q=${encodeURIComponent(q)}`,
+      )
+    ).visitors,
+
   servedVisitors: async (limit = 10): Promise<Visitor[]> =>
     (await request<{ visitors: Visitor[] }>(`/api/visitors/served?limit=${limit}`)).visitors ?? [],
 

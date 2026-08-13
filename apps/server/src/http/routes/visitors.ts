@@ -191,6 +191,45 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     }),
   );
 
+  // GET /api/visitors/search?q= — master search over visitors by name, email,
+  // phone or IP across the user's accessible websites (online or not).
+  // Registered before /:id so "search" isn't taken as an id.
+  router.get(
+    '/api/visitors/search',
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
+      if (q.length < 2) {
+        res.json({ visitors: [] });
+        return;
+      }
+      const scoped = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
+      if (scoped.length === 0) {
+        res.json({ visitors: [] });
+        return;
+      }
+      const like = `%${q}%`;
+      const rows = await deps.db.all<VisitorRow & { n_chats: number }>(
+        `SELECT v.*,
+                (SELECT COUNT(*) FROM conversations cc WHERE cc.visitor_id = v.id) AS n_chats
+           FROM visitors v
+          WHERE v.website_id IN (${placeholders(scoped.length)})
+            AND (v.name LIKE ? OR v.email LIKE ? OR v.phone LIKE ? OR v.ip LIKE ?)
+          ORDER BY v.last_seen_at DESC
+          LIMIT 20`,
+        [...scoped, like, like, like, like],
+      );
+      res.json({
+        visitors: rows.map((r) => ({
+          ...toVisitor(r),
+          online: deps.presence.isVisitorOnline(r.id),
+          chats: Number(r.n_chats),
+        })),
+      });
+    }),
+  );
+
   // GET /api/visitors/:id — profile, session path, stats
   router.get(
     '/api/visitors/:id',

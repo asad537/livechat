@@ -15,6 +15,7 @@ import ChatHistory from './pages/ChatHistory';
 import TransferChats from './pages/TransferChats';
 import BlockList from './pages/BlockList';
 import Queries from './pages/Queries';
+import Search from './pages/Search';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
@@ -30,6 +31,7 @@ import {
   IconLogout,
   IconMessage,
   IconPlug,
+  IconSearch,
   IconTransfer,
   IconUser,
   IconUsers,
@@ -92,6 +94,9 @@ function Sidebar() {
       </div>
       <div className="nav-section-label">Workspace</div>
       <nav className="sidebar-nav">
+        <NavLink to="/search" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(<IconSearch size={17} />, 'Search')}
+        </NavLink>
         {isDashboardRole && (
           <NavLink to="/dashboard" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
             {navItem(<IconHome size={17} />, 'Dashboard')}
@@ -288,6 +293,7 @@ export default function App() {
           <Route path="/history" element={<Navigate to="/visitors" replace />} />
           <Route path="/chat-history" element={<ChatHistory />} />
           <Route path="/transfers" element={<TransferChats />} />
+          <Route path="/search" element={<Search />} />
           <Route
             path="/queries"
             element={
