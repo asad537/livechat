@@ -197,9 +197,11 @@ export default function Dashboard() {
         <>
           {/* ── Tiles ── */}
           <div className="db-tiles">
+            {/* Total chats = chats started in the range where the CLIENT sent a
+                message — agent-only outreach doesn't count. */}
             <Tile
               label="Total chats"
-              value={data.funnel?.chats ?? 0}
+              value={data.totals.clientChats ?? 0}
               icon={<IconMessage size={17} />}
               tint="#dcfce7"
               color="#16a34a"
