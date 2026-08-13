@@ -225,6 +225,10 @@ let visitorRefresh: ((websiteId: string) => void) | null = null;
 export function setVisitorRefresh(fn: (websiteId: string) => void): void {
   visitorRefresh = fn;
 }
+/** Ask the realtime layer to rebroadcast a website's live visitor list. */
+export function requestVisitorRefresh(websiteId: string): void {
+  visitorRefresh?.(websiteId);
+}
 
 /** Push a fresh summary to the assignee's room and the website watchers' room in `/agent`. */
 export async function emitInboxUpdate(deps: AppDeps, conversationId: string): Promise<void> {

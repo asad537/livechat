@@ -330,12 +330,12 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     window.addEventListener('pagehide', onPageHide);
 
     // ── Idle detection (Zendesk-style) ──
-    // Backgrounded tab (2 min) or no mouse/key/scroll/touch for 15 min →
+    // Backgrounded tab (30 min) or no mouse/key/scroll/touch for 30 min →
     // report idle: the socket stays connected (messages still arrive) but the
     // visitor drops out of the agents' "Online now" list. Any activity or
     // refocusing the tab flips them back to online instantly — no reload.
-    const IDLE_AFTER_MS = 15 * 60 * 1000;
-    const HIDDEN_AFTER_MS = 2 * 60 * 1000;
+    const IDLE_AFTER_MS = 30 * 60 * 1000;
+    const HIDDEN_AFTER_MS = 30 * 60 * 1000;
     let lastActivity = Date.now();
     let reportedActive = true;
     let hiddenTimer: number | null = null;

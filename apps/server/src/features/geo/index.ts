@@ -5,6 +5,7 @@
 // row so each IP is looked up once.
 import type { Socket } from 'socket.io';
 import type { AppDeps } from '../../core/deps.js';
+import { requestVisitorRefresh } from '../../domain/conversations.js';
 
 /** Real client IP for a socket (proxy-aware). */
 export function clientIp(socket: Socket): string | null {
@@ -53,10 +54,11 @@ export function updateVisitorGeo(deps: AppDeps, visitorId: string, ip: string | 
   if (!ip) return;
   void (async () => {
     try {
-      const row = await deps.db.get<{ ip: string | null; geo_country: string | null }>(
-        'SELECT ip, geo_country FROM visitors WHERE id = ?',
-        [visitorId],
-      );
+      const row = await deps.db.get<{
+        ip: string | null;
+        geo_country: string | null;
+        website_id: string;
+      }>('SELECT ip, geo_country, website_id FROM visitors WHERE id = ?', [visitorId]);
       if (!row) return;
 
       if (row.ip !== ip) {
@@ -88,6 +90,9 @@ export function updateVisitorGeo(deps: AppDeps, visitorId: string, ip: string | 
             visitorId,
           ],
         );
+        // Country just resolved — push the visitor list again so the agent sees
+        // the flag right away instead of a globe until the next broadcast.
+        requestVisitorRefresh(row.website_id);
       } finally {
         inFlight.delete(visitorId);
       }
