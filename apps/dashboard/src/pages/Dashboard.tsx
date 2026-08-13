@@ -198,8 +198,8 @@ export default function Dashboard() {
           {/* ── Tiles ── */}
           <div className="db-tiles">
             <Tile
-              label="Client chats"
-              value={data.totals.clientChats ?? 0}
+              label="Total chats"
+              value={data.funnel?.chats ?? 0}
               icon={<IconMessage size={17} />}
               tint="#dcfce7"
               color="#16a34a"

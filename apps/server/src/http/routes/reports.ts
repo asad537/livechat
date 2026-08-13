@@ -298,7 +298,9 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const totals = {
         active: activeNow,
         waiting: waitingNow,
-        closed: closedRows.length,
+        // Closed = chats STARTED in the range that ended CLOSED — an old chat
+        // merely swept closed today must not count as "closed today".
+        closed: startedRows.filter((r) => r.status === 'CLOSED').length,
         missed: missedCount,
         clientChats: Number(clientLiveRow?.n ?? 0),
         csrChats: Number(csrLiveRow?.n ?? 0),
@@ -572,7 +574,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
           const s = secondsBetween(r.created_at, r.activated_at);
           if (s != null) yFrt.push(s);
         }
-        if (r.status === 'CLOSED' && r.closed_at && r.closed_at >= yesterdayStart && r.closed_at < todayStart) {
+        // Mirror totals.closed: count chats STARTED yesterday that ended CLOSED.
+        if (startedY && r.status === 'CLOSED') {
           yClosed += 1;
         }
       }
