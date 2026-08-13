@@ -150,9 +150,11 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
     await emitInboxUpdate(deps, conversationId);
   };
 
-  // Rule 1 — unanswered client: the client's last message has had no AGENT
-  // reply for an hour → the chat was missed; end it as MISSED. (BOT/SYSTEM
-  // chatter after the client's message doesn't count as an answer.)
+  // Rule 1 — unanswered client: an ASSIGNED agent left the client's last
+  // message without a reply for an hour → the chat was missed; end it as
+  // MISSED. (BOT/SYSTEM chatter doesn't count as an answer.) Chats assigned to
+  // NOBODY are exempt — they stay in the Offline Chats queue waiting to be
+  // picked up; only the 12h total-silence rule can eventually end them.
   const unansweredCutoff = new Date(Date.now() - UNANSWERED_CLOSE_MS).toISOString();
   const unanswered = await deps.db.all<{ id: string }>(
     `SELECT c.id
@@ -161,6 +163,7 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
               WHERE sender_type = 'VISITOR' GROUP BY conversation_id) v
          ON v.conversation_id = c.id
       WHERE c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+        AND c.assigned_user_id IS NOT NULL
         AND v.last_v < ?
         AND NOT EXISTS (
           SELECT 1 FROM messages m
