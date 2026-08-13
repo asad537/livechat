@@ -406,10 +406,12 @@ export function buildReportsRouter(deps: AppDeps): Router {
         .map(([word, n]) => ({ word, n, pct: pct(n, topicTotal) ?? 0 }));
 
       // ── Outcomes donut ──
+      // Cohort = chats STARTED in the range, so the donut total matches the
+      // "chats today" numbers (old chats merely swept closed today don't leak in).
       const transferred = new Set(transferRows.map((t) => t.cid));
       const outcomes = { resolved: 0, transferred: 0, missed: missedCount, open: 0 };
-      for (const r of rows) {
-        if (r.status === 'CLOSED' && inRange(r.closed_at)) {
+      for (const r of startedRows) {
+        if (r.status === 'CLOSED') {
           if (transferred.has(r.id)) outcomes.transferred += 1;
           else outcomes.resolved += 1;
         } else if (r.status === 'ACTIVE' || r.status === 'WAITING' || r.status === 'OFFERED') {
@@ -445,7 +447,9 @@ export function buildReportsRouter(deps: AppDeps): Router {
         visitors: visitorsSeen,
         chats: startedRows.length,
         answered: startedRows.filter((r) => r.activated_at != null).length,
-        resolved: closedRows.length,
+        // Same cohort as `chats` — otherwise old chats closed today make the
+        // resolved step exceed the started step (6000%+ funnels).
+        resolved: startedRows.filter((r) => r.status === 'CLOSED').length,
       };
 
       const tiles = {
@@ -640,11 +644,11 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const to = asString(req.query.to); // inclusive (end of day)
       if (from) {
         where += ' AND c.created_at >= ?';
-        params.push(`${from}T00:00:00.000Z`);
+        params.push(new Date(`${from}T00:00:00`).toISOString()); // server-local midnight, matches the dashboard range
       }
       if (to) {
         where += ' AND c.created_at <= ?';
-        params.push(`${to}T23:59:59.999Z`);
+        params.push(new Date(`${to}T23:59:59.999`).toISOString());
       }
       // A CSR may only pull their own records. A Team Lead may pull records for
       // self + own CSRs (plus unassigned queue).

@@ -271,12 +271,12 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const from = asString(req.query.from);
       if (from) {
         where.push('c.created_at >= ?');
-        params.push(`${from}T00:00:00.000Z`);
+        params.push(new Date(`${from}T00:00:00`).toISOString()); // server-local midnight, matches the dashboard range
       }
       const to = asString(req.query.to);
       if (to) {
         where.push('c.created_at <= ?');
-        params.push(`${to}T23:59:59.999Z`);
+        params.push(new Date(`${to}T23:59:59.999`).toISOString());
       }
       const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
       if (q.length >= 2) {
@@ -399,12 +399,12 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const from = asString(req.query.from);
       if (from) {
         where.push('h.created_at >= ?');
-        params.push(`${from}T00:00:00.000Z`);
+        params.push(new Date(`${from}T00:00:00`).toISOString()); // server-local midnight, matches the dashboard range
       }
       const to = asString(req.query.to);
       if (to) {
         where.push('h.created_at <= ?');
-        params.push(`${to}T23:59:59.999Z`);
+        params.push(new Date(`${to}T23:59:59.999`).toISOString());
       }
       const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
       if (q.length >= 2) {
