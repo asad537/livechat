@@ -406,7 +406,15 @@ async function announceAgentJoin(
     [conversationId, body],
   );
   if (already) return;
-  await postMessage(deps, { conversationId, senderType: 'SYSTEM', kind: 'SYSTEM', body });
+  await postMessage(deps, {
+    conversationId,
+    senderType: 'SYSTEM',
+    kind: 'SYSTEM',
+    body,
+    // Backdate a moment so the notice always sorts ABOVE the message that
+    // triggered it, even when both land in the same millisecond.
+    createdAt: new Date(Date.now() - 5).toISOString(),
+  });
 }
 
 // ─── attachRealtime ──────────────────────────────────────────

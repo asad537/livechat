@@ -78,6 +78,9 @@ export interface PostMessageInput {
   fileId?: string | null;
   callId?: string | null;
   tempId?: string;
+  /** Override the stored timestamp — e.g. a join notice backdated a moment so
+      it always sorts above the message that triggered it. */
+  createdAt?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -210,7 +213,7 @@ export async function postMessage(deps: AppDeps, input: PostMessageInput): Promi
       input.kind ?? 'TEXT',
       input.fileId ?? null,
       input.callId ?? null,
-      nowIso(),
+      input.createdAt ?? nowIso(),
     ],
   );
 
