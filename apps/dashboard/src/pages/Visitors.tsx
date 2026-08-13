@@ -60,6 +60,8 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
   const [servedVisitors, setServedVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
   const [drawerId, setDrawerId] = useState<string | null>(null);
+  const [onlineCollapsed, setOnlineCollapsed] = useState(false);
+  const [servedCollapsed, setServedCollapsed] = useState(false);
   const [startTarget, setStartTarget] = useState<Visitor | null>(null);
   const [firstMessage, setFirstMessage] = useState('');
   const [, forceTick] = useState(0);
@@ -253,7 +255,7 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
     setFirstMessage('');
   };
 
-  const row = (v: Visitor) => {
+  const row = (v: Visitor, served = false) => {
     const name = v.name || `Visitor ${v.id.slice(0, 6)}`;
     const ua = uaParse(v.userAgent);
     const site = siteById.get(v.websiteId);
@@ -320,25 +322,39 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
           {v.online ? <span className="vt-onsite">{durationSince(v.sessionStartedAt)}</span> : '—'}
         </td>
         <td className="vt-num">{v.sessionPages ?? 0}</td>
-        <td className="vt-num">{v.totalVisits ?? 0}</td>
-        <td className="vt-num">{v.chats ?? 0}</td>
-        <td className="vt-actions">
-          <button
-            className="btn btn-ghost btn-sm"
-            title="Open visitor"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDrawerId(v.id);
-            }}
-          >
-            Chat
-          </button>
-        </td>
+        {served ? (
+          // Recently served: show who is handling the visitor instead of
+          // visit/chat counters and the Chat button (the row itself opens them).
+          <td className="vt-assigned">
+            {v.activeConversation?.agentName ? (
+              <span className="chip">{v.activeConversation.agentName}</span>
+            ) : (
+              <span className="vt-muted">—</span>
+            )}
+          </td>
+        ) : (
+          <>
+            <td className="vt-num">{v.totalVisits ?? 0}</td>
+            <td className="vt-num">{v.chats ?? 0}</td>
+            <td className="vt-actions">
+              <button
+                className="btn btn-ghost btn-sm"
+                title="Open visitor"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDrawerId(v.id);
+                }}
+              >
+                Chat
+              </button>
+            </td>
+          </>
+        )}
       </tr>
     );
   };
 
-  const table = (list: Visitor[]) => (
+  const table = (list: Visitor[], served = false) => (
     <div className="vt-table-wrap card">
       <table className="vt-table">
         <thead>
@@ -350,12 +366,18 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
             <th>Device</th>
             <th className="vt-num">On site</th>
             <th className="vt-num">Pages</th>
-            <th className="vt-num">Visits</th>
-            <th className="vt-num">Chats</th>
-            <th />
+            {served ? (
+              <th>Assigned</th>
+            ) : (
+              <>
+                <th className="vt-num">Visits</th>
+                <th className="vt-num">Chats</th>
+                <th />
+              </>
+            )}
           </tr>
         </thead>
-        <tbody>{list.map(row)}</tbody>
+        <tbody>{list.map((v) => row(v, served))}</tbody>
       </table>
     </div>
   );
@@ -390,22 +412,38 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
         <>
           {onlineList.length > 0 && (
             <>
-              <h3 className="vt-group-title">
+              <h3
+                className="vt-group-title vt-group-toggle"
+                role="button"
+                title={onlineCollapsed ? 'Expand' : 'Collapse'}
+                onClick={() => setOnlineCollapsed((c) => !c)}
+              >
                 <span className="dot dot-online" /> Online now ({onlineList.length})
+                <span className={classNames('vt-caret', onlineCollapsed && 'vt-caret-closed')}>⌄</span>
               </h3>
-              {table(onlineList)}
+              {!onlineCollapsed && table(onlineList)}
             </>
           )}
 
           {servedList.length > 0 && (
             <>
-              <h3 className="vt-group-title vt-group-offline">
+              <h3
+                className="vt-group-title vt-group-offline vt-group-toggle"
+                role="button"
+                title={servedCollapsed ? 'Expand' : 'Collapse'}
+                onClick={() => setServedCollapsed((c) => !c)}
+              >
                 <IconClock size={13} /> Recently served ({servedList.length})
+                <span className={classNames('vt-caret', servedCollapsed && 'vt-caret-closed')}>⌄</span>
               </h3>
-              {table(servedList)}
-              <button className="vt-more-link" onClick={() => navigate('/chat-history')}>
-                View all past chats in Chat History →
-              </button>
+              {!servedCollapsed && (
+                <>
+                  {table(servedList, true)}
+                  <button className="vt-more-link" onClick={() => navigate('/chat-history')}>
+                    View all past chats in Chat History →
+                  </button>
+                </>
+              )}
             </>
           )}
 

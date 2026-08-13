@@ -6513,6 +6513,29 @@ tr:hover .vt-open-hint {
   object-fit: cover;
   display: block;
 }
+/* Visitors — collapsible section headers + served Assigned cell */
+.vt-group-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.vt-group-toggle:hover {
+  opacity: 0.8;
+}
+.vt-caret {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.vt-caret-closed {
+  transform: rotate(-90deg);
+}
+.vt-assigned .chip {
+  font-weight: 600;
+}
+
 /* ── Access Blocking (admin) ── */
 .bl-grid {
   display: grid;
