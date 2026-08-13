@@ -167,6 +167,36 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
   }
 }
 
+// ─── Agent-outreach close timers (visitor left, never replied) ───────────────
+// 15-minute grace after the visitor goes offline: the timer re-checks at fire
+// time, so a visitor who came back (or finally replied) is left alone. No
+// explicit cancel needed — the re-check covers every case.
+const OUTREACH_CLOSE_MS = 15 * 60 * 1000;
+const outreachTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleOutreachClose(deps: AppDeps, conversationId: string, visitorId: string): void {
+  if (outreachTimers.has(conversationId)) return; // already counting down
+  const t = setTimeout(() => {
+    outreachTimers.delete(conversationId);
+    void (async () => {
+      const conv = await deps.db.get<ConversationRow>(
+        'SELECT * FROM conversations WHERE id = ?',
+        [conversationId],
+      );
+      if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
+      if (deps.presence.isVisitorOnline(visitorId)) return; // they came back
+      const replied = await deps.db.get<{ id: string }>(
+        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
+        [conversationId],
+      );
+      if (replied) return; // client spoke — the 12h rule owns it now
+      await closeConversation(deps, conversationId);
+    })().catch((err: unknown) => console.error('[realtime] outreach close', err));
+  }, OUTREACH_CLOSE_MS);
+  t.unref?.();
+  outreachTimers.set(conversationId, t);
+}
+
 function startInactivitySweeper(deps: AppDeps): void {
   const run = () =>
     void sweepInactiveConversations(deps).catch((err) =>
@@ -403,8 +433,22 @@ export function attachRealtime(deps: AppDeps): void {
         visitorId,
       ]);
       await broadcastVisitors(deps, websiteId);
-      // A chat is no longer auto-missed when the visitor leaves — it stays open
-      // and only auto-ends after 12h of total silence (see the inactivity sweep).
+
+      // Agent-only outreach (CSR messaged, visitor NEVER replied): when the
+      // visitor leaves the site they get 15 minutes to come back; if they're
+      // still gone (and still haven't replied) the chat closes on its own.
+      // The instant the client has sent even one message this never fires —
+      // the 12-hour inactivity rule owns the conversation instead.
+      const openConvs = await deps.db.all<{ id: string }>(
+        `SELECT c.id FROM conversations c
+          WHERE c.visitor_id = ? AND c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+            AND EXISTS (SELECT 1 FROM messages m
+                         WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')
+            AND NOT EXISTS (SELECT 1 FROM messages m
+                             WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')`,
+        [visitorId],
+      );
+      for (const c of openConvs) scheduleOutreachClose(deps, c.id, visitorId);
     })().catch((err: unknown) => console.error('[realtime] visitor offline', err));
   });
 }
