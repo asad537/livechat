@@ -257,21 +257,25 @@ export function buildReportsRouter(deps: AppDeps): Router {
 
       // Engagement split for the selected date range: chats where the CLIENT
       // has messaged vs ones where a CSR/agent has messaged (dashboard tiles).
-      // Follows the range picker (today/7d/30d/all) like the other tiles.
+      // STRICTLY chats STARTED in the range — the shared rangeFilter also
+      // matches on closed_at, which would count a month-old chat that merely
+      // got closed today (e.g. by the inactivity sweep) as "today".
+      const cStartedFilter = since ? ' AND c.created_at >= ?' : '';
+      const startedParams = since ? [since] : [];
       const [clientLiveRow, csrLiveRow] = await Promise.all([
         deps.db.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM conversations c
-            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter}
+            WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
               AND EXISTS (SELECT 1 FROM messages m
                            WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')`,
-          [...siteIds, ...rangeParams, ...agentParams],
+          [...siteIds, ...startedParams, ...agentParams],
         ),
         deps.db.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM conversations c
-            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter}
+            WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
               AND EXISTS (SELECT 1 FROM messages m
                            WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')`,
-          [...siteIds, ...rangeParams, ...agentParams],
+          [...siteIds, ...startedParams, ...agentParams],
         ),
       ]);
 
