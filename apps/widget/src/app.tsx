@@ -368,6 +368,13 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     });
 
     socket.on(EV.AppError, ({ message }: { message: string }) => {
+      // Deferred country-block check booted us → hide the widget entirely.
+      if (/access blocked|blocked/i.test(message ?? '')) {
+        socket.io.opts.reconnection = false;
+        socket.disconnect();
+        setBlocked(true);
+        return;
+      }
       if (message) showToast(message);
     });
 
@@ -995,20 +1002,23 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
         />
       )}
 
-      {/* Launcher */}
-      <button
-        type="button"
-        class={`lc-launcher ${unread > 0 ? 'lc-pulse' : ''}`}
-        title={open ? 'Close chat' : `Chat with ${website?.name ?? 'us'}`}
-        onClick={() => {
-          const next = !openRef.current;
-          markDismissed(!next);
-          setOpen(next);
-        }}
-      >
-        {open ? <IconClose /> : <IconChat />}
-        {!open && unread > 0 && <span class="lc-badge">{unread > 9 ? '9+' : unread}</span>}
-      </button>
+      {/* Launcher — only once the connection is live (branding loaded), so it
+          never flashes a wrong colour or a dead "Reconnecting…" bubble. */}
+      {website && (
+        <button
+          type="button"
+          class={`lc-launcher ${unread > 0 ? 'lc-pulse' : ''}`}
+          title={open ? 'Close chat' : `Chat with ${website?.name ?? 'us'}`}
+          onClick={() => {
+            const next = !openRef.current;
+            markDismissed(!next);
+            setOpen(next);
+          }}
+        >
+          {open ? <IconClose /> : <IconChat />}
+          {!open && unread > 0 && <span class="lc-badge">{unread > 9 ? '9+' : unread}</span>}
+        </button>
+      )}
     </div>
   );
 }

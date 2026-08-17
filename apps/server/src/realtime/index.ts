@@ -55,6 +55,8 @@ interface WidgetSocketData {
   visitorId: string;
   websiteId: string;
   conversationId: string | null;
+  /** Cached country at handshake time — null means "resolve & recheck async". */
+  geoCc: string | null;
 }
 
 interface AgentSocketData {
@@ -676,6 +678,7 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       data.visitorId = visitorRow.id;
       data.websiteId = website.id;
       data.conversationId = null;
+      data.geoCc = visitorRow.geo_cc ?? null;
       widgetCtx.set(socket, {
         visitorToken,
         page: asString(auth.page),
@@ -724,12 +727,14 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           [newId(), visitorRow.id, pageUrl, asString(auth.pageTitle)?.slice(0, 500) ?? null, now],
         );
       }
-      // Country blocklist — use the cached country when we have it, else resolve
-      // it now (only when country rules exist, to avoid the lookup otherwise).
+      // Country blocklist — block synchronously ONLY when we already know the
+      // visitor's country (cached on the row). A brand-new visitor's country
+      // needs a geo lookup that can take up to 4s on ip-api.com's free tier —
+      // doing it here would stall EVERY new visitor's handshake, so we defer it
+      // to just after connect (see onWidgetConnected's async country recheck).
       if (deps.blocklist.hasCountryBlocks()) {
-        let cc = visitorRow.geo_cc ?? null;
-        if (!cc && cip) cc = await lookupCountry(cip);
-        if (deps.blocklist.isCountryBlocked(cc)) return next(new Error('Access blocked'));
+        const cc = visitorRow.geo_cc ?? null;
+        if (cc && deps.blocklist.isCountryBlocked(cc)) return next(new Error('Access blocked'));
       }
 
       // Capture IP + city/country (best-effort, non-blocking).
@@ -752,6 +757,22 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       console.error('[realtime] widget connect', err);
       socket.emit(EV.AppError, { message: 'Failed to initialise chat' });
     });
+
+    // Country blocklist for a brand-new visitor whose country we couldn't check
+    // synchronously at handshake time (no cached geo). Resolved off the critical
+    // path so the socket connects instantly; if they turn out to be in a blocked
+    // country we boot them right back off (the widget then hides itself).
+    if (deps.blocklist.hasCountryBlocks() && !data.geoCc) {
+      void (async () => {
+        const cip = clientIp(socket);
+        if (!cip) return;
+        const cc = await lookupCountry(cip);
+        if (deps.blocklist.isCountryBlocked(cc)) {
+          socket.emit(EV.AppError, { message: 'Access blocked' });
+          socket.disconnect(true);
+        }
+      })().catch(() => {});
+    }
 
     // ── Visitor sends a message ──
     const allowVisitorMsg = makeLimiter(MSG_RATE_MAX, MSG_RATE_WINDOW_MS);
