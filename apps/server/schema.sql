@@ -212,3 +212,6 @@ CREATE TABLE IF NOT EXISTS shortcuts (
   body TEXT NOT NULL,
   created_at VARCHAR(40) NOT NULL
 );
+
+-- Agent-only system notes (e.g. "Visitor left the site") — never sent to the widget
+ALTER TABLE messages ADD COLUMN agent_only TINYINT DEFAULT 0;

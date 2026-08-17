@@ -163,7 +163,7 @@ async function buildTranscriptData(
          FROM messages m
          LEFT JOIN users u ON u.id = m.sender_user_id
          LEFT JOIN files f ON f.id = m.file_id
-        WHERE m.conversation_id = ?
+        WHERE m.conversation_id = ? AND m.agent_only = 0
         ORDER BY m.created_at ASC`,
       [conversationId],
     ),

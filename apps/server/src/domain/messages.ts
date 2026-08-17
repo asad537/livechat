@@ -81,6 +81,9 @@ export interface PostMessageInput {
   /** Override the stored timestamp — e.g. a join notice backdated a moment so
       it always sorts above the message that triggered it. */
   createdAt?: string;
+  /** Agent-facing note (e.g. "Visitor left the site") — stored + shown to
+      agents, but never broadcast to or loaded by the visitor's widget. */
+  agentOnly?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -200,10 +203,11 @@ export async function postMessage(deps: AppDeps, input: PostMessageInput): Promi
   if (!conv) throw new Error('Conversation not found');
 
   const id = newId();
+  const agentOnly = input.agentOnly ? 1 : 0;
   await deps.db.run(
     `INSERT INTO messages
-       (id, conversation_id, sender_type, sender_user_id, body, kind, file_id, call_id, created_at, delivered_at, read_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+       (id, conversation_id, sender_type, sender_user_id, body, kind, file_id, call_id, created_at, delivered_at, read_at, agent_only)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
     [
       id,
       input.conversationId,
@@ -214,6 +218,7 @@ export async function postMessage(deps: AppDeps, input: PostMessageInput): Promi
       input.fileId ?? null,
       input.callId ?? null,
       input.createdAt ?? nowIso(),
+      agentOnly,
     ],
   );
 
@@ -236,7 +241,10 @@ export async function postMessage(deps: AppDeps, input: PostMessageInput): Promi
   }
 
   const room = `conv:${conv.id}`;
-  deps.io.of(WIDGET_NAMESPACE).to(room).emit(EV.ChatMessage, { message });
+  // Agent-only notes go to agents only — the visitor's widget never receives them.
+  if (!input.agentOnly) {
+    deps.io.of(WIDGET_NAMESPACE).to(room).emit(EV.ChatMessage, { message });
+  }
   deps.io.of(AGENT_NAMESPACE).to(room).emit(EV.ChatMessage, { message });
 
   if (message.deliveredAt) {

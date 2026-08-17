@@ -597,6 +597,7 @@ export function attachRealtime(deps: AppDeps): void {
           senderType: 'SYSTEM',
           kind: 'SYSTEM',
           body: VISITOR_LEFT_NOTICE,
+          agentOnly: true,
         });
       }
     })().catch((err: unknown) => console.error('[realtime] visitor offline', err));
@@ -1065,12 +1066,14 @@ async function onWidgetConnected(
         senderType: 'SYSTEM',
         kind: 'SYSTEM',
         body: VISITOR_BACK_NOTICE,
+        agentOnly: true,
       });
     }
     conversation = (await loadSummary(deps, conv.id)) ?? null;
     // Bounded: only the latest 150 messages ride the widget handshake.
+    // agent_only notes ("Visitor left the site" …) are never shown to the visitor.
     const rows = await deps.db.all<MessageRow>(
-      'SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 150) t ORDER BY created_at ASC, id ASC',
+      'SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? AND agent_only = 0 ORDER BY created_at DESC, id DESC LIMIT 150) t ORDER BY created_at ASC, id ASC',
       [conv.id],
     );
     messages = await hydrateMessages(deps, rows);
