@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ChatMessage } from '@livechat/shared';
 import { fileDownloadUrl } from '../api';
 import { formatBytes, formatTime, linkify } from '../util';
@@ -113,6 +113,27 @@ function CallCard({ message }: { message: ChatMessage }) {
   );
 }
 
+/** Text body that shows the auto-translation (with a toggle back to the original). */
+function TextBody({ message, translate }: { message: ChatMessage; translate: boolean }) {
+  const [showOriginal, setShowOriginal] = useState(false);
+  const translated = translate ? message.translatedBody : null;
+  if (!translated) return <span className="msg-text">{linkify(message.body)}</span>;
+  const lang = message.origLang ? message.origLang.toUpperCase() : '';
+  return (
+    <span className="msg-text">
+      {linkify(showOriginal ? message.body : translated)}
+      <button
+        type="button"
+        className="msg-translate-toggle"
+        onClick={() => setShowOriginal((v) => !v)}
+        title={showOriginal ? 'Show the translation' : 'Show what the visitor actually typed'}
+      >
+        🌐 {showOriginal ? 'Show translation' : `Translated${lang ? ` from ${lang}` : ''} · show original`}
+      </button>
+    </span>
+  );
+}
+
 export default function MessageBubble({ message }: Props) {
   if (message.senderType === 'SYSTEM' || message.kind === 'SYSTEM') {
     return (
@@ -146,7 +167,7 @@ export default function MessageBubble({ message }: Props) {
         ) : message.kind === 'CALL' ? (
           <CallCard message={message} />
         ) : (
-          <span className="msg-text">{linkify(message.body)}</span>
+          <TextBody message={message} translate={!own} />
         )}
         <span className="msg-meta">
           <span className="msg-time">{formatTime(message.createdAt)}</span>

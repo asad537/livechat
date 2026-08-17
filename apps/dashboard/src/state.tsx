@@ -307,10 +307,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           `chat-${conv.id}`,
         );
       }
-      // The visitor left the site → auto-minimize their floating chat window
-      // (its tab stays in the dock below).
+      // The visitor left the site → close their floating chat window AND drop
+      // its tab from the bottom dock (nothing lingers once they're gone).
       if (conv.lastMessage?.kind === 'SYSTEM' && conv.lastMessage.body === 'Visitor left the site') {
         setDockedChatId((prevId) => (prevId === conv.id ? null : prevId));
+        setOpenChats((prev) => prev.filter((c) => c !== conv.id));
+      }
+      // The visitor came back → restore the tab so the agent can resume in a click
+      // (the window itself stays minimized — we don't pop it open unasked).
+      if (conv.lastMessage?.kind === 'SYSTEM' && conv.lastMessage.body === 'Visitor is back on the site') {
+        setOpenChats((prev) => (prev.includes(conv.id) ? prev : [...prev.slice(-7), conv.id]));
       }
       setConversations((current) => ({ ...current, [conv.id]: { ...current[conv.id], ...conv } }));
     };

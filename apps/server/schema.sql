@@ -215,3 +215,10 @@ CREATE TABLE IF NOT EXISTS shortcuts (
 
 -- Agent-only system notes (e.g. "Visitor left the site") — never sent to the widget
 ALTER TABLE messages ADD COLUMN agent_only TINYINT DEFAULT 0;
+
+-- Auto-translate (cross-language chat): the reader-facing translation of a
+-- message's body, plus the language the body was originally written in.
+ALTER TABLE messages ADD COLUMN translated_body TEXT;
+ALTER TABLE messages ADD COLUMN orig_lang VARCHAR(8);
+-- Cached detected language of a visitor, so we skip re-detecting every message.
+ALTER TABLE visitors ADD COLUMN lang VARCHAR(8);

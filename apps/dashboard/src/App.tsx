@@ -258,7 +258,7 @@ function AvailabilityToggle() {
 }
 
 export default function App() {
-  const { authed, booting, me, activeCall } = useApp();
+  const { authed, booting, me, activeCall, openChats } = useApp();
 
   if (!authed) {
     return (
@@ -281,7 +281,9 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar />
-      <main className="content">
+      {/* When the bottom chat dock is showing, reserve room for it so it never
+          covers the composer / page content (issue #14). */}
+      <main className={openChats.length > 0 ? 'content has-dock' : 'content'}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/visitors" element={<Visitors key="live" />} />

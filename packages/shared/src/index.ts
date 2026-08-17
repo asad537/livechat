@@ -126,6 +126,12 @@ export interface ChatMessage {
   call?: CallMeta | null;
   sender?: { name: string; avatarColor: string; avatarUrl?: string | null } | null;
   tempId?: string;
+  /** Auto-translation of `body` into the reader's language (cross-language chat).
+      For a VISITOR message this is the agent-facing English; for an AGENT message
+      it's the visitor-language version. null when no translation was needed. */
+  translatedBody?: string | null;
+  /** ISO 639-1 code of the language `body` was originally written in. */
+  origLang?: string | null;
 }
 
 export interface ConversationSummary {
@@ -185,6 +191,8 @@ export const EV = {
   ChatReceipt: 'chat:receipt',               // { conversationId, messageIds: string[], deliveredAt?, readAt? }
   ChatTyping: 'chat:typing',                 // { conversationId, from: 'VISITOR'|'AGENT', typing: boolean }
   ChatStatus: 'chat:status',                 // { conversation: ConversationSummary }
+  ChatTranslation: 'chat:translation',       // { conversationId, messageId, translatedBody, origLang } — auto-translate patch
+
   ChatAgent: 'chat:agent',                   // { conversationId, agent: {name, avatarColor} | null }
   ChatFeedbackRequest: 'chat:feedback-request', // { conversationId } — agent asked the visitor to rate
 

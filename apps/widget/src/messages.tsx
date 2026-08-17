@@ -4,6 +4,27 @@ import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { dayKey, dayLabel, fmtBytes, fmtTime, initials } from './util';
 
+/** Agent bubble text: shows the auto-translation, with a tap to see the original. */
+function BubbleText({ m }: { m: LocalMessage }): JSX.Element {
+  const [showOriginal, setShowOriginal] = useState(false);
+  // Visitors read the agent's words in their own language; their own messages
+  // (and anything without a translation) render as-is.
+  const translated = m.senderType === 'AGENT' ? m.translatedBody : null;
+  if (!translated) return <>{linkify(m.body)}</>;
+  return (
+    <>
+      {linkify(showOriginal ? m.body : translated)}
+      <button
+        type="button"
+        class="lc-translate-toggle"
+        onClick={() => setShowOriginal((v) => !v)}
+      >
+        {showOriginal ? 'Show translation' : 'Show original'}
+      </button>
+    </>
+  );
+}
+
 /** Messages carried in local state — pending flag for optimistic sends. */
 export type LocalMessage = ChatMessage & { pending?: boolean };
 
@@ -209,7 +230,7 @@ export function MessageRow({ m, server, token, fallbackAgent }: MessageRowProps)
       <CallCard m={m} />
     ) : (
       <div class={`lc-bubble ${m.senderType === 'VISITOR' ? 'lc-bubble-v' : 'lc-bubble-a'} ${m.pending ? 'lc-pending' : ''}`}>
-        {linkify(m.body)}
+        <BubbleText m={m} />
       </div>
     );
 

@@ -16,6 +16,7 @@ export interface Config {
   aiApiKey: string | null;
   aiModel: string;
   aiGreeter: boolean;
+  autoTranslate: boolean;   // cross-language chat: translate visitor↔agent (uses the AI engine)
   smtpHost: string | null;
   smtpPort: number;
   smtpUser: string | null;
@@ -50,7 +51,7 @@ function resolveAi(env: NodeJS.ProcessEnv): {
           : 'builtin';
   const defaultModel =
     aiProvider === 'groq'
-      ? 'llama-3.3-70b-versatile'
+      ? 'openai/gpt-oss-120b'
       : aiProvider === 'gemini'
         ? 'gemini-2.5-flash'
         : 'claude-opus-5';
@@ -78,6 +79,9 @@ export function loadConfig(): Config {
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
     ...resolveAi(env),
     aiGreeter: env.AI_GREETER !== 'off',
+    // Auto-translate is on by default (turns itself off when no AI engine is
+    // configured — see features/translate). Set AUTO_TRANSLATE=off to disable.
+    autoTranslate: env.AUTO_TRANSLATE !== 'off',
     smtpHost: env.SMTP_HOST || null,
     smtpPort: Number(env.SMTP_PORT || 587),
     smtpUser: env.SMTP_USER || null,

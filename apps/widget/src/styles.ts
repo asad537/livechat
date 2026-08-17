@@ -355,6 +355,11 @@ export const WIDGET_CSS = `
 .lc-bubble .lc-link { word-break: break-all; text-decoration: underline; }
 .lc-bubble-a .lc-link { color: var(--lc-primary); font-weight: 600; }
 .lc-bubble-v .lc-link { color: inherit; }
+.lc-translate-toggle {
+  display: block; margin-top: 4px; padding: 0; background: none; border: none;
+  cursor: pointer; font: inherit; font-size: 11px; opacity: .6; color: inherit;
+}
+.lc-translate-toggle:hover { opacity: .9; text-decoration: underline; }
 
 /* ── CSAT rating card ─────────────────────────────────────── */
 .lc-ratebox { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }

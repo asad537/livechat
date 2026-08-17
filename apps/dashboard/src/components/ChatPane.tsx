@@ -258,10 +258,29 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
       setMessages((prev) => prev.map((m) => (m.callId === meta.id ? { ...m, call: meta } : m)));
     };
 
+    // Auto-translate: a visitor message's English translation arrives a beat
+    // after the message itself → patch the bubble in place.
+    const onTranslation = (payload: {
+      conversationId: string;
+      messageId: string;
+      translatedBody: string;
+      origLang: string;
+    }) => {
+      if (payload.conversationId !== conversationId) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === payload.messageId
+            ? { ...m, translatedBody: payload.translatedBody, origLang: payload.origLang }
+            : m,
+        ),
+      );
+    };
+
     socket.on(EV.ChatMessage, onMessage);
     socket.on(EV.ChatReceipt, onReceipt);
     socket.on(EV.ChatTyping, onTyping);
     socket.on(EV.CallStatus, onCallStatus);
+    socket.on(EV.ChatTranslation, onTranslation);
 
     return () => {
       disposed = true;
@@ -269,6 +288,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
       socket.off(EV.ChatReceipt, onReceipt);
       socket.off(EV.ChatTyping, onTyping);
       socket.off(EV.CallStatus, onCallStatus);
+      socket.off(EV.ChatTranslation, onTranslation);
       const t = typingRef.current;
       if (t.timer !== null) window.clearTimeout(t.timer);
       t.active = false;

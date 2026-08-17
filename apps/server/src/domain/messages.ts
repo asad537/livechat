@@ -15,6 +15,7 @@ import {
 import type { AppDeps } from '../core/deps.js';
 import { newId, nowIso } from '../core/db.js';
 import { emitInboxUpdate } from './conversations.js';
+import { applyTranslation } from '../features/translate/index.js';
 
 // ─── Row shapes (snake_case DB columns) ──────────────────────
 
@@ -31,6 +32,8 @@ export interface MessageRow {
   created_at: string;
   delivered_at: string | null;
   read_at: string | null;
+  translated_body?: string | null;
+  orig_lang?: string | null;
 }
 
 interface FileRow {
@@ -176,6 +179,8 @@ export async function hydrateMessages(deps: AppDeps, rows: MessageRow[]): Promis
     createdAt: row.created_at,
     deliveredAt: row.delivered_at,
     readAt: row.read_at,
+    translatedBody: row.translated_body ?? null,
+    origLang: row.orig_lang ?? null,
     file: row.file_id ? (files.get(row.file_id) ?? null) : null,
     call: row.call_id ? (calls.get(row.call_id) ?? null) : null,
     sender:
@@ -258,5 +263,15 @@ export async function postMessage(deps: AppDeps, input: PostMessageInput): Promi
   }
 
   await emitInboxUpdate(deps, conv.id);
+
+  // Cross-language chat: translate in the background and patch the bubble in
+  // (fire-and-forget so message delivery itself is never delayed).
+  if (!input.agentOnly && (input.senderType === 'VISITOR' || input.senderType === 'AGENT')) {
+    void applyTranslation(deps, message, {
+      website_id: conv.website_id,
+      visitor_id: conv.visitor_id,
+    }).catch((err: unknown) => console.warn('[translate] apply failed:', (err as Error).message));
+  }
+
   return message;
 }

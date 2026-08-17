@@ -260,6 +260,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       },
     );
 
+    // Auto-translate: the agent's reply arrives in English, then a moment later
+    // its translation into the visitor's language patches the bubble in place.
+    socket.on(
+      EV.ChatTranslation,
+      ({ messageId, translatedBody, origLang }: { conversationId: string; messageId: string; translatedBody: string; origLang: string }) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, translatedBody, origLang } : m)),
+        );
+      },
+    );
+
     socket.on(EV.ChatTyping, ({ from, typing }: { conversationId: string; from: 'VISITOR' | 'AGENT'; typing: boolean }) => {
       if (from !== 'AGENT') return;
       setAgentTyping(typing);
