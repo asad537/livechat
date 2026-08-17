@@ -4379,8 +4379,10 @@ img.avatar {
 }
 
 .db-tile-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
   color: var(--text-soft);
 }
 
@@ -4388,6 +4390,7 @@ img.avatar {
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .db-tile-icon {
@@ -5152,7 +5155,7 @@ img.avatar {
 
 .rp-kpis {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
 }
 
@@ -5176,9 +5179,9 @@ img.avatar {
 }
 
 .rp-kpi:hover {
-  box-shadow: 0 10px 24px rgba(100, 80, 180, 0.1);
-  border-color: #ddd6f3;
-  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
 }
 
 .rp-kpi-top {
@@ -5189,8 +5192,10 @@ img.avatar {
 }
 
 .rp-kpi-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5215,6 +5220,7 @@ img.avatar {
   letter-spacing: -0.03em;
   color: var(--text);
   line-height: 1.05;
+  font-variant-numeric: tabular-nums;
 }
 
 .rp-kpi-value-sm { font-size: 19px; }

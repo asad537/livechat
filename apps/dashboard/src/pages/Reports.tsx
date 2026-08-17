@@ -8,6 +8,7 @@ import {
   IconChart,
   IconCheckCircle,
   IconClock,
+  IconGlobe,
   IconMessage,
   IconPhoneOff,
   IconStar,
@@ -240,22 +241,23 @@ export default function Reports() {
           {/* ── Overview ── */}
           <SectionLabel>Overview</SectionLabel>
           <div className="rp-kpis">
+            {/* Same set as the dashboard overview. */}
             <Tile
-              label="Active now"
-              value={data.totals.active}
+              label="Total chats"
+              value={data.totals.clientChats ?? 0}
               icon={<IconMessage size={18} />}
               tint="#dcfce7"
               color="#16a34a"
             />
             <Tile
-              label="In queue"
-              value={data.totals.waiting}
+              label="CSR clicks"
+              value={data.totals.csrChats ?? 0}
               icon={<IconUsers size={18} />}
               tint="#ffedd5"
               color="#ea580c"
             />
             <Tile
-              label="Closed"
+              label="Closed chats"
               value={data.totals.closed}
               icon={<IconCheckCircle size={18} />}
               tint="#dbeafe"
@@ -263,7 +265,7 @@ export default function Reports() {
               foot={y ? <Delta now={data.totals.closed} before={y.closed} /> : undefined}
             />
             <Tile
-              label="Missed"
+              label="Missed chats"
               value={data.totals.missed}
               icon={<IconPhoneOff size={18} />}
               tint="#fee2e2"
@@ -271,37 +273,12 @@ export default function Reports() {
               foot={y ? <Delta now={data.totals.missed} before={y.missed} invert /> : undefined}
             />
             <Tile
-              label="Avg first response"
-              value={formatSeconds(data.avgFirstResponseSeconds)}
-              icon={<IconClock size={18} />}
-              tint="#ede9fe"
-              color="#5865f2"
-              foot={
-                data.avgFirstResponseSeconds != null && y?.frtSeconds != null ? (
-                  <Delta now={data.avgFirstResponseSeconds} before={y.frtSeconds} invert />
-                ) : undefined
-              }
-            />
-            <Tile
-              label="CSAT"
-              value={
-                data.csat?.average != null ? (
-                  <>
-                    {data.csat.average.toFixed(1)}
-                    <span className="rp-kpi-suffix">/5</span>
-                  </>
-                ) : (
-                  '—'
-                )
-              }
-              icon={<IconStar size={18} />}
-              tint="#fef3c7"
-              color="#d97706"
-              foot={
-                <span className="rp-kpi-muted">
-                  {data.csat?.count ?? 0} rating{(data.csat?.count ?? 0) === 1 ? '' : 's'}
-                </span>
-              }
+              label="Total visitors"
+              value={(data.funnel?.visitors ?? 0).toLocaleString()}
+              icon={<IconGlobe size={18} />}
+              tint="#dbeafe"
+              color="#2563eb"
+              foot={<span className="rp-kpi-muted">{RANGE_HINT[range]}</span>}
             />
           </div>
 
@@ -314,13 +291,6 @@ export default function Reports() {
               icon={<IconChart size={18} />}
               tint="#f3e8ff"
               color="#9333ea"
-            />
-            <Tile
-              label="Avg chat duration"
-              value={formatSeconds(tiles?.avgChatDurationSeconds)}
-              icon={<IconClock size={18} />}
-              tint="#ede9fe"
-              color="#5865f2"
             />
             <Tile
               label="Avg response time"
@@ -496,7 +466,7 @@ export default function Reports() {
                       <th className="num">Missed</th>
                       <th className="num">Avg reply</th>
                       <th className="num">Resolution</th>
-                      <th className="num">CSAT</th>
+                      <th className="num">Visitors</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -512,9 +482,7 @@ export default function Reports() {
                         <td className="num">{w.missed}</td>
                         <td className="num">{formatSeconds(w.avgReplySeconds)}</td>
                         <td className="num">{w.resolutionRate != null ? `${w.resolutionRate}%` : '—'}</td>
-                        <td className="num">
-                          {w.csat != null ? <span className="lb-rating">★ {w.csat.toFixed(1)}</span> : '—'}
-                        </td>
+                        <td className="num">{w.visitors ?? 0}</td>
                       </tr>
                     ))}
                     {(data.websitePerf ?? []).length === 0 && (

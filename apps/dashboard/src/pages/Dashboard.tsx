@@ -207,7 +207,7 @@ export default function Dashboard() {
               color="#16a34a"
             />
             <Tile
-              label="CSR chats"
+              label="CSR clicks"
               value={data.totals.csrChats ?? 0}
               icon={<IconUsers size={17} />}
               tint="#ffedd5"
@@ -392,8 +392,12 @@ export default function Dashboard() {
                       <tr
                         key={row.user.id}
                         className="ch-row"
-                        title={`Open ${row.user.name}'s chats`}
-                        onClick={() => navigate('/chat-history', { state: { agentId: row.user.id } })}
+                        title={`Open ${row.user.name}'s un-replied chats`}
+                        onClick={() =>
+                          navigate('/chat-history', {
+                            state: { agentId: row.user.id, noReply: true },
+                          })
+                        }
                       >
                         <td>
                           <span className="cell-user">
@@ -431,7 +435,7 @@ export default function Dashboard() {
                       <th className="num">Chats</th>
                       <th className="num">Missed</th>
                       <th className="num">Avg reply</th>
-                      <th className="num">CSAT</th>
+                      <th className="num">Visitors</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -446,7 +450,7 @@ export default function Dashboard() {
                         <td className="num lb-strong">{w.chats}</td>
                         <td className="num">{w.missed}</td>
                         <td className="num">{formatSeconds(w.avgReplySeconds)}</td>
-                        <td className="num">{w.csat != null ? <span className="lb-rating">★ {w.csat.toFixed(1)}</span> : '—'}</td>
+                        <td className="num">{w.visitors ?? 0}</td>
                       </tr>
                     ))}
                     {sites.length === 0 && (

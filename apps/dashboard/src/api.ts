@@ -99,6 +99,7 @@ export interface WebsitePerfRow {
   color: string;
   chats: number;
   missed: number;
+  visitors: number;
   avgReplySeconds: number | null;
   resolutionRate: number | null;
   csat: number | null;
@@ -305,6 +306,7 @@ export const api = {
     from?: string;
     to?: string;
     contact?: boolean; // Queries view: visitor shared name/email (ADMIN/MANAGER)
+    noReply?: boolean; // only chats the (assigned) CSR never replied to
   }) => {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(opts)) {

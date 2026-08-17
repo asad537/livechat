@@ -508,6 +508,13 @@ export function buildReportsRouter(deps: AppDeps): Router {
       });
 
       // ── Per-website performance ──
+      // Visitors seen per website in the range (for the dashboard's Visitors column).
+      const visitorByWebsite = await deps.db.all<{ website_id: string; n: number }>(
+        `SELECT website_id, COUNT(*) AS n FROM visitors
+          WHERE ${siteFilter} AND last_seen_at >= ? GROUP BY website_id`,
+        [...siteIds, visitorSince],
+      );
+      const visitorCount = new Map(visitorByWebsite.map((r) => [r.website_id, Number(r.n)]));
       const websitePerf = siteRows
         .filter((w) => siteIds.includes(w.id))
         .map((w: WebsiteRow) => {
@@ -527,6 +534,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
             color: w.primary_color,
             chats: wStarted.length,
             missed: wMissed,
+            visitors: visitorCount.get(w.id) ?? 0,
             avgReplySeconds: avg(frt),
             resolutionRate: pct(wClosed.length, wClosed.length + wMissed),
             csat:

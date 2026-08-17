@@ -269,6 +269,22 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         where.push('c.assigned_user_id = ?');
         params.push(agentId);
       }
+      // "CSR didn't reply" — chats where the CSR sent no agent message (whether
+      // or not the client wrote). Tied to the agent when one is filtered, else
+      // any chat with no agent reply at all.
+      const noReply = asString(req.query.noReply) === '1' || asString(req.query.noReply) === 'true';
+      if (noReply) {
+        if (agentId) {
+          where.push(
+            "NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT' AND m.sender_user_id = ?)",
+          );
+          params.push(agentId);
+        } else {
+          where.push(
+            "NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')",
+          );
+        }
+      }
       const from = asString(req.query.from);
       if (from) {
         where.push('c.created_at >= ?');

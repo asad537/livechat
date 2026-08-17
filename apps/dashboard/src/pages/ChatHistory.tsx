@@ -25,7 +25,9 @@ export default function ChatHistory() {
   // Arriving from the Dashboard's agent-performance table pre-filters that
   // agent's chats (any status).
   const location = useLocation();
-  const presetAgentId = (location.state as { agentId?: string } | null)?.agentId ?? '';
+  const presetState = location.state as { agentId?: string; noReply?: boolean } | null;
+  const presetAgentId = presetState?.agentId ?? '';
+  const presetNoReply = presetState?.noReply ?? false;
   const [rows, setRows] = useState<ChatHistoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -35,6 +37,7 @@ export default function ChatHistory() {
   const [q, setQ] = useState('');
   const [websiteId, setWebsiteId] = useState('');
   const [agentId, setAgentId] = useState(presetAgentId);
+  const [noReply, setNoReply] = useState(presetNoReply);
   const [status, setStatus] = useState(presetAgentId ? 'ALL' : '');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -59,6 +62,7 @@ export default function ChatHistory() {
           status: status || undefined,
           from: from || undefined,
           to: to || undefined,
+          noReply: noReply || undefined,
         });
         setRows(res.chats);
         setTotal(res.total);
@@ -70,7 +74,7 @@ export default function ChatHistory() {
         setLoading(false);
       }
     },
-    [q, websiteId, agentId, status, from, to],
+    [q, websiteId, agentId, status, from, to, noReply],
   );
 
   // Reload on filter change (debounced for typing in search).
@@ -139,6 +143,13 @@ export default function ChatHistory() {
             <option value="CLOSED">Closed</option>
             <option value="MISSED">Missed</option>
             <option value="ALL">Any status</option>
+          </select>
+        </label>
+        <label className="rec-field">
+          <span>Reply</span>
+          <select value={noReply ? '1' : ''} onChange={(e) => setNoReply(e.target.value === '1')}>
+            <option value="">All chats</option>
+            <option value="1">No CSR reply</option>
           </select>
         </label>
         <label className="rec-field">
@@ -222,7 +233,7 @@ export default function ChatHistory() {
       {!loading && rows.length === 0 && (
         <div className="empty-state card">
           <IconUsers size={32} className="empty-state-icon" />
-          <p>{q || websiteId || agentId || from || to ? 'No chats match these filters' : 'No finished chats yet'}</p>
+          <p>{q || websiteId || agentId || from || to || noReply ? 'No chats match these filters' : 'No finished chats yet'}</p>
         </div>
       )}
 
