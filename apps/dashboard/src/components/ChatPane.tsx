@@ -58,6 +58,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     startCall,
     pushToast,
     online,
+    visitorsByWebsite,
   } = useApp();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -122,6 +123,14 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   const readSentRef = useRef<Set<string>>(new Set());
 
   const conversation = conversations[conversationId];
+
+  // Freshest webpage the visitor is on: the live visitors stream updates on
+  // every navigation, so it can carry a current page even when the conversation
+  // summary's copy is stale or missing (e.g. a TL watching a team chat — #22).
+  const liveVisitor = conversation
+    ? visitorsByWebsite[conversation.websiteId]?.find((vv) => vv.id === conversation.visitorId)
+    : undefined;
+  const currentPage = conversation?.visitor?.currentPage ?? liveVisitor?.currentPage ?? null;
 
   const canSend = useMemo(() => {
     if (!me || !conversation) return false;
@@ -714,12 +723,18 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               </span>
               <span className="side-v">{conversation.website ? siteLabel(conversation.website) : '—'}</span>
             </div>
-            {conversation.visitor?.currentPage && (
+            {currentPage && (
               <div className="side-kv">
                 <span className="side-k">Current page</span>
-                <span className="side-v side-v-trunc" title={conversation.visitor.currentPage}>
-                  {conversation.visitor.currentPage}
-                </span>
+                <a
+                  className="side-v side-v-trunc side-v-link"
+                  href={currentPage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={currentPage}
+                >
+                  {currentPage}
+                </a>
               </div>
             )}
             {(conversation.visitor?.city || conversation.visitor?.country) && (

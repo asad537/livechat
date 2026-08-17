@@ -1344,6 +1344,14 @@ p {
   display: inline-block;
 }
 
+.side-v-link {
+  color: var(--accent-strong, #4f46e5);
+  text-decoration: none;
+}
+.side-v-link:hover {
+  text-decoration: underline;
+}
+
 /* Timeline */
 .timeline {
   display: flex;
