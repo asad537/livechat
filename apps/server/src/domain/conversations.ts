@@ -135,7 +135,7 @@ export async function loadSummaries(
   const convIds = convs.map((c) => c.id);
   const cPh = placeholders(convIds.length);
 
-  const [visitorRows, websiteRows, userRows, lastMsgRows, unreadRows, visitorSpokeRows] =
+  const [visitorRows, websiteRows, userRows, lastMsgRows, unreadRows, visitorSpokeRows, lastPageRows] =
     await Promise.all([
     deps.db.all<VisitorRow>(
       `SELECT * FROM visitors WHERE id IN (${placeholders(visitorIds.length)})`,
@@ -171,7 +171,18 @@ export async function loadSummaries(
         WHERE conversation_id IN (${cPh}) AND sender_type = 'VISITOR'`,
       convIds,
     ),
+    // Latest recorded page per visitor — the "current page" fallback for the
+    // panel when the visitor is offline (presence has no live page then). #22
+    deps.db.all<{ vid: string; url: string }>(
+      `SELECT vp.visitor_id AS vid, vp.url
+         FROM visitor_pages vp
+         JOIN (SELECT visitor_id, MAX(created_at) AS mx FROM visitor_pages
+                WHERE visitor_id IN (${placeholders(visitorIds.length)}) GROUP BY visitor_id) x
+           ON x.visitor_id = vp.visitor_id AND x.mx = vp.created_at`,
+      visitorIds,
+    ),
   ]);
+  const lastPageByVisitor = new Map(lastPageRows.map((r) => [r.vid, r.url]));
 
   const visitors = new Map(visitorRows.map((r) => [r.id, r]));
   const websites = new Map(websiteRows.map((r) => [r.id, r]));
@@ -208,7 +219,10 @@ export async function loadSummaries(
         ? toVisitor(
             visitorRow,
             deps.presence.isVisitorOnline(conv.visitor_id),
-            deps.presence.getVisitorPage(conv.visitor_id),
+            // Live page when online, else the last page we recorded for them.
+            deps.presence.getVisitorPage(conv.visitor_id) ??
+              lastPageByVisitor.get(conv.visitor_id) ??
+              null,
           )
         : undefined,
       website: websiteRow ? toBranding(websiteRow) : undefined,
