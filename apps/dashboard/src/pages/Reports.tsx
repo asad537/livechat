@@ -408,7 +408,7 @@ export default function Reports() {
                       <th className="lb-rank">#</th>
                       <th>Agent</th>
                       <th className="num">Chats</th>
-                      <th className="num">CSR clicks</th>
+                      <th className="num">Clicks</th>
                       <th className="num">Resolution</th>
                       <th className="num">Avg reply</th>
                       <th className="num">Avg duration</th>

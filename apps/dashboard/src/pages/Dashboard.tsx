@@ -382,7 +382,7 @@ export default function Dashboard() {
                     <tr>
                       <th>Agent</th>
                       <th className="num">Chats</th>
-                      <th className="num">CSR clicks</th>
+                      <th className="num">Clicks</th>
                       <th className="num">Res. rate</th>
                       <th className="num">Avg reply</th>
                       <th className="num">Rating</th>
