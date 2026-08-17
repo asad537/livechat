@@ -240,8 +240,20 @@ const BUSY_NOTICE_TEXT =
   'Please share your email and phone number and we will get back to you as soon as possible.';
 const busyTimers = new Map<string, NodeJS.Timeout>();
 
+/** Cancel the pending busy notice — called whenever an agent replies. */
+function cancelBusyNotice(conversationId: string): void {
+  const t = busyTimers.get(conversationId);
+  if (t) {
+    clearTimeout(t);
+    busyTimers.delete(conversationId);
+  }
+}
+
 function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
-  if (busyTimers.has(conversationId)) return;
+  // Reset on every client message so the 5-minute clock always measures from the
+  // client's LATEST message — an agent who is actively replying keeps cancelling
+  // it, so it only ever fires when the client is genuinely left waiting.
+  cancelBusyNotice(conversationId);
   const t = setTimeout(() => {
     busyTimers.delete(conversationId);
     void (async () => {
@@ -250,21 +262,18 @@ function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
         [conversationId],
       );
       if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
-      // Only a genuinely unattended chat gets the busy note. If ANY human agent
-      // has sent even one message, someone is handling it — never interrupt an
-      // active conversation with "our team is busy". (An ACTIVE status also means
-      // a human accepted it.)
-      if (conv.status === 'ACTIVE') return;
-      const clientSpoke = await deps.db.get<{ id: string }>(
-        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
+      // Fire only if the client's LATEST message has gone unanswered by any
+      // agent for the full window (an agent reply after it cancels this).
+      const lastVisitor = await deps.db.get<{ created_at: string }>(
+        "SELECT created_at FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' ORDER BY created_at DESC LIMIT 1",
         [conversationId],
       );
-      if (!clientSpoke) return; // no client message → nothing to be sorry for
-      const agentMsg = await deps.db.get<{ id: string }>(
-        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' LIMIT 1",
-        [conversationId],
+      if (!lastVisitor) return;
+      const agentReply = await deps.db.get<{ id: string }>(
+        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' AND created_at >= ? LIMIT 1",
+        [conversationId, lastVisitor.created_at],
       );
-      if (agentMsg) return; // an agent is/was engaged — no busy note
+      if (agentReply) return; // agent answered the latest client message
       // Only once per conversation.
       const already = await deps.db.get<{ id: string }>(
         "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'BOT' AND body = ? LIMIT 1",
@@ -793,6 +802,11 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           tempId,
         });
 
+        // (Re)start the 5-minute busy-notice clock from THIS client message —
+        // for every path (new, queued or agent-initiated). An agent reply cancels
+        // it, so it only fires when the client is genuinely left waiting.
+        scheduleBusyNotice(deps, conv.id);
+
         // Assigned CSR is off-duty and their client is talking → nudge the
         // Team Lead (throttled per conversation) so somebody answers.
         if (
@@ -839,9 +853,6 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         // AI greeter keeps queued visitors company until an agent joins
         // (it re-checks WAITING + unassigned internally, so always safe).
         maybeBotReply(deps, conv.id);
-
-        // No human reply in a few minutes → automated busy notice + contact form.
-        scheduleBusyNotice(deps, conv.id);
       }),
     );
 
@@ -1249,6 +1260,8 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           body,
           tempId,
         });
+        // An agent just replied — the client isn't being left waiting.
+        cancelBusyNotice(conv.id);
       }),
     );
 
