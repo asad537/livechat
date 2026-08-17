@@ -4440,7 +4440,7 @@ img.avatar {
 
 .db-row-bottom {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.9fr;
+  grid-template-columns: 1fr 1fr;
   gap: 18px;
   align-items: start;
 }
