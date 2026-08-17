@@ -51,9 +51,10 @@ function langName(code: string): string {
   return LANG_NAMES[code.toLowerCase()] ?? code;
 }
 
-/** True when this deployment can translate at all (feature on + an AI engine set). */
+/** True when this deployment can translate at all. The primary engine is the
+    free, keyless Google endpoint, so no AI key is required — only the toggle. */
 export function translationEnabled(deps: AppDeps): boolean {
-  return deps.config.autoTranslate && deps.config.aiProvider !== 'builtin';
+  return deps.config.autoTranslate;
 }
 
 // ─── One AI round-trip: detect source language + translate ───
@@ -147,12 +148,45 @@ async function openAiCompatTranslate(
   return data.choices?.[0]?.message?.content?.trim() ?? null;
 }
 
-/** Detect + translate `text` into `target`. Returns null on any failure. */
+/** Free, keyless translation via Google's public endpoint — auto-detects the
+    source language and has no per-day token limit (unlike the LLM providers). */
+async function googleTranslate(text: string, target: string): Promise<TranslateResult | null> {
+  const url =
+    'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' +
+    encodeURIComponent(target) +
+    '&dt=t&q=' +
+    encodeURIComponent(text);
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'user-agent': 'Mozilla/5.0' },
+    });
+    if (!res.ok) return null;
+    // Shape: [ [ ["translated","original",…], … ], null, "<detected src lang>", … ]
+    const data = (await res.json()) as [Array<[string]>, unknown, string];
+    const segments = Array.isArray(data?.[0]) ? data[0] : [];
+    const translated = segments.map((s) => (Array.isArray(s) ? s[0] : '')).join('');
+    const lang = typeof data?.[2] === 'string' ? data[2].toLowerCase().slice(0, 8) : 'und';
+    if (!translated) return null;
+    return { lang: lang || 'und', text: translated };
+  } catch {
+    return null;
+  }
+}
+
+/** Detect + translate `text` into `target`. Returns null on any failure.
+    Free Google endpoint first (no token limits); the configured LLM is only a
+    fallback for when that endpoint is unreachable. */
 async function translate(
   deps: AppDeps,
   text: string,
   target: string,
 ): Promise<TranslateResult | null> {
+  const free = await googleTranslate(text, target);
+  if (free) return free;
+
+  // Fallback: the LLM provider (if any). Skipped when none is configured.
+  if (deps.config.aiProvider === 'builtin') return null;
   const system = buildPrompt(target);
   try {
     const raw =
@@ -162,7 +196,7 @@ async function translate(
     if (!raw) return null;
     return parseResult(raw);
   } catch (err) {
-    console.warn('[translate] failed:', (err as Error).message);
+    console.warn('[translate] fallback failed:', (err as Error).message);
     return null;
   }
 }
