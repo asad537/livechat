@@ -250,17 +250,21 @@ function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
         [conversationId],
       );
       if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
-      // Still unanswered? (an AGENT reply after the client's last message cancels this)
-      const lastVisitor = await deps.db.get<{ created_at: string }>(
-        "SELECT created_at FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' ORDER BY created_at DESC LIMIT 1",
+      // Only a genuinely unattended chat gets the busy note. If ANY human agent
+      // has sent even one message, someone is handling it — never interrupt an
+      // active conversation with "our team is busy". (An ACTIVE status also means
+      // a human accepted it.)
+      if (conv.status === 'ACTIVE') return;
+      const clientSpoke = await deps.db.get<{ id: string }>(
+        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
         [conversationId],
       );
-      if (!lastVisitor) return;
-      const agentReply = await deps.db.get<{ id: string }>(
-        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' AND created_at >= ? LIMIT 1",
-        [conversationId, lastVisitor.created_at],
+      if (!clientSpoke) return; // no client message → nothing to be sorry for
+      const agentMsg = await deps.db.get<{ id: string }>(
+        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' LIMIT 1",
+        [conversationId],
       );
-      if (agentReply) return;
+      if (agentMsg) return; // an agent is/was engaged — no busy note
       // Only once per conversation.
       const already = await deps.db.get<{ id: string }>(
         "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'BOT' AND body = ? LIMIT 1",
