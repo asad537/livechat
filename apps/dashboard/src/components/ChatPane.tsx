@@ -746,50 +746,6 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               </span>
               <span className="side-v">{conversation.website ? siteLabel(conversation.website) : '—'}</span>
             </div>
-            {sessionPath.length > 0 ? (
-              <div className="side-path">
-                <div className="side-path-title">
-                  <IconEye size={13} /> Visitor path
-                </div>
-                <ol className="vd-path side-path-list">
-                  {[...sessionPath].reverse().slice(0, 12).map((p, i) => (
-                    <li
-                      key={`${p.at}_${i}`}
-                      className={classNames('vd-path-item', i === 0 && conversation.visitor?.online && 'current')}
-                    >
-                      <span className="vd-path-time">{formatWhen(p.at)}</span>
-                      <div className="vd-path-page">
-                        <span className="vd-path-title">{p.title || pageLabel(p.url)}</span>
-                        {p.url && (
-                          <a
-                            className="vd-path-url"
-                            href={p.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={p.url}
-                          >
-                            {pageLabel(p.url)}
-                          </a>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ) : currentPage ? (
-              <div className="side-kv">
-                <span className="side-k">Current page</span>
-                <a
-                  className="side-v side-v-trunc side-v-link"
-                  href={currentPage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={currentPage}
-                >
-                  {currentPage}
-                </a>
-              </div>
-            ) : null}
             {(conversation.visitor?.city || conversation.visitor?.country) && (
               <div className="side-kv">
                 <span className="side-k">📍 Location</span>
@@ -828,6 +784,49 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
           <div className="side-section">
             <h4>Assignment history</h4>
             <HistoryTimeline history={history} />
+          </div>
+          <div className="side-section">
+            <h4>
+              <IconEye size={13} /> Visitor path
+            </h4>
+            {sessionPath.length > 0 ? (
+              <ol className="vd-path side-path-list">
+                {[...sessionPath].reverse().slice(0, 12).map((p, i) => (
+                  <li
+                    key={`${p.at}_${i}`}
+                    className={classNames('vd-path-item', i === 0 && conversation.visitor?.online && 'current')}
+                  >
+                    <span className="vd-path-time">{formatWhen(p.at)}</span>
+                    <div className="vd-path-page">
+                      <span className="vd-path-title">{p.title || pageLabel(p.url)}</span>
+                      {p.url && (
+                        <a
+                          className="vd-path-url"
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={p.url}
+                        >
+                          {pageLabel(p.url)}
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : currentPage ? (
+              <a
+                className="side-v-link side-v-trunc"
+                href={currentPage}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={currentPage}
+              >
+                {currentPage}
+              </a>
+            ) : (
+              <p className="side-empty">No pages recorded yet.</p>
+            )}
           </div>
         </div>
       )}
