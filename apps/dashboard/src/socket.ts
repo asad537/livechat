@@ -8,7 +8,16 @@ import { AGENT_NAMESPACE } from '@livechat/shared';
 let socket: Socket | null = null;
 
 export function connectSocket(token: string): Socket {
-  if (socket) return socket;
+  if (socket) {
+    // The singleton may have been created with a token that has since been
+    // replaced (e.g. a stale token bounced us to /login and the user signed in
+    // again). Socket.IO snapshots `auth` per handshake, so refresh it and kick
+    // a reconnect — otherwise every retry re-sends the dead token and the app
+    // sits on "Reconnecting…" until a full page refresh.
+    (socket.auth as { token?: string }).token = token;
+    if (!socket.connected) socket.connect();
+    return socket;
+  }
   socket = io(AGENT_NAMESPACE, {
     auth: { token },
     autoConnect: true,
