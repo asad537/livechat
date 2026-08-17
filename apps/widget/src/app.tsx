@@ -84,6 +84,7 @@ function playPing(): void {
 export function App({ server, widgetKey }: { server: string; widgetKey: string }): JSX.Element | null {
   const tokenKey = `livechat:token:${widgetKey}`;
   const infoDismissKey = `livechat:info-dismissed:${widgetKey}`;
+  const colorKey = `livechat:color:${widgetKey}`;
 
   const [open, setOpen] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -99,6 +100,13 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     return () => window.clearTimeout(t);
   }, [connected]);
   const [website, setWebsite] = useState<WebsiteBranding | null>(null);
+  // Brand colour resolved instantly from cache (and refreshed by a fast HTTP
+  // boot fetch below), so the launcher never flashes the default blue while the
+  // socket handshake — which can take a few seconds — is still in flight.
+  const [brandColor, setBrandColor] = useState(() => lsGet(colorKey) || DEFAULT_PRIMARY);
+  // Visitor is on the admin blocklist (IP / country) → hide the widget entirely
+  // instead of letting it spin forever on "Reconnecting…".
+  const [blocked, setBlocked] = useState(false);
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [visitorToken, setVisitorToken] = useState('');
   const [conversation, setConversation] = useState<ConvState | null>(null);
@@ -133,6 +141,39 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     });
   };
   const [forceInfoForm, setForceInfoForm] = useState(false);
+
+  // Fetch branding over a fast HTTP call at boot so the launcher shows the real
+  // brand colour right away — within ~100ms on a first visit, and instantly
+  // (from cache) on every visit after — instead of waiting on the socket.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${server}/api/widget/boot?key=${encodeURIComponent(widgetKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { website?: WebsiteBranding; blocked?: boolean } | null) => {
+        if (cancelled || !data) return;
+        // Blocked visitor → hide right away, don't even open a socket.
+        if (data.blocked) {
+          setBlocked(true);
+          return;
+        }
+        const c = data.website?.primaryColor;
+        if (c) {
+          setBrandColor(c);
+          lsSet(colorKey, c);
+        }
+      })
+      .catch(() => {
+        /* offline — the socket handshake will still deliver branding */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [server, widgetKey, colorKey]);
+
+  // Keep the cached colour fresh once the authoritative branding arrives.
+  useEffect(() => {
+    if (website?.primaryColor) lsSet(colorKey, website.primaryColor);
+  }, [website, colorKey]);
 
   const socketRef = useRef<Socket | null>(null);
   const openRef = useRef(open);
@@ -194,6 +235,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
+
+    // Blocklisted visitor (IP / country): the server rejects the handshake with
+    // "Access blocked". Stop retrying and hide the widget rather than looping on
+    // "Reconnecting…". (The boot fetch usually catches this first and faster.)
+    socket.on('connect_error', (err: Error) => {
+      if (/access blocked|blocked/i.test(err?.message ?? '')) {
+        socket.io.opts.reconnection = false;
+        socket.disconnect();
+        setBlocked(true);
+      }
+    });
 
     socket.on(EV.WidgetReady, (payload: ReadyPayload) => {
       lsSet(tokenKey, payload.visitorToken);
@@ -643,7 +695,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   };
 
   // ── Derived UI state ───────────────────────────────────────
-  const primary = website?.primaryColor || DEFAULT_PRIMARY;
+  const primary = website?.primaryColor || brandColor;
   const header = website?.headerColor || primary;
   const cssVars = useMemo(
     () =>
@@ -666,6 +718,9 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const showInfoForm =
     forceInfoForm || (!infoDismissed && !!visitor && !visitor.name && !visitor.email && !ended);
   const selfLabel = visitor?.name || 'You';
+
+  // Blocked visitor → render nothing at all (no bubble, no "Reconnecting…").
+  if (blocked) return null;
 
   return (
     <div class="lc-root" style={cssVars}>

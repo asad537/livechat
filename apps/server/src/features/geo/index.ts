@@ -16,6 +16,18 @@ export function clientIp(socket: Socket): string | null {
   return ip.length > 0 ? ip.slice(0, 64) : null;
 }
 
+/** Real client IP for an HTTP request (proxy-aware) — mirrors `clientIp`. */
+export function httpClientIp(req: {
+  headers: Record<string, string | string[] | undefined>;
+  socket?: { remoteAddress?: string | null };
+}): string | null {
+  const fwd = req.headers['x-forwarded-for'];
+  const first = (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0]?.trim();
+  const raw = first || req.socket?.remoteAddress || '';
+  const ip = raw.replace(/^::ffff:/i, '').trim();
+  return ip.length > 0 ? ip.slice(0, 64) : null;
+}
+
 export function isPrivateIp(ip: string): boolean {
   return (
     ip === '::1' ||

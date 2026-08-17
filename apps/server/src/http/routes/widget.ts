@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import { API, WIDGET_NAMESPACE } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { verifyToken, type VisitorTokenPayload } from '../../core/auth.js';
+import { httpClientIp, lookupCountry } from '../../features/geo/index.js';
 import { asString, h, toBranding, type WebsiteRow } from '../helpers.js';
 
 export function buildWidgetRouter(deps: AppDeps): Router {
@@ -22,6 +23,21 @@ export function buildWidgetRouter(deps: AppDeps): Router {
       if (!site) {
         res.status(404).json({ error: 'Unknown widget key' });
         return;
+      }
+      // Admin blocklist — tell a blocked visitor up-front (in ~100ms) so the
+      // widget can hide itself immediately instead of spinning on "Reconnecting…"
+      // when the socket handshake is later rejected.
+      const ip = httpClientIp(req);
+      if (deps.blocklist.isIpBlocked(ip)) {
+        res.json({ blocked: true });
+        return;
+      }
+      if (deps.blocklist.hasCountryBlocks() && ip) {
+        const cc = await lookupCountry(ip);
+        if (deps.blocklist.isCountryBlocked(cc)) {
+          res.json({ blocked: true });
+          return;
+        }
       }
       res.json({ website: toBranding(site) });
     }),
