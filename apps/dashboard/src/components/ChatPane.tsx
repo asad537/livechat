@@ -4,12 +4,13 @@ import type {
   CallMeta,
   ChatMessage,
   ConversationSummary,
+  VisitorPage,
 } from '@livechat/shared';
 import { EV } from '@livechat/shared';
 import { useApp } from '../state';
 import { getSocket } from '../socket';
 import { api, uploadFile, type Shortcut } from '../api';
-import { classNames, formatDay, formatTime, initials, newTempId, siteLabel, visitorNumber } from '../util';
+import { classNames, formatDay, formatTime, formatWhen, initials, newTempId, pageLabel, siteLabel, visitorNumber } from '../util';
 import MessageBubble from './MessageBubble';
 import HistoryTimeline from './HistoryTimeline';
 import TransferModal from './TransferModal';
@@ -63,6 +64,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [history, setHistory] = useState<AssignmentRecord[]>([]);
+  const [sessionPath, setSessionPath] = useState<VisitorPage[]>([]);
   const [openError, setOpenError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [visitorTyping, setVisitorTyping] = useState(false);
@@ -131,6 +133,27 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     ? visitorsByWebsite[conversation.websiteId]?.find((vv) => vv.id === conversation.visitorId)
     : undefined;
   const currentPage = conversation?.visitor?.currentPage ?? liveVisitor?.currentPage ?? null;
+
+  // Full page-view history for the side panel's "Visitor path" timeline.
+  const visitorId = conversation?.visitorId;
+  useEffect(() => {
+    if (!showSidebar || !visitorId) {
+      setSessionPath([]);
+      return;
+    }
+    let cancelled = false;
+    void api
+      .visitorProfile(visitorId)
+      .then((p) => {
+        if (!cancelled) setSessionPath(p.sessionPath ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionPath([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visitorId, showSidebar]);
 
   const canSend = useMemo(() => {
     if (!me || !conversation) return false;
@@ -723,7 +746,37 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               </span>
               <span className="side-v">{conversation.website ? siteLabel(conversation.website) : '—'}</span>
             </div>
-            {currentPage && (
+            {sessionPath.length > 0 ? (
+              <div className="side-path">
+                <div className="side-path-title">
+                  <IconEye size={13} /> Visitor path
+                </div>
+                <ol className="vd-path side-path-list">
+                  {[...sessionPath].reverse().slice(0, 12).map((p, i) => (
+                    <li
+                      key={`${p.at}_${i}`}
+                      className={classNames('vd-path-item', i === 0 && conversation.visitor?.online && 'current')}
+                    >
+                      <span className="vd-path-time">{formatWhen(p.at)}</span>
+                      <div className="vd-path-page">
+                        <span className="vd-path-title">{p.title || pageLabel(p.url)}</span>
+                        {p.url && (
+                          <a
+                            className="vd-path-url"
+                            href={p.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={p.url}
+                          >
+                            {pageLabel(p.url)}
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : currentPage ? (
               <div className="side-kv">
                 <span className="side-k">Current page</span>
                 <a
@@ -736,7 +789,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                   {currentPage}
                 </a>
               </div>
-            )}
+            ) : null}
             {(conversation.visitor?.city || conversation.visitor?.country) && (
               <div className="side-kv">
                 <span className="side-k">📍 Location</span>
