@@ -222,6 +222,9 @@ export default function VisitorDrawer({
     me?.role === 'MANAGER';
   const busyAgent = openConv && !canOpenConv ? openConv.agentName : null;
   const chatConvId = (canOpenConv ? openConv?.id : undefined) ?? startedId;
+  // "Past chats" lists finished conversations only — the ongoing one lives in
+  // the Chat tab, so it must not double as history.
+  const pastChats = chats?.filter((c) => c.status === 'CLOSED' || c.status === 'MISSED') ?? null;
 
   const startChatInline = () => {
     const body = starterDraft.trim();
@@ -458,7 +461,7 @@ export default function VisitorDrawer({
             className={classNames('vd-tab', tab === 'chats' && 'active')}
             onClick={() => setTab('chats')}
           >
-            Past chats{chats ? ` (${chats.length})` : ''}
+            Past chats{pastChats ? ` (${pastChats.length})` : ''}
           </button>
         </div>
 
@@ -544,8 +547,8 @@ export default function VisitorDrawer({
         {tab === 'chats' && (
           <div className="vd-body">
             {!chats && <p className="vd-muted">Loading…</p>}
-            {chats && chats.length === 0 && <p className="vd-muted">No conversations yet.</p>}
-            {chats?.map((c) => (
+            {pastChats && pastChats.length === 0 && <p className="vd-muted">No past conversations yet.</p>}
+            {pastChats?.map((c) => (
               <div key={c.id} className={classNames('vd-chat card', openChatId === c.id && 'open')}>
                 <button className="vd-chat-head" onClick={() => void toggleTranscript(c.id)}>
                   <div className="vd-chat-main">

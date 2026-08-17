@@ -171,6 +171,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ── Bottom chat dock (Zendesk-style open-chat tabs) ──
+  const [openChats, setOpenChats] = useState<string[]>([]);
+  const openChatTab = useCallback((id: string) => {
+    setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-7), id]));
+  }, []);
+  // Floating docked chat window (opened from the dock or the visitor drawer).
+  const [dockedChatId, setDockedChatId] = useState<string | null>(null);
+  const openDockedChat = useCallback(
+    (id: string) => {
+      openChatTab(id);
+      setDockedChatId(id);
+    },
+    [openChatTab],
+  );
+  const closeDockedChat = useCallback(() => setDockedChatId(null), []);
+
+  const closeChatTab = useCallback((id: string) => {
+    setOpenChats((prev) => prev.filter((c) => c !== id));
+    setDockedChatId((prev) => (prev === id ? null : prev));
+  }, []);
+
   // ─── Socket lifecycle ──────────────────────────────────────
   useEffect(() => {
     if (!token) return;
@@ -260,14 +281,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (
         user &&
         conv.assignedUserId === user.id &&
-        conv.status === 'WAITING' &&
-        (!prev || prev.assignedUserId !== user.id)
+        (!prev || prev.assignedUserId !== user.id) &&
+        (conv.status === 'WAITING' || conv.status === 'ACTIVE' || conv.status === 'OFFERED')
       ) {
         const who = conv.visitor?.name || 'A visitor';
         const where = conv.website?.label?.trim() || conv.website?.name || 'your site';
-        pushToast('New chat assigned', `${who} is waiting on ${where}.`, 'info');
+        // A hand-off to an already-running chat is a transfer, not a fresh chat.
+        const transferred = conv.status !== 'WAITING' || !!prev;
+        const title = transferred ? 'Chat transferred to you' : 'New chat assigned';
+        pushToast(title, `${who} on ${where}.`, 'info');
         playChime('new-chat');
-        desktopNotify('New chat assigned', `${who} is waiting on ${where}.`, `chat-${conv.id}`);
+        desktopNotify(title, `${who} on ${where}.`, `chat-${conv.id}`);
       } else if (
         user &&
         conv.assignedUserId === user.id &&
@@ -282,6 +306,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           conv.lastMessage.body || 'New message',
           `chat-${conv.id}`,
         );
+      }
+      // The visitor left the site → auto-minimize their floating chat window
+      // (its tab stays in the dock below).
+      if (conv.lastMessage?.kind === 'SYSTEM' && conv.lastMessage.body === 'Visitor left the site') {
+        setDockedChatId((prevId) => (prevId === conv.id ? null : prevId));
       }
       setConversations((current) => ({ ...current, [conv.id]: { ...current[conv.id], ...conv } }));
     };
@@ -364,6 +393,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
     socket.on(EV.AgentReady, onReady);
+    const onAgentAlert = (p: { message?: string }) => {
+      if (p?.message) {
+        pushToast('Heads up', p.message, 'info');
+        playChime('new-chat');
+      }
+    };
+    socket.on(EV.AgentAlert, onAgentAlert);
     socket.on(EV.InboxUpdate, onInboxUpdate);
     socket.on(EV.ChatStatus, onChatStatus);
     socket.on(EV.VisitorsUpdate, onVisitorsUpdate);
@@ -379,6 +415,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
       socket.off(EV.AgentReady, onReady);
+      socket.off(EV.AgentAlert, onAgentAlert);
       socket.off(EV.InboxUpdate, onInboxUpdate);
       socket.off(EV.ChatStatus, onChatStatus);
       socket.off(EV.VisitorsUpdate, onVisitorsUpdate);
@@ -495,27 +532,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const clearActiveCall = useCallback(() => {
     setActiveCall(null);
-  }, []);
-
-  // ── Bottom chat dock (Zendesk-style open-chat tabs) ──
-  const [openChats, setOpenChats] = useState<string[]>([]);
-  const openChatTab = useCallback((id: string) => {
-    setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-7), id]));
-  }, []);
-  // Floating docked chat window (opened from the dock or the visitor drawer).
-  const [dockedChatId, setDockedChatId] = useState<string | null>(null);
-  const openDockedChat = useCallback(
-    (id: string) => {
-      openChatTab(id);
-      setDockedChatId(id);
-    },
-    [openChatTab],
-  );
-  const closeDockedChat = useCallback(() => setDockedChatId(null), []);
-
-  const closeChatTab = useCallback((id: string) => {
-    setOpenChats((prev) => prev.filter((c) => c !== id));
-    setDockedChatId((prev) => (prev === id ? null : prev));
   }, []);
 
   const value: AppContextValue = {

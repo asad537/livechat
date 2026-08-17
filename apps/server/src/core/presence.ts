@@ -39,6 +39,8 @@ export interface PresenceStore {
     idle: boolean,
   ): { changed: boolean; idleMs: number };
   isVisitorIdle(visitorId: string): boolean;
+  /** Current page URL of an online visitor (null when unknown/offline). */
+  getVisitorPage(visitorId: string): string | null;
 }
 
 // Page reloads / navigation close the widget socket for a moment — keep the
@@ -195,6 +197,11 @@ export function createPresence(): PresenceStore {
       const websiteId = visitorIndex.get(visitorId);
       if (!websiteId) return false;
       return (visitors.get(websiteId)?.get(visitorId)?.idleSince ?? null) !== null;
+    },
+    getVisitorPage(visitorId) {
+      const websiteId = visitorIndex.get(visitorId);
+      if (!websiteId) return null;
+      return visitors.get(websiteId)?.get(visitorId)?.page ?? null;
     },
   };
 }

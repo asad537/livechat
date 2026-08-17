@@ -169,6 +169,7 @@ export const EV = {
   WidgetRead: 'widget:read',                 // { messageIds: string[] }
   WidgetInfo: 'widget:info',                 // { name?: string, email?: string, phone?: string }
   ChatRequestInfo: 'chat:request-info',      // → widget: open the contact form (busy fallback)
+  AgentAlert: 'agent:alert',                 // → agent: toast { message } (e.g. TL when a CSR is off-duty)
   WidgetCallAccept: 'widget:call:accept',    // { callId: string }
   WidgetCallDecline: 'widget:call:decline',  // { callId: string }
   WidgetActivity: 'widget:activity',         // { active: boolean } — tab idle/active (presence only)

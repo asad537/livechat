@@ -205,7 +205,11 @@ export async function loadSummaries(
       closedAt: conv.closed_at,
       rating: conv.rating === null || conv.rating === undefined ? null : Number(conv.rating),
       visitor: visitorRow
-        ? toVisitor(visitorRow, deps.presence.isVisitorOnline(conv.visitor_id))
+        ? toVisitor(
+            visitorRow,
+            deps.presence.isVisitorOnline(conv.visitor_id),
+            deps.presence.getVisitorPage(conv.visitor_id),
+          )
         : undefined,
       website: websiteRow ? toBranding(websiteRow) : undefined,
       assignedUser: assignedRow ? toUserPublic(assignedRow) : null,

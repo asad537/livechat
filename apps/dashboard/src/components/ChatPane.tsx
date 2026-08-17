@@ -339,6 +339,12 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   };
 
   const closeConversation = () => {
+    // The visitor is still browsing — make sure this isn't a mis-click that
+    // kills a live conversation.
+    if (conversation?.visitor?.online) {
+      const name = conversation.visitor.name || 'The visitor';
+      if (!window.confirm(`${name} is still on the website. End this chat anyway?`)) return;
+    }
     getSocket()?.emit(EV.AgentClose, { conversationId });
   };
 

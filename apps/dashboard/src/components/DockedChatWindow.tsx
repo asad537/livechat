@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../state';
 import { initials, visitorNumber } from '../util';
-import { IconExpand, IconX } from '../icons';
+import { IconExpand, IconUser, IconX } from '../icons';
 import ChatPane from './ChatPane';
+import VisitorDrawer from './VisitorDrawer';
 
 /**
  * Zendesk-style floating chat window: full ChatPane (composer, typing, calls,
  * type-to-join) docked above the bottom tab bar — chat from any page.
  */
 export default function DockedChatWindow() {
-  const { dockedChatId, closeDockedChat, closeChatTab, conversations } = useApp();
+  const { dockedChatId, closeDockedChat, closeChatTab, conversations, openDockedChat } = useApp();
   const navigate = useNavigate();
+  const [showProfile, setShowProfile] = useState(false);
   if (!dockedChatId) return null;
 
   const conv = conversations[dockedChatId];
@@ -28,6 +30,15 @@ export default function DockedChatWindow() {
         </span>
         <span className="docked-chat-title">{name}</span>
         <span className="docked-chat-actions">
+          {conv?.visitorId && (
+            <button
+              className="icon-btn icon-btn-dark"
+              title="Client details — view or edit contact info"
+              onClick={() => setShowProfile(true)}
+            >
+              <IconUser size={14} />
+            </button>
+          )}
           <button
             className="icon-btn icon-btn-dark"
             title="Open in Inbox"
@@ -62,6 +73,19 @@ export default function DockedChatWindow() {
       <div className="docked-chat-body">
         <ChatPane conversationId={dockedChatId} showSidebar={false} />
       </div>
+
+      {showProfile && conv?.visitorId && (
+        <VisitorDrawer
+          visitorId={conv.visitorId}
+          accentColor={conv.website?.primaryColor || 'var(--accent)'}
+          onClose={() => setShowProfile(false)}
+          onStartChat={() => setShowProfile(false)}
+          onOpenConversation={(conversationId) => {
+            setShowProfile(false);
+            openDockedChat(conversationId);
+          }}
+        />
+      )}
     </div>
   );
 }

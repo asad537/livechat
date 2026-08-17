@@ -77,6 +77,8 @@ const INACTIVITY_SWEEP_MS = 15 * 60 * 1000; // re-check every 15 minutes
 // Client's last message unanswered by any AGENT for this long → close as MISSED.
 const UNANSWERED_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 const QUEUE_MESSAGE = "You're in the queue — an agent will be with you shortly.";
+const VISITOR_LEFT_NOTICE = 'Visitor left the site';
+const VISITOR_BACK_NOTICE = 'Visitor is back on the site';
 
 // Scale/abuse guards
 const MAX_MESSAGE_CHARS = 4000;
@@ -279,6 +281,34 @@ function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
   }, BUSY_NOTICE_AFTER_MS);
   t.unref?.();
   busyTimers.set(conversationId, t);
+}
+
+// TL nudge throttle: one alert per conversation per 10 minutes.
+const leadAlertAt = new Map<string, number>();
+
+function notifyLeadOfOfflineAssignee(
+  deps: AppDeps,
+  conversationId: string,
+  assigneeId: string,
+): void {
+  const last = leadAlertAt.get(conversationId) ?? 0;
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  leadAlertAt.set(conversationId, Date.now());
+  void (async () => {
+    const assignee = await deps.db.get<{ name: string; team_lead_id: string | null }>(
+      'SELECT name, team_lead_id FROM users WHERE id = ?',
+      [assigneeId],
+    );
+    if (!assignee?.team_lead_id) return;
+    if (!deps.presence.isAgentOnline(assignee.team_lead_id)) return;
+    deps.io
+      .of(AGENT_NAMESPACE)
+      .to(userRoom(assignee.team_lead_id))
+      .emit(EV.AgentAlert, {
+        conversationId,
+        message: `${assignee.name} is off-duty and their client just messaged — please take over.`,
+      });
+  })().catch((err: unknown) => console.error('[realtime] lead alert', err));
 }
 
 function startInactivitySweeper(deps: AppDeps): void {
@@ -548,6 +578,28 @@ export function attachRealtime(deps: AppDeps): void {
         [visitorId],
       );
       for (const c of openConvs) scheduleOutreachClose(deps, c.id, visitorId);
+
+      // "Visitor left the site" notice in every open chat that has messages —
+      // agents see in the chat itself that nobody is reading right now.
+      const noticeConvs = await deps.db.all<{ id: string }>(
+        `SELECT c.id FROM conversations c
+          WHERE c.visitor_id = ? AND c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+            AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)`,
+        [visitorId],
+      );
+      for (const c of noticeConvs) {
+        const last = await deps.db.get<{ body: string | null; kind: string }>(
+          'SELECT body, kind FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+          [c.id],
+        );
+        if (last?.kind === 'SYSTEM' && last.body === VISITOR_LEFT_NOTICE) continue;
+        await postMessage(deps, {
+          conversationId: c.id,
+          senderType: 'SYSTEM',
+          kind: 'SYSTEM',
+          body: VISITOR_LEFT_NOTICE,
+        });
+      }
     })().catch((err: unknown) => console.error('[realtime] visitor offline', err));
   });
 }
@@ -736,6 +788,16 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           body,
           tempId,
         });
+
+        // Assigned CSR is off-duty and their client is talking → nudge the
+        // Team Lead (throttled per conversation) so somebody answers.
+        if (
+          !isNew &&
+          conv.assigned_user_id &&
+          !deps.presence.isAgentOnline(conv.assigned_user_id)
+        ) {
+          notifyLeadOfOfflineAssignee(deps, conv.id, conv.assigned_user_id);
+        }
 
         // Auto-capture contact details the visitor typed (email / phone / name).
         if (await captureVisitorInfo(deps, data.visitorId, body)) {
@@ -993,6 +1055,19 @@ async function onWidgetConnected(
   if (conv) {
     data.conversationId = conv.id;
     await socket.join(convRoom(conv.id));
+    // If the chat's last entry is the "left" notice, the visitor just returned.
+    const lastMsg = await deps.db.get<{ body: string | null; kind: string }>(
+      'SELECT body, kind FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+      [conv.id],
+    );
+    if (lastMsg?.kind === 'SYSTEM' && lastMsg.body === VISITOR_LEFT_NOTICE) {
+      await postMessage(deps, {
+        conversationId: conv.id,
+        senderType: 'SYSTEM',
+        kind: 'SYSTEM',
+        body: VISITOR_BACK_NOTICE,
+      });
+    }
     conversation = (await loadSummary(deps, conv.id)) ?? null;
     // Bounded: only the latest 150 messages ride the widget handshake.
     const rows = await deps.db.all<MessageRow>(
