@@ -167,7 +167,7 @@ function Sidebar() {
         </>
       )}
       <div className="sidebar-foot">
-        {me.role !== 'MANAGER' && <AvailabilityToggle />}
+        <AvailabilityToggle />
         <div
           className="sidebar-user sidebar-user-link"
           role="button"

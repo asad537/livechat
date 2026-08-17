@@ -304,7 +304,6 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     auth,
     h(async (req, res) => {
       const user = agent(req);
-      if (user.role === 'MANAGER') throw new HttpError(403, 'Managers have view-only access');
       const row = await loadScopedVisitor(deps, req, user.id, user.role);
       const body = (req.body ?? {}) as Record<string, unknown>;
 

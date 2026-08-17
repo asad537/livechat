@@ -300,14 +300,12 @@ export default function VisitorDrawer({
               }}
             />
           </label>
-          {me?.role !== 'MANAGER' && (
-            <div className="vd-form-actions">
-              {savedFlash && <span className="vd-saved">✓ Saved</span>}
-              <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
-                {saving ? 'Saving…' : 'Save details'}
-              </button>
-            </div>
-          )}
+          <div className="vd-form-actions">
+            {savedFlash && <span className="vd-saved">✓ Saved</span>}
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={!dirty || saving}>
+              {saving ? 'Saving…' : 'Save details'}
+            </button>
+          </div>
         </section>
 
         {/* Session path */}
@@ -487,18 +485,6 @@ export default function VisitorDrawer({
               </div>
             ) : chats === null ? (
               <p className="vd-muted vd-chat-loading">Loading…</p>
-            ) : me?.role === 'MANAGER' ? (
-              // Managers observe — they never open a chat with a visitor.
-              <div className="vd-chat-starter">
-                <div className="vd-chat-starter-hint">
-                  <span className="vd-chat-starter-emoji">👁️</span>
-                  <p>
-                    No open conversation with {name}.
-                    <br />
-                    Managers have view-only access and cannot start chats.
-                  </p>
-                </div>
-              </div>
             ) : (
               // No open conversation yet — typing here starts one instantly.
               <div className="vd-chat-starter">

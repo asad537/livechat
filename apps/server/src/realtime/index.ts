@@ -455,9 +455,9 @@ async function isLeadOfAssignee(deps: AppDeps, conv: ConversationRow, userId: st
 }
 
 /**
- * Assignee or ADMIN may manage (accept/close/transfer/send); a Team Lead may
- * manage their own CSRs' chats and the unassigned queue of accessible sites.
- * MANAGER never manages — view-only.
+ * Assignee, ADMIN or MANAGER may manage (accept/close/transfer/send); a Team
+ * Lead may manage their own CSRs' chats and the unassigned queue of accessible
+ * sites.
  */
 async function canManageConversation(
   deps: AppDeps,
@@ -465,8 +465,7 @@ async function canManageConversation(
   userId: string,
   role: Role,
 ): Promise<boolean> {
-  if (role === 'ADMIN') return true;
-  if (role === 'MANAGER') return false;
+  if (role === 'ADMIN' || role === 'MANAGER') return true;
   if (conv.assigned_user_id === userId) return true;
   if (role === 'LEAD') {
     if (conv.assigned_user_id) return isLeadOfAssignee(deps, conv, userId);
@@ -475,14 +474,14 @@ async function canManageConversation(
   return false;
 }
 
-/** Assignee, ADMIN, or the assignee's own Team Lead may send agent messages. */
+/** Assignee, ADMIN/MANAGER, or the assignee's own Team Lead may send agent messages. */
 async function canSendAsAgent(
   deps: AppDeps,
   conv: ConversationRow,
   userId: string,
   role: Role,
 ): Promise<boolean> {
-  if (role === 'ADMIN' || conv.assigned_user_id === userId) return true;
+  if (role === 'ADMIN' || role === 'MANAGER' || conv.assigned_user_id === userId) return true;
   if (role === 'LEAD') return isLeadOfAssignee(deps, conv, userId);
   return false;
 }
@@ -1182,10 +1181,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       EV.AgentMessage,
       safe(socket, async (payload: unknown) => {
         if (!allowAgentMsg()) return;
-        if (data.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
-          return;
-        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const body = asString(p.body)?.trim().slice(0, MAX_MESSAGE_CHARS);
         const tempId = asString(p.tempId) ?? undefined;
@@ -1256,10 +1251,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       safe(socket, async (payload: unknown, ack?: unknown) => {
         const reply =
           typeof ack === 'function' ? (ack as (r: { conversationId: string }) => void) : null;
-        if (data.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
-          return;
-        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const websiteId = asString(p.websiteId);
         const visitorId = asString(p.visitorId);
@@ -1336,10 +1327,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentAccept,
       safe(socket, async (payload: unknown) => {
-        if (data.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
-          return;
-        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv) return;
@@ -1384,10 +1371,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentClose,
       safe(socket, async (payload: unknown) => {
-        if (data.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
-          return;
-        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv) return;
@@ -1403,10 +1386,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentTransfer,
       safe(socket, async (payload: unknown) => {
-        if (data.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
-          return;
-        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const toUserId = asString(p.toUserId);
         const conv = await getConversation(deps, asString(p.conversationId));
@@ -1422,10 +1401,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         const target = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [toUserId]);
         if (!target) {
           socket.emit(EV.AppError, { message: 'Target agent not found' });
-          return;
-        }
-        if (target.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers cannot take chats' });
           return;
         }
         const isMember = await userCanAccessWebsite(
@@ -1446,7 +1421,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentTyping,
       safe(socket, (payload: unknown) => {
-        if (data.role === 'MANAGER') return; // watchers never show as typing
         const p = (payload ?? {}) as Record<string, unknown>;
         const conversationId = asString(p.conversationId);
         if (!conversationId) return;
@@ -1486,10 +1460,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
     socket.on(
       EV.AgentRequestFeedback,
       safe(socket, async (payload: unknown) => {
-        if (data.role === 'MANAGER') {
-          socket.emit(EV.AppError, { message: 'Managers have view-only access' });
-          return;
-        }
         const p = (payload ?? {}) as Record<string, unknown>;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv) return;

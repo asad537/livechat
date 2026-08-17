@@ -30,7 +30,6 @@ export default function TransferModal({ conversation, onClose }: Props) {
         (m) =>
           m.id !== conversation.assignedUserId &&
           m.id !== me?.id &&
-          m.role !== 'MANAGER' && // view-only, never takes chats
           !!online[m.id],
       )
       .map((m) => ({

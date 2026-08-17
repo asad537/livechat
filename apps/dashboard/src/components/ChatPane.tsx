@@ -125,8 +125,8 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
 
   const canSend = useMemo(() => {
     if (!me || !conversation) return false;
-    if (me.role === 'MANAGER') return false; // view-only role
     if (conversation.status === 'CLOSED' || conversation.status === 'MISSED') return false;
+    const boss = me.role === 'ADMIN' || me.role === 'MANAGER'; // full chat access
     const assigneeIsMyCsr =
       me.role === 'LEAD' &&
       conversation.assignedUserId != null &&
@@ -137,11 +137,11 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
         conversation.assignedUserId === me.id ||
         conversation.assignedUserId == null ||
         assigneeIsMyCsr ||
-        me.role === 'ADMIN'
+        boss
       );
     }
-    // ACTIVE: assignee, ADMIN, or the assignee's Team Lead may reply.
-    return conversation.assignedUserId === me.id || me.role === 'ADMIN' || assigneeIsMyCsr;
+    // ACTIVE: assignee, ADMIN/MANAGER, or the assignee's Team Lead may reply.
+    return conversation.assignedUserId === me.id || boss || assigneeIsMyCsr;
   }, [me, csrIds, conversation]);
 
   const joinByTyping = canSend && conversation?.status === 'WAITING';
@@ -396,7 +396,6 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     !!conversation &&
     conversation.status === 'WAITING' &&
     !!me &&
-    me.role !== 'MANAGER' &&
     (conversation.assignedUserId === me.id ||
       conversation.assignedUserId == null ||
       me.role === 'ADMIN' ||
@@ -487,7 +486,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                 </button>
               </>
             )}
-            {conversation && conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' && me?.role !== 'MANAGER' && (me?.role !== 'CSR' || canSend) && (
+            {conversation && conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' && (me?.role !== 'CSR' || canSend) && (
               <>
                 <button className="icon-btn" title="Transfer" onClick={() => setShowTransfer(true)}>
                   <IconTransfer size={17} />
@@ -503,9 +502,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
         {watchingReadOnly && (
           <div className="watch-banner">
             <IconEye size={15} />
-            {me?.role === 'MANAGER'
-              ? 'Monitoring — view-only. Managers can watch every conversation but never reply.'
-              : 'Monitoring — you are watching this conversation live. Only the assigned agent can reply.'}
+            Monitoring — you are watching this conversation live. Only the assigned agent can reply.
           </div>
         )}
 
@@ -553,9 +550,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
             </div>
           ) : !canSend ? (
             <div className="composer-closed">
-              {me?.role === 'MANAGER'
-                ? 'View-only (Manager).'
-                : watchingReadOnly
+              {watchingReadOnly
                   ? 'Read-only view.'
                   : conversation?.status === 'WAITING'
                     ? 'Accept the chat to start replying.'

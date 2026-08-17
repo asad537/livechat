@@ -202,10 +202,6 @@ export function buildFilesRouter(deps: AppDeps): Router {
         res.status(403).json({ error: 'Not authorized for this conversation' });
         return;
       }
-      if (auth.actor.type === 'AGENT' && auth.actor.role === 'MANAGER') {
-        res.status(403).json({ error: 'Managers have view-only access' });
-        return;
-      }
       const file = req.file;
       if (!file) {
         res.status(400).json({ error: "Missing 'file' field" });
