@@ -204,3 +204,11 @@ CREATE TABLE IF NOT EXISTS blocklist (
   created_at VARCHAR(40) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_blocklist_type ON blocklist (type);
+
+-- Canned response shortcuts (Zendesk-style macros) — shared across the team
+CREATE TABLE IF NOT EXISTS shortcuts (
+  id VARCHAR(36) PRIMARY KEY,
+  title VARCHAR(80) NOT NULL,
+  body TEXT NOT NULL,
+  created_at VARCHAR(40) NOT NULL
+);

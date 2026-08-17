@@ -157,6 +157,12 @@ export interface ChatHistoryRow {
   messages: number;
 }
 
+export interface Shortcut {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface BlockRule {
   id: string;
   type: 'IP' | 'COUNTRY';
@@ -274,6 +280,14 @@ export const api = {
   ) => request<UserPublic>(`${API.users}/${id}`, { method: 'PATCH', body: patch }),
 
   deleteUser: (id: string) => request<{ ok: boolean }>(`${API.users}/${id}`, { method: 'DELETE' }),
+
+  // ── Canned response shortcuts ──
+  shortcuts: async (): Promise<Shortcut[]> =>
+    (await request<{ shortcuts: Shortcut[] }>('/api/shortcuts')).shortcuts,
+  addShortcut: (title: string, body: string) =>
+    request<{ shortcut: Shortcut }>('/api/shortcuts', { method: 'POST', body: { title, body } }),
+  deleteShortcut: (id: string) =>
+    request<{ ok: boolean }>(`/api/shortcuts/${id}`, { method: 'DELETE' }),
 
   // ── Admin blocklist (IP / country) ──
   blocklist: () => request<{ rules: BlockRule[] }>('/api/blocklist'),

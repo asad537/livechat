@@ -8,7 +8,7 @@ import type {
 import { EV } from '@livechat/shared';
 import { useApp } from '../state';
 import { getSocket } from '../socket';
-import { uploadFile } from '../api';
+import { api, uploadFile, type Shortcut } from '../api';
 import { classNames, formatDay, formatTime, initials, newTempId, siteLabel, visitorNumber } from '../util';
 import MessageBubble from './MessageBubble';
 import HistoryTimeline from './HistoryTimeline';
@@ -30,6 +30,15 @@ import {
 interface Props {
   conversationId: string;
   showSidebar?: boolean;
+}
+
+// Shared canned-response cache — fetched once per session, refreshed on edit.
+let shortcutsCache: Shortcut[] | null = null;
+async function loadShortcuts(force = false): Promise<Shortcut[]> {
+  if (!shortcutsCache || force) {
+    shortcutsCache = await api.shortcuts().catch(() => [] as Shortcut[]);
+  }
+  return shortcutsCache;
 }
 
 interface OpenAck {
@@ -58,6 +67,53 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   const [visitorTyping, setVisitorTyping] = useState(false);
   const [draft, setDraft] = useState('');
   const [uploading, setUploading] = useState(false);
+
+  // ── Canned response shortcuts ──
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
+  const [scOpen, setScOpen] = useState(false); // popover (⚡ or "/" trigger)
+  const [scIndex, setScIndex] = useState(0);
+  const [scManage, setScManage] = useState(false);
+  const [scTitle, setScTitle] = useState('');
+  const [scBody, setScBody] = useState('');
+  useEffect(() => {
+    void loadShortcuts().then(setShortcuts);
+  }, []);
+
+  // "/" at the start of the draft filters shortcuts inline.
+  const slashMode = draft.startsWith('/');
+  const scFilter = slashMode ? draft.slice(1).toLowerCase() : '';
+  const scList = useMemo(() => {
+    if (!slashMode && !scOpen) return [];
+    if (!scFilter) return shortcuts;
+    return shortcuts.filter(
+      (s) => s.title.toLowerCase().includes(scFilter) || s.body.toLowerCase().includes(scFilter),
+    );
+  }, [shortcuts, slashMode, scOpen, scFilter]);
+  const scVisible = (slashMode || scOpen) && scList.length > 0;
+  useEffect(() => setScIndex(0), [scFilter, scOpen]);
+
+  const applyShortcut = (s: Shortcut) => {
+    setDraft(s.body);
+    setScOpen(false);
+    const el = composerRef.current;
+    if (el) {
+      el.focus();
+      // Let React paint the new value before resizing the box to fit it.
+      requestAnimationFrame(() => autoGrow());
+    }
+  };
+
+  // Composer grows with the text (up to ~6 lines) so nothing is hidden.
+  const autoGrow = () => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+  };
+  useEffect(() => {
+    autoGrow();
+  }, [draft]);
   const [showTransfer, setShowTransfer] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -89,6 +145,13 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   }, [me, csrIds, conversation]);
 
   const joinByTyping = canSend && conversation?.status === 'WAITING';
+
+  // Keep the composer focused across the WAITING→ACTIVE transition (sending the
+  // first "Hi" claims the chat and re-renders the composer — previously the
+  // agent had to click back into the box to type the next message).
+  useEffect(() => {
+    if (canSend) composerRef.current?.focus();
+  }, [canSend, conversation?.status]);
 
   const watchingReadOnly = !!conversation && !canSend && !openError &&
     conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' &&
@@ -267,6 +330,8 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     socket.emit(EV.AgentMessage, { conversationId, body, tempId });
     setDraft('');
     emitTyping(false);
+    // Stay in the box for the next message.
+    composerRef.current?.focus();
   };
 
   const accept = () => {
@@ -509,10 +574,48 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               >
                 <IconPaperclip size={17} className={uploading ? 'spin-soft' : undefined} />
               </button>
+              <button
+                className={classNames('icon-btn', scOpen && 'active')}
+                title="Shortcuts — or type / in the box"
+                onClick={() => setScOpen((v) => !v)}
+              >
+                ⚡
+              </button>
+              {scVisible && (
+                <div className="sc-pop">
+                  {scList.map((s, i) => (
+                    <button
+                      key={s.id}
+                      className={classNames('sc-item', i === scIndex && 'active')}
+                      onMouseEnter={() => setScIndex(i)}
+                      onClick={() => applyShortcut(s)}
+                    >
+                      <span className="sc-title">{s.title}</span>
+                      <span className="sc-body">{s.body}</span>
+                    </button>
+                  ))}
+                  {(me?.role === 'ADMIN' || me?.role === 'MANAGER') && (
+                    <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
+                      Manage shortcuts…
+                    </button>
+                  )}
+                </div>
+              )}
+              {scOpen && !scVisible && (
+                <div className="sc-pop">
+                  <div className="sc-empty">No shortcuts yet.</div>
+                  {(me?.role === 'ADMIN' || me?.role === 'MANAGER') && (
+                    <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
+                      Add shortcuts…
+                    </button>
+                  )}
+                </div>
+              )}
               <textarea
+                ref={composerRef}
                 className="composer-input"
                 placeholder={
-                  uploading ? 'Uploading…' : joinByTyping ? 'Type to join the chat…' : 'Type a reply…'
+                  uploading ? 'Uploading…' : joinByTyping ? 'Type to join the chat…' : 'Type a reply… ("/" for shortcuts)'
                 }
                 value={draft}
                 rows={1}
@@ -521,6 +624,28 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                   emitTyping(e.target.value.length > 0);
                 }}
                 onKeyDown={(e) => {
+                  if (scVisible) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setScIndex((i) => (i + 1) % scList.length);
+                      return;
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setScIndex((i) => (i - 1 + scList.length) % scList.length);
+                      return;
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      applyShortcut(scList[scIndex]);
+                      return;
+                    }
+                    if (e.key === 'Escape') {
+                      setScOpen(false);
+                      if (slashMode) setDraft('');
+                      return;
+                    }
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     send();
@@ -620,6 +745,76 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
 
       {showTransfer && conversation && (
         <TransferModal conversation={conversation} onClose={() => setShowTransfer(false)} />
+      )}
+
+      {scManage && (
+        <div className="modal-backdrop" onClick={() => setScManage(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Message shortcuts</h3>
+              <button className="icon-btn" onClick={() => setScManage(false)} aria-label="Close">
+                <IconX size={16} />
+              </button>
+            </div>
+            <div className="sc-list">
+              {shortcuts.length === 0 && <div className="empty-hint">No shortcuts yet — add one below.</div>}
+              {shortcuts.map((s) => (
+                <div key={s.id} className="sc-row">
+                  <div className="sc-row-meta">
+                    <span className="sc-title">{s.title}</span>
+                    <span className="sc-body">{s.body}</span>
+                  </div>
+                  <button
+                    className="icon-btn icon-btn-danger"
+                    title="Delete"
+                    onClick={() => {
+                      void api.deleteShortcut(s.id).then(() => loadShortcuts(true).then(setShortcuts));
+                    }}
+                  >
+                    <IconX size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <label className="field">
+              <span>Title</span>
+              <input
+                value={scTitle}
+                maxLength={80}
+                placeholder="e.g. Greeting"
+                onChange={(e) => setScTitle(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Message</span>
+              <textarea
+                rows={3}
+                value={scBody}
+                maxLength={2000}
+                placeholder="Are you looking for custom printed boxes?"
+                onChange={(e) => setScBody(e.target.value)}
+              />
+            </label>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setScManage(false)}>
+                Close
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!scTitle.trim() || !scBody.trim()}
+                onClick={() => {
+                  void api.addShortcut(scTitle.trim(), scBody.trim()).then(() => {
+                    setScTitle('');
+                    setScBody('');
+                    void loadShortcuts(true).then(setShortcuts);
+                  });
+                }}
+              >
+                Add shortcut
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
