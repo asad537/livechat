@@ -1377,6 +1377,20 @@ p {
 .side-path-list {
   margin: 0;
 }
+/* Visitor path fills the rest of the panel and scrolls when long, so a long
+   journey uses the space and a short one still reads cleanly. */
+.side-section-grow {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.side-section-grow .side-path-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 
 /* Timeline */
 .timeline {

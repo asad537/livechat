@@ -785,7 +785,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
             <h4>Assignment history</h4>
             <HistoryTimeline history={history} />
           </div>
-          <div className="side-section">
+          <div className="side-section side-section-grow">
             <h4>
               <IconEye size={13} /> Visitor path
             </h4>
