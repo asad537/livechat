@@ -185,6 +185,9 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
           pageTitle: document.title || undefined,
           referrer: document.referrer || undefined,
         }),
+      // Try WebSocket first (one round-trip) instead of polling → upgrade, so the
+      // chat connects and the greeting appears faster; polling stays as fallback.
+      transports: ['websocket', 'polling'],
       reconnectionDelayMax: 8000,
     });
     socketRef.current = socket;
@@ -644,8 +647,9 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     [primary, header],
   );
 
-  if (!website) return null; // nothing renders until the socket handshake succeeds
-
+  // The launcher bubble renders instantly on page load (no waiting for the
+  // socket handshake) so the customer sees it the moment they arrive. Only the
+  // open panel's content needs the branding/history from WidgetReady.
   const status = conversation?.status ?? null;
   const ended = status === 'CLOSED' || status === 'MISSED';
   const showInfoForm =
@@ -654,7 +658,20 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
   return (
     <div class="lc-root" style={cssVars}>
-      {open && (
+      {open && !website && (
+        <div class="lc-panel lc-panel-loading">
+          <div class="lc-header">
+            <div class="lc-head-info">
+              <div class="lc-title">Chat</div>
+              <div class="lc-subtitle">Connecting…</div>
+            </div>
+          </div>
+          <div class="lc-body lc-body-loading">
+            <span class="lc-spinner" />
+          </div>
+        </div>
+      )}
+      {open && website && (
         <div
           class="lc-panel"
           onDragOver={(e) => {
@@ -916,7 +933,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       <button
         type="button"
         class={`lc-launcher ${unread > 0 ? 'lc-pulse' : ''}`}
-        title={open ? 'Close chat' : `Chat with ${website.name}`}
+        title={open ? 'Close chat' : `Chat with ${website?.name ?? 'us'}`}
         onClick={() => {
           const next = !openRef.current;
           markDismissed(!next);

@@ -278,6 +278,16 @@ export const WIDGET_CSS = `
   display: block; width: 100%; max-width: 240px; max-height: 300px;
   border-radius: 14px; background: #000; box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
 }
+.lc-panel-loading .lc-header { background: var(--lc-header); color: var(--lc-on-header); }
+.lc-body-loading {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+}
+.lc-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid rgba(15, 23, 42, .12); border-top-color: var(--lc-primary);
+  animation: lc-spin .8s linear infinite;
+}
+@keyframes lc-spin { to { transform: rotate(360deg); } }
 .lc-file-icon {
   width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
   background: var(--lc-soft); color: var(--lc-primary);
