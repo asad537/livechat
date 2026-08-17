@@ -382,6 +382,7 @@ export default function Dashboard() {
                     <tr>
                       <th>Agent</th>
                       <th className="num">Chats</th>
+                      <th className="num">CSR clicks</th>
                       <th className="num">Res. rate</th>
                       <th className="num">Avg reply</th>
                       <th className="num">Rating</th>
@@ -406,6 +407,7 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="num lb-strong">{row.handled}</td>
+                        <td className="num">{row.csrClicks}</td>
                         <td className="num">{row.resolutionRate != null ? `${row.resolutionRate}%` : '—'}</td>
                         <td className="num">{formatSeconds(row.avgFirstResponseSeconds)}</td>
                         <td className="num">
@@ -464,23 +466,6 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
-
-            {insights.length > 0 && (
-              <div className="rp-insights card db-insights">
-                <h3>✨ {range === 'today' ? "Today's" : 'Period'} insights</h3>
-                <div className="db-insights-col">
-                  {insights.map((ins) => (
-                    <div className="rp-insight" key={ins.sub}>
-                      <span className="rp-insight-icon">{ins.icon}</span>
-                      <div>
-                        <div className="rp-insight-title">{ins.title}</div>
-                        <div className="rp-insight-sub">{ins.sub}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </>
       )}

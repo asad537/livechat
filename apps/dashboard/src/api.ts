@@ -85,6 +85,7 @@ export interface AgentReportRow {
   closed: number;
   active: number;
   handled: number;
+  csrClicks: number;
   resolutionRate?: number | null;
   avgFirstResponseSeconds: number | null;
   avgDurationSeconds: number | null;

@@ -122,6 +122,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
           closed: 0,
           active: 0,
           handled: 0,
+          csrClicks: 0,
           avgFirstResponseSeconds: null,
           avgDurationSeconds: null,
           rating: { average: null, count: 0 },
@@ -468,6 +469,17 @@ export function buildReportsRouter(deps: AppDeps): Router {
       };
 
       // ── Per-agent breakdown ──
+      // Per-agent "CSR clicks" = range-started chats this agent sent a message
+      // in (the per-agent breakdown of the csrChats total; outreach counts too).
+      const csrClicksRows = await deps.db.all<{ uid: string; n: number }>(
+        `SELECT m.sender_user_id AS uid, COUNT(DISTINCT m.conversation_id) AS n
+           FROM messages m JOIN conversations c ON c.id = m.conversation_id
+          WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
+            AND m.sender_type = 'AGENT' AND m.sender_user_id IS NOT NULL
+          GROUP BY m.sender_user_id`,
+        [...siteIds, ...startedParams, ...agentParams],
+      );
+      const csrClicksByAgent = new Map(csrClicksRows.map((r) => [r.uid, Number(r.n)]));
       const perAgent = agents.map((a) => {
         const mine = rows.filter((r) => r.assigned_user_id === a.id);
         const handledRows = mine.filter(
@@ -494,6 +506,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
           closed: myClosed.length,
           active: activeByAgent.get(a.id) ?? 0,
           handled: handledRows.length,
+          csrClicks: csrClicksByAgent.get(a.id) ?? 0,
           resolutionRate: pct(myClosed.length, myClosed.length + myMissed),
           avgFirstResponseSeconds: avg(frt),
           avgDurationSeconds: avg(dur),
