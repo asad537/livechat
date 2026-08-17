@@ -1375,10 +1375,7 @@ p {
   margin-bottom: 10px;
 }
 .side-path-list {
-  max-height: 240px;
-  overflow-y: auto;
   margin: 0;
-  padding-right: 4px;
 }
 
 /* Timeline */
