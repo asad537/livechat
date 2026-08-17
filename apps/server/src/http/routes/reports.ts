@@ -155,6 +155,12 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const rangeFilter = since ? ' AND (created_at >= ? OR closed_at >= ?)' : '';
       const cRangeFilter = since ? ' AND (c.created_at >= ? OR c.closed_at >= ?)' : '';
       const rangeParams = since ? [since, since] : [];
+      // A "conversation" only counts once the CLIENT has actually spoken. Agent
+      // outreach the visitor never answered is not a real chat — it must not
+      // inflate Closed / Resolution / per-agent / website / outcome numbers.
+      // (messages also has an `id` column, so the correlation MUST be qualified.)
+      const engaged = `EXISTS (SELECT 1 FROM messages em WHERE em.conversation_id = co.id AND em.sender_type = 'VISITOR')`;
+      const cEngaged = `EXISTS (SELECT 1 FROM messages em WHERE em.conversation_id = c.id AND em.sender_type = 'VISITOR')`;
 
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -175,7 +181,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
       ] = await Promise.all([
         deps.db.all<ConvRow>(
           `SELECT id, website_id, status, assigned_user_id, created_at, activated_at, closed_at, rating
-             FROM (SELECT * FROM conversations WHERE ${siteFilter}${rangeFilter}${agentFilter}
+             FROM (SELECT * FROM conversations co WHERE ${siteFilter}${rangeFilter}${agentFilter} AND ${engaged}
                    ORDER BY created_at DESC LIMIT 10000) t`,
           [...siteIds, ...rangeParams, ...agentParams],
         ),
@@ -186,8 +192,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
           [...siteIds, ...agentParams],
         ),
         deps.db.all<{ created_at: string; activated_at: string | null; closed_at: string | null; status: string }>(
-          `SELECT created_at, activated_at, closed_at, status FROM conversations
-            WHERE ${siteFilter} AND created_at >= ?${agentFilter}`,
+          `SELECT created_at, activated_at, closed_at, status FROM conversations co
+            WHERE ${siteFilter} AND created_at >= ?${agentFilter} AND ${engaged}`,
           [...siteIds, trendSince, ...agentParams],
         ),
         deps.db.get<{ n: number; ret: number }>(
@@ -204,19 +210,19 @@ export function buildReportsRouter(deps: AppDeps): Router {
         deps.db.all<{ cid: string }>(
           `SELECT DISTINCT h.conversation_id AS cid FROM assignment_history h
              JOIN conversations c ON c.id = h.conversation_id
-            WHERE h.reason = 'TRANSFER' AND ${cSiteFilter}${cRangeFilter}${cAgentFilter}`,
+            WHERE h.reason = 'TRANSFER' AND ${cSiteFilter}${cRangeFilter}${cAgentFilter} AND ${cEngaged}`,
           [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.all<{ cid: string; st: string; at: string; kind: string; body: string | null }>(
           `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at, m.kind, m.body
              FROM messages m JOIN conversations c ON c.id = m.conversation_id
-            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter}
+            WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter} AND ${cEngaged}
             ORDER BY m.conversation_id, m.created_at LIMIT 20000`,
           [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.all<{ status: string; created_at: string; activated_at: string | null; closed_at: string | null }>(
-          `SELECT status, created_at, activated_at, closed_at FROM conversations
-            WHERE ${siteFilter} AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))${agentFilter}`,
+          `SELECT status, created_at, activated_at, closed_at FROM conversations co
+            WHERE ${siteFilter} AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))${agentFilter} AND ${engaged}`,
           [...siteIds, yesterdayStart, todayStart, yesterdayStart, todayStart, ...agentParams],
         ),
       ]);
