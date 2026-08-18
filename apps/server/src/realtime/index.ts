@@ -264,18 +264,23 @@ function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
         [conversationId],
       );
       if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
-      // Fire only if the client's LATEST message has gone unanswered by any
-      // agent for the full window (an agent reply after it cancels this).
       const lastVisitor = await deps.db.get<{ created_at: string }>(
         "SELECT created_at FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' ORDER BY created_at DESC LIMIT 1",
         [conversationId],
       );
       if (!lastVisitor) return;
+      // Don't nag when an agent is actively handling the chat: skip if any agent
+      // spoke after the client's last message OR within the busy window. The
+      // latter covers a client's closing "okay"/"thanks" right after the agent
+      // replied — the agent is clearly engaged, so no "we're busy" note.
+      const windowStart = new Date(Date.now() - BUSY_NOTICE_AFTER_MS).toISOString();
+      const threshold =
+        lastVisitor.created_at < windowStart ? lastVisitor.created_at : windowStart;
       const agentReply = await deps.db.get<{ id: string }>(
         "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' AND created_at >= ? LIMIT 1",
-        [conversationId, lastVisitor.created_at],
+        [conversationId, threshold],
       );
-      if (agentReply) return; // agent answered the latest client message
+      if (agentReply) return; // an agent answered recently — actively engaged
       // Only once per conversation.
       const already = await deps.db.get<{ id: string }>(
         "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'BOT' AND body = ? LIMIT 1",
