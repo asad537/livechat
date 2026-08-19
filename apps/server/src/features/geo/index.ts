@@ -4,6 +4,7 @@
 // free ip-api.com endpoint — fire-and-forget, cached on the visitor
 // row so each IP is looked up once.
 import type { Socket } from 'socket.io';
+import { WIDGET_NAMESPACE, EV } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requestVisitorRefresh } from '../../domain/conversations.js';
 
@@ -142,6 +143,17 @@ export function updateVisitorGeo(deps: AppDeps, visitorId: string, ip: string | 
         // Country just resolved — push the visitor list again so the agent sees
         // the flag right away instead of a globe until the next broadcast.
         requestVisitorRefresh(row.website_id);
+        // Reliable country-block enforcement: fetchGeo retries on throttle, so
+        // this resolves the country even when the fast connect-time lookup
+        // couldn't. If it's a blocked country, boot the visitor now.
+        if (deps.blocklist.isCountryBlocked(geo.cc)) {
+          for (const socket of deps.io.of(WIDGET_NAMESPACE).sockets.values()) {
+            if ((socket.data as { visitorId?: string }).visitorId === visitorId) {
+              socket.emit(EV.AppError, { message: 'Access blocked' });
+              socket.disconnect(true);
+            }
+          }
+        }
       } finally {
         inFlight.delete(visitorId);
       }
