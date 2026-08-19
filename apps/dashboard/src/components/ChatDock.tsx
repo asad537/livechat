@@ -6,13 +6,16 @@ import { IconX } from '../icons';
 
 /** Zendesk-style bottom dock: every opened chat gets a tab you can switch to from any page. */
 export default function ChatDock() {
-  const { openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
+  const { me, openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const onInbox = location.pathname === '/';
   const activeId = onInbox
     ? ((location.state as { conversationId?: string } | null)?.conversationId ?? null)
     : dockedChatId;
+
+  // Admins oversee rather than handle chats — no bottom chat dock for them.
+  if (me?.role === 'ADMIN') return null;
 
   const tabs = openChats
     .map((id) => conversations[id])

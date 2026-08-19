@@ -283,7 +283,7 @@ export default function App() {
       <Sidebar />
       {/* When the bottom chat dock is showing, reserve room for it so it never
           covers the composer / page content (issue #14). */}
-      <main className={openChats.length > 0 ? 'content has-dock' : 'content'}>
+      <main className={openChats.length > 0 && me.role !== 'ADMIN' ? 'content has-dock' : 'content'}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/visitors" element={<Visitors key="live" />} />
