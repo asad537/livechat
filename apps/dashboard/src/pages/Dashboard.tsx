@@ -160,7 +160,7 @@ export default function Dashboard() {
         <div>
           <h2>Dashboard</h2>
           <p className="page-sub">
-            Salaam {me?.name?.split(' ')[0]} — overview of your live chat performance.
+            Welcome back, {me?.name?.split(' ')[0]} — overview of your live chat performance.
           </p>
         </div>
         <div className="filters">
