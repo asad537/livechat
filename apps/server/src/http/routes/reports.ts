@@ -556,7 +556,9 @@ export function buildReportsRouter(deps: AppDeps): Router {
                 : null,
           };
         })
-        .sort((a, b) => b.chats - a.chats);
+        // Most chats first; break ties (e.g. all the 0-chat sites) by visitors,
+        // so the busier-by-traffic website still ranks higher.
+        .sort((a, b) => b.chats - a.chats || b.visitors - a.visitors);
 
       // ── 14-day trend (count + avg FRT + avg duration per day) ──
       const byDay = new Map<string, { count: number; frt: number[]; dur: number[] }>();
