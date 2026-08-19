@@ -452,10 +452,13 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart'] as const;
     for (const ev of activityEvents) window.addEventListener(ev, onActivity, { passive: true });
     document.addEventListener('visibilitychange', onVisibility);
-    // A reconnect resets server-side state to active — mirror it locally.
+    // A fresh socket is "active" server-side. Re-sync our real state WITHOUT
+    // resetting the idle clock — otherwise a left-open tab that quietly
+    // reconnects every so often would keep looking active forever. If we're
+    // actually idle/hidden, tell the server again so we stay off "Online now".
     socket.on('connect', () => {
       reportedActive = true;
-      lastActivity = Date.now();
+      if (document.hidden || Date.now() - lastActivity > IDLE_AFTER_MS) report(false);
     });
 
     return () => {

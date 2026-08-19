@@ -332,10 +332,18 @@ function notifyLeadOfOfflineAssignee(
 }
 
 function startInactivitySweeper(deps: AppDeps): void {
-  const run = () =>
+  const run = () => {
     void sweepInactiveConversations(deps).catch((err) =>
       console.error('[realtime] inactivity sweep', err),
     );
+    // Rebroadcast live visitor lists so a session that just crossed the
+    // max-online cap (left-open tab / bot) drops off "Online now" even when the
+    // site is otherwise quiet and nothing else would trigger a refresh.
+    void (async () => {
+      const sites = await deps.db.all<{ id: string }>('SELECT id FROM websites');
+      for (const s of sites) await broadcastVisitors(deps, s.id);
+    })().catch((err) => console.error('[realtime] visitor refresh sweep', err));
+  };
   const t = setInterval(run, INACTIVITY_SWEEP_MS);
   t.unref?.();
   run(); // sweep once at startup too

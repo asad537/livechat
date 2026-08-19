@@ -48,6 +48,11 @@ export interface PresenceStore {
 // so they don't flicker into Recently Active. Kept tiny on purpose: closing
 // the site should read offline near-instantly.
 const VISITOR_OFFLINE_GRACE_MS = 5_000;
+// Hard cap on how long a connected visitor counts as "online now". A real
+// person goes idle within ~30 min of stepping away; a session that stays
+// "active" far longer is a left-open tab or a bot holding the socket, so we
+// stop showing it in the live list (the chat itself keeps working).
+const MAX_ONLINE_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 export function createPresence(): PresenceStore {
   const agents = new Map<string, Set<string>>();
@@ -60,6 +65,7 @@ export function createPresence(): PresenceStore {
         sockets: Set<string>;
         idleSockets: Set<string>;
         idleSince: number | null;
+        onlineSince: number;
         page: string | null;
         linger: NodeJS.Timeout | null;
       }
@@ -111,6 +117,7 @@ export function createPresence(): PresenceStore {
           sockets: new Set<string>(),
           idleSockets: new Set<string>(),
           idleSince: null,
+          onlineSince: Date.now(),
           page: null,
           linger: null,
         };
@@ -160,15 +167,19 @@ export function createPresence(): PresenceStore {
       if (!websiteId) return false;
       const entry = visitors.get(websiteId)?.get(visitorId);
       if (!entry) return false;
+      if (Date.now() - entry.onlineSince >= MAX_ONLINE_MS) return false; // stale ghost / bot
       return entry.sockets.size > 0 || entry.linger !== null; // lingering = still online
     },
     onlineVisitors(websiteId) {
       const site = visitors.get(websiteId);
       if (!site) return [];
       // Idle visitors (every tab idle) are hidden from the live list — they're
-      // still connected (chat keeps working) but not "online now".
+      // still connected (chat keeps working) but not "online now". A session
+      // that has been "active" past MAX_ONLINE_MS is a left-open tab / bot, so
+      // it drops off too (no more "online 18h" ghosts).
+      const now = Date.now();
       return [...site.entries()]
-        .filter(([, e]) => e.idleSince === null)
+        .filter(([, e]) => e.idleSince === null && now - e.onlineSince < MAX_ONLINE_MS)
         .map(([visitorId, e]) => ({ visitorId, page: e.page }));
     },
     setVisitorOfflineListener(cb) {
