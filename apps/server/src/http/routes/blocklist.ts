@@ -1,9 +1,37 @@
 import { Router } from 'express';
+import { WIDGET_NAMESPACE, EV } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requireAgent, requireRole } from '../../core/auth.js';
 import { newId, nowIso } from '../../core/db.js';
 import { sanitizeAllowedIps } from '../../core/ip.js';
+import { clientIp } from '../../features/geo/index.js';
 import { HttpError, asString, h } from '../helpers.js';
+
+/** Boot any currently-connected widget visitors that a (just-added) rule now
+    blocks — otherwise a block would only ever apply to future connections and
+    already-online visitors would linger until they left on their own. */
+async function kickBlockedVisitors(deps: AppDeps): Promise<void> {
+  const ns = deps.io.of(WIDGET_NAMESPACE);
+  const hasCountry = deps.blocklist.hasCountryBlocks();
+  for (const socket of ns.sockets.values()) {
+    const ip = clientIp(socket);
+    let blocked = deps.blocklist.isIpBlocked(ip);
+    if (!blocked && hasCountry) {
+      const vid = (socket.data as { visitorId?: string }).visitorId;
+      if (vid) {
+        const row = await deps.db.get<{ geo_cc: string | null }>(
+          'SELECT geo_cc FROM visitors WHERE id = ?',
+          [vid],
+        );
+        blocked = deps.blocklist.isCountryBlocked(row?.geo_cc ?? null);
+      }
+    }
+    if (blocked) {
+      socket.emit(EV.AppError, { message: 'Access blocked' });
+      socket.disconnect(true);
+    }
+  }
+}
 
 interface BlockRow {
   id: string;
@@ -84,6 +112,10 @@ export function buildBlocklistRouter(deps: AppDeps): Router {
         created.push({ id, type, value, note, createdAt: nowIso() });
       }
       await deps.blocklist.reload();
+      // Enforce the new rule on visitors who are already connected right now.
+      await kickBlockedVisitors(deps).catch((err) =>
+        console.warn('[blocklist] kick after add failed:', (err as Error).message),
+      );
       res.json({ added: created });
     }),
   );
