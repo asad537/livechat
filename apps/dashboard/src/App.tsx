@@ -60,13 +60,25 @@ function Landing() {
 }
 
 function Sidebar() {
-  const { me, logout, connected, conversations } = useApp();
+  const { me, logout, connected, conversations, online, awayMap, teams } = useApp();
   const navigate = useNavigate();
   if (!me) return null;
 
   // Offline Chats lists the truly-waiting queue (OFFERED chats are already being
   // rung to an agent), so the badge counts WAITING chats to match the list.
   const queueCount = Object.values(conversations).filter((c) => c.status === 'WAITING').length;
+
+  // Live "who's online" roster (Zendesk-style) — every agent the user can see,
+  // deduped, currently online, name-sorted.
+  const onlineSeen = new Set<string>();
+  const onlineAgents = (teams ?? [])
+    .flatMap((t) => t.members ?? [])
+    .filter((a) => {
+      if (onlineSeen.has(a.id) || !online[a.id]) return false;
+      onlineSeen.add(a.id);
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const isLeadUp = me.role !== 'CSR'; // LEAD, MANAGER and ADMIN
   const isDashboardRole = me.role === 'ADMIN' || me.role === 'MANAGER'; // Dashboard = admin + manager only
@@ -126,6 +138,22 @@ function Sidebar() {
         <NavLink to="/reports" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconChart size={17} />, 'Performance')}
         </NavLink>
+        {onlineAgents.length > 0 && (
+          <div className="sidebar-online">
+            <div className="nav-section-label">Online now · {onlineAgents.length}</div>
+            <div className="sidebar-online-list">
+              {onlineAgents.map((a) => (
+                <div className="sidebar-online-item" key={a.id} title={a.name}>
+                  <span className={classNames('dot', awayMap[a.id] ? 'dot-away' : 'dot-online')} />
+                  <span className="sidebar-online-name">
+                    {a.name}
+                    {a.id === me.id ? ' (you)' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </nav>
       {(me.role === 'ADMIN' || me.role === 'MANAGER') && (
         <>

@@ -177,6 +177,41 @@ p {
   flex: 1;
 }
 
+/* Zendesk-style "who's online" roster under the workspace nav. */
+.sidebar-online {
+  margin: 12px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+.sidebar-online > .nav-section-label {
+  margin: 0 0 8px 8px;
+}
+.sidebar-online-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.sidebar-online-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sidebar-fg, #475569);
+}
+.sidebar-online-item:hover {
+  background: rgba(148, 163, 184, 0.1);
+}
+.sidebar-online-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nav-item {
   position: relative;
   display: flex;
