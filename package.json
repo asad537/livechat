@@ -17,6 +17,10 @@
     "reset": "rm -rf apps/server/data apps/server/storage"
   },
   "devDependencies": {
+    "@types/geoip-lite": "^1.4.4",
     "concurrently": "^9.1.0"
+  },
+  "dependencies": {
+    "geoip-lite": "^2.0.3"
   }
 }

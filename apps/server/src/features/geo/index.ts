@@ -4,9 +4,27 @@
 // free ip-api.com endpoint — fire-and-forget, cached on the visitor
 // row so each IP is looked up once.
 import type { Socket } from 'socket.io';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+import geoip from 'geoip-lite';
 import { WIDGET_NAMESPACE, EV } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requestVisitorRefresh } from '../../domain/conversations.js';
+
+/**
+ * Instant, OFFLINE country lookup (ISO alpha-2) from a bundled MaxMind DB — no
+ * network, no rate limit. Used for synchronous blocklist checks right at the
+ * handshake, so a blocked-country visitor is rejected before they ever connect
+ * (no brief "flash" in the online list, and no slow connect either).
+ */
+export function localCountry(ip: string | null | undefined): string | null {
+  if (!ip || isPrivateIp(ip)) return null;
+  try {
+    const r = geoip.lookup(ip);
+    return r?.country ? r.country.toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Real client IP for a socket (proxy-aware). */
 export function clientIp(socket: Socket): string | null {

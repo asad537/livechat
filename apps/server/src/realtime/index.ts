@@ -22,7 +22,7 @@ import { hydrateMessages, postMessage, type MessageRow } from '../domain/message
 import { maybeBotReply } from '../features/aibot/index.js';
 import { sendTranscriptEmail } from '../features/email/index.js';
 import { captureVisitorInfo } from '../features/capture/index.js';
-import { clientIp, lookupCountry, updateVisitorGeo } from '../features/geo/index.js';
+import { clientIp, localCountry, lookupCountry, updateVisitorGeo } from '../features/geo/index.js';
 import { ipAllowed } from '../core/ip.js';
 import {
   activateConversation,
@@ -691,7 +691,8 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       data.visitorId = visitorRow.id;
       data.websiteId = website.id;
       data.conversationId = null;
-      data.geoCc = visitorRow.geo_cc ?? null;
+      // Known synchronously: cached geo, else the instant offline lookup.
+      data.geoCc = visitorRow.geo_cc ?? localCountry(clientIp(socket));
       widgetCtx.set(socket, {
         visitorToken,
         page: asString(auth.page),
@@ -740,13 +741,13 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           [newId(), visitorRow.id, pageUrl, asString(auth.pageTitle)?.slice(0, 500) ?? null, now],
         );
       }
-      // Country blocklist — block synchronously ONLY when we already know the
-      // visitor's country (cached on the row). A brand-new visitor's country
-      // needs a geo lookup that can take up to 4s on ip-api.com's free tier —
-      // doing it here would stall EVERY new visitor's handshake, so we defer it
-      // to just after connect (see onWidgetConnected's async country recheck).
+      // Country blocklist — resolved synchronously and instantly: the cached
+      // country if we have it, else the OFFLINE geoip DB (no network, ~1ms). So
+      // a blocked-country visitor is rejected right here, before they connect —
+      // no brief flash in the online list and no slow handshake. The rare IP the
+      // offline DB doesn't know is caught by the async recheck / geo-resolve.
       if (deps.blocklist.hasCountryBlocks()) {
-        const cc = visitorRow.geo_cc ?? null;
+        const cc = visitorRow.geo_cc ?? localCountry(cip);
         if (cc && deps.blocklist.isCountryBlocked(cc)) return next(new Error('Access blocked'));
       }
 
