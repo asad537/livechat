@@ -313,9 +313,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDockedChatId((prevId) => (prevId === conv.id ? null : prevId));
         setOpenChats((prev) => prev.filter((c) => c !== conv.id));
       }
-      // The visitor came back → restore the tab so the agent can resume in a click
-      // (the window itself stays minimized — we don't pop it open unasked).
-      if (conv.lastMessage?.kind === 'SYSTEM' && conv.lastMessage.body === 'Visitor is back on the site') {
+      // The visitor came back → restore the tab so the agent can resume in a
+      // click — but ONLY for the agent who actually handles this chat, never for
+      // someone just watching the website (or the tab would be a dead "Forbidden"
+      // tile for another CSR's conversation).
+      if (
+        conv.lastMessage?.kind === 'SYSTEM' &&
+        conv.lastMessage.body === 'Visitor is back on the site' &&
+        !!user &&
+        conv.assignedUserId === user.id
+      ) {
         setOpenChats((prev) => (prev.includes(conv.id) ? prev : [...prev.slice(-7), conv.id]));
       }
       setConversations((current) => ({ ...current, [conv.id]: { ...current[conv.id], ...conv } }));

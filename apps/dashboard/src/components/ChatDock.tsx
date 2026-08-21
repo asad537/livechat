@@ -6,7 +6,7 @@ import { IconX } from '../icons';
 
 /** Zendesk-style bottom dock: every opened chat gets a tab you can switch to from any page. */
 export default function ChatDock() {
-  const { me, openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
+  const { me, csrIds, openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const onInbox = location.pathname === '/';
@@ -17,9 +17,19 @@ export default function ChatDock() {
   // Admins oversee rather than handle chats — no bottom chat dock for them.
   if (me?.role === 'ADMIN') return null;
 
+  // Only dock chats this user can actually open — a CSR sees their own, a Team
+  // Lead theirs + their CSRs', a Manager any. Otherwise a tab could be a dead
+  // "Forbidden" tile for someone else's conversation.
+  const canDock = (assignedUserId: string | null): boolean => {
+    if (me?.role === 'MANAGER') return true;
+    if (assignedUserId && assignedUserId === me?.id) return true;
+    if (me?.role === 'LEAD' && assignedUserId && csrIds.includes(assignedUserId)) return true;
+    return false;
+  };
+
   const tabs = openChats
     .map((id) => conversations[id])
-    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+    .filter((c): c is NonNullable<typeof c> => Boolean(c) && canDock(c.assignedUserId));
   if (tabs.length === 0) return null;
 
   return (
