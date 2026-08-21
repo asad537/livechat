@@ -393,10 +393,10 @@ export default function Dashboard() {
                       <tr
                         key={row.user.id}
                         className="ch-row"
-                        title={`Open ${row.user.name}'s un-replied chats`}
+                        title={`Open all of ${row.user.name}'s chats`}
                         onClick={() =>
                           navigate('/chat-history', {
-                            state: { agentId: row.user.id, noReply: true },
+                            state: { agentId: row.user.id },
                           })
                         }
                       >
