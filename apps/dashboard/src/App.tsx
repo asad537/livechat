@@ -228,6 +228,13 @@ function AvailabilityToggle() {
   const { me, setAway, connected } = useApp();
   const [openMenu, setOpenMenu] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
+  // Track whether the socket has ever connected this session, so we can show
+  // "Connecting…" during the very first handshake and only switch to
+  // "Reconnecting…" if we actually drop after being online.
+  const [everConnected, setEverConnected] = React.useState(false);
+  React.useEffect(() => {
+    if (connected) setEverConnected(true);
+  }, [connected]);
 
   // Close the menu on any click outside it, or on Escape.
   React.useEffect(() => {
@@ -249,7 +256,14 @@ function AvailabilityToggle() {
   if (!me) return null;
   const away = !!me.away;
   const state = !connected ? 'offline' : away ? 'away' : 'online';
-  const label = state === 'offline' ? 'Reconnecting…' : state === 'away' ? 'Away' : 'Online';
+  const label =
+    state === 'offline'
+      ? everConnected
+        ? 'Reconnecting…'
+        : 'Connecting…'
+      : state === 'away'
+        ? 'Away'
+        : 'Online';
   return (
     <div className="avail" ref={ref}>
       <button className="avail-current" onClick={() => setOpenMenu((v) => !v)} disabled={!connected}>
