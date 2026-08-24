@@ -104,6 +104,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const meRef = useRef<UserPublic | null>(null);
   // Known online-visitor ids per website — to knock only for genuinely new ones.
   const seenVisitorsRef = useRef<Record<string, Set<string>>>({});
+  // Conversation ids we already toasted for arrival — synchronous dedupe so
+  // two rapid-fire InboxUpdate events (message + status) can't fire twice
+  // before React re-renders and refreshes `conversationsRef.current`.
+  const notifiedArrivalRef = useRef<Set<string>>(new Set());
   meRef.current = me;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
@@ -278,12 +282,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!conv?.id) return;
       const user = meRef.current;
       const prev = conversationsRef.current[conv.id];
+      // Synchronous dedupe key — set before firing any arrival popup so a
+      // burst of two InboxUpdates (message + status) can't double-notify.
+      const arrivalKey = `${conv.id}:${conv.assignedUserId ?? 'queue'}`;
+      const alreadyNotified = notifiedArrivalRef.current.has(arrivalKey);
       if (
         user &&
+        !alreadyNotified &&
         conv.assignedUserId === user.id &&
         (!prev || prev.assignedUserId !== user.id) &&
         (conv.status === 'WAITING' || conv.status === 'ACTIVE' || conv.status === 'OFFERED')
       ) {
+        notifiedArrivalRef.current.add(arrivalKey);
         const who = conv.visitor?.name || 'A visitor';
         const where = conv.website?.label?.trim() || conv.website?.name || 'your site';
         // A hand-off to an already-running chat is a transfer, not a fresh chat.
@@ -299,10 +309,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // the first inbox update for this conversation (i.e. when it first
         // appears — either genuinely new, or newly returned to WAITING).
         user &&
+        !alreadyNotified &&
         !conv.assignedUserId &&
         conv.status === 'WAITING' &&
         (!prev || prev.assignedUserId || prev.status !== 'WAITING')
       ) {
+        notifiedArrivalRef.current.add(arrivalKey);
         const who = conv.visitor?.name || 'A visitor';
         const where = conv.website?.label?.trim() || conv.website?.name || 'your site';
         pushToast('New chat in queue', `${who} on ${where}.`, 'info');
