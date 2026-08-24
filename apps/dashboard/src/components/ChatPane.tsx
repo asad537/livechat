@@ -647,21 +647,17 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                       <span className="sc-body">{s.body}</span>
                     </button>
                   ))}
-                  {(me?.role === 'ADMIN' || me?.role === 'MANAGER') && (
-                    <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
-                      Manage shortcuts…
-                    </button>
-                  )}
+                  <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
+                    Manage shortcuts…
+                  </button>
                 </div>
               )}
               {scOpen && !scVisible && (
                 <div className="sc-pop">
                   <div className="sc-empty">No shortcuts yet.</div>
-                  {(me?.role === 'ADMIN' || me?.role === 'MANAGER') && (
-                    <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
-                      Add shortcuts…
-                    </button>
-                  )}
+                  <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
+                    Add shortcuts…
+                  </button>
                 </div>
               )}
               <textarea
