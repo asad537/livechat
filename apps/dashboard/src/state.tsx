@@ -541,7 +541,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setVisitorsByWebsite({});
     setOnline({});
     setConnected(false);
-    setEverConnected(false); // next login's first handshake reads "Connecting…" again
     setIncomingCall(null);
     setActiveCall(null);
   }, []);
