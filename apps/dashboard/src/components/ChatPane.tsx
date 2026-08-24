@@ -60,6 +60,8 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     pushToast,
     online,
     visitorsByWebsite,
+    closeChatTab,
+    closeDockedChat,
   } = useApp();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -225,7 +227,22 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
       if (disposed) return;
       setLoading(false);
       if (!ack || ack.error) {
-        setOpenError(ack?.error ?? 'Could not open this conversation.');
+        // Forbidden / not-found → this chat should not be sitting in the dock
+        // waiting to be re-clicked. Drop the tile and close the floating
+        // window so the agent isn't stuck staring at a dead 'Forbidden' popup.
+        const err = ack?.error ?? 'Could not open this conversation.';
+        setOpenError(err);
+        if (err === 'Forbidden' || err === 'Conversation not found') {
+          closeChatTab(conversationId);
+          closeDockedChat();
+          pushToast(
+            'Chat unavailable',
+            err === 'Forbidden'
+              ? 'This chat is assigned to another agent.'
+              : 'This chat is no longer available.',
+            'info',
+          );
+        }
         return;
       }
       if (ack.conversation) updateConversation(ack.conversation);
