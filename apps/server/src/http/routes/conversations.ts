@@ -256,8 +256,15 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         where.push('c.status = ?');
         params.push(status);
       } else if (status !== 'ALL') {
-        // History defaults to finished chats.
-        where.push("c.status IN ('CLOSED', 'MISSED')");
+        // History defaults to finished chats — plus long-stale ACTIVE/WAITING
+        // ones that outlived any reasonable inactivity window but were never
+        // closed by the sweeper (server was down / restarted / earlier bugs).
+        // Anything older than 12 hours is effectively abandoned.
+        const stuckCutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+        where.push(
+          "(c.status IN ('CLOSED', 'MISSED') OR (c.status IN ('WAITING', 'OFFERED', 'ACTIVE') AND c.created_at < ?))",
+        );
+        params.push(stuckCutoff);
       }
       const agentId = asString(req.query.agentId);
       if (agentId) {

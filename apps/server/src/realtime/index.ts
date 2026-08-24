@@ -173,7 +173,7 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
           SELECT 1 FROM messages m
            WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT' AND m.created_at >= v.last_v
         )
-      LIMIT 500`,
+      LIMIT 5000`,
     [unansweredCutoff],
   );
   for (const conv of unanswered) await closeAs(conv.id, 'MISSED');
@@ -190,7 +190,7 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
           SELECT 1 FROM messages m
            WHERE m.conversation_id = c.id AND m.created_at >= ?
         )
-      LIMIT 500`,
+      LIMIT 5000`,
     [cutoff, cutoff],
   );
   for (const conv of stale) {
@@ -1434,6 +1434,10 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           return;
         }
         await closeConversation(deps, conv.id);
+        // The visitor's activeConversation just became null — refresh the
+        // Visitors list so they reappear as a free live visitor (they didn't
+        // leave the site, just this chat ended).
+        await broadcastVisitors(deps, conv.website_id);
       }),
     );
 
