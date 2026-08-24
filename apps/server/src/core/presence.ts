@@ -44,10 +44,12 @@ export interface PresenceStore {
 }
 
 // Page reloads / navigation close the widget socket for a moment — keep the
-// visitor "online" just long enough to cover that reconnect (1-2s typical)
-// so they don't flicker into Recently Active. Kept tiny on purpose: closing
-// the site should read offline near-instantly.
-const VISITOR_OFFLINE_GRACE_MS = 5_000;
+// visitor "online" long enough to cover that reconnect (page → page on the
+// same site can take 5-10s on slow networks/heavy pages). Anything under this
+// window is treated as one continuous session: no "left" system message
+// fires, the dock tile doesn't flicker, and the agents' Online-Now list stays
+// steady. Closing the site still reads offline within this window.
+const VISITOR_OFFLINE_GRACE_MS = 15_000;
 // Hard cap on how long a connected visitor counts as "online now". A real
 // person goes idle within ~30 min of stepping away; a session that stays
 // "active" far longer is a left-open tab or a bot holding the socket, so we
