@@ -24,6 +24,11 @@ export function connectSocket(token: string): Socket {
     reconnection: true,
     reconnectionDelay: 800,
     reconnectionDelayMax: 5000,
+    // Prefer WebSocket — polling adds up to 25 s of delay to every event.
+    // We still list polling as a fallback so hostile networks (proxies /
+    // corporate firewalls that block WS upgrade) can degrade gracefully.
+    transports: ['websocket', 'polling'],
+    upgrade: true,
   });
   return socket;
 }
