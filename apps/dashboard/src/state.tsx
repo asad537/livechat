@@ -48,9 +48,6 @@ interface AppContextValue {
   awayMap: Record<string, boolean>;
   setAway(away: boolean): void;
   connected: boolean;
-  /** True after the socket connects the first time this session — lets the UI
-   * distinguish "Connecting…" (first handshake) from "Reconnecting…" (dropped). */
-  everConnected: boolean;
   toasts: Toast[];
   incomingCall: IncomingCall | null;
   activeCall: CallMeta | null;
@@ -100,7 +97,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMe((m) => (m ? { ...m, away } : m));
   }, []);
   const [connected, setConnected] = useState(false);
-  const [everConnected, setEverConnected] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [activeCall, setActiveCall] = useState<CallMeta | null>(null);
@@ -178,7 +174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Bottom chat dock (Zendesk-style open-chat tabs) ──
   const [openChats, setOpenChats] = useState<string[]>([]);
   const openChatTab = useCallback((id: string) => {
-    setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-19), id]));
+    setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-7), id]));
   }, []);
   // Floating docked chat window (opened from the dock or the visitor drawer).
   const [dockedChatId, setDockedChatId] = useState<string | null>(null);
@@ -219,10 +215,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const socket = connectSocket(token);
 
-    const onConnect = () => {
-      setConnected(true);
-      setEverConnected(true);
-    };
+    const onConnect = () => setConnected(true);
     const onDisconnect = () => setConnected(false);
     let authFailures = 0;
     const onConnectError = (err: Error) => {
@@ -299,13 +292,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         pushToast(title, `${who} on ${where}.`, 'info');
         playChime('new-chat');
         desktopNotify(title, `${who} on ${where}.`, `chat-${conv.id}`);
-        // Transferred chats pop up like Zopim: dock the tile AND open the
-        // floating window so the receiving agent sees the transcript instantly
-        // (fresh WAITING chats stay in the queue until picked, unchanged).
-        if (transferred) {
-          setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-19), conv.id]));
-          setDockedChatId(conv.id);
-        }
       } else if (
         user &&
         conv.assignedUserId === user.id &&
@@ -338,18 +324,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         !!user &&
         conv.assignedUserId === user.id
       ) {
-        setOpenChats((prev) => (prev.includes(conv.id) ? prev : [...prev.slice(-19), conv.id]));
-      }
-      // A visitor reply on an assigned-to-me chat that has slipped out of the
-      // dock (or was never docked this session) — resurrect the tile so the
-      // unread badge fires and no reply gets lost behind the tab limit.
-      if (
-        user &&
-        conv.assignedUserId === user.id &&
-        conv.lastMessage?.senderType === 'VISITOR' &&
-        prev?.lastMessage?.id !== conv.lastMessage.id
-      ) {
-        setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-19), conv.id]));
+        setOpenChats((prev) => (prev.includes(conv.id) ? prev : [...prev.slice(-7), conv.id]));
       }
       setConversations((current) => ({ ...current, [conv.id]: { ...current[conv.id], ...conv } }));
     };
@@ -586,7 +561,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     awayMap,
     setAway,
     connected,
-    everConnected,
     toasts,
     incomingCall,
     activeCall,

@@ -3376,7 +3376,6 @@ th.vt-num {
   cursor: pointer;
   box-shadow: var(--shadow-md);
   transition: transform 0.12s, background 0.12s;
-  flex-shrink: 0; /* keep each tab at its natural width — the dock scrolls */
 }
 
 .chat-dock-tab:hover {

@@ -225,7 +225,7 @@ function Sidebar() {
 
 /** Agent availability: Online / Away — Away stops new auto-assigned chats. */
 function AvailabilityToggle() {
-  const { me, setAway, connected, everConnected } = useApp();
+  const { me, setAway, connected } = useApp();
   const [openMenu, setOpenMenu] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -249,16 +249,7 @@ function AvailabilityToggle() {
   if (!me) return null;
   const away = !!me.away;
   const state = !connected ? 'offline' : away ? 'away' : 'online';
-  // First-ever handshake reads "Connecting…"; a mid-session drop reads
-  // "Reconnecting…" (a fresh login should never spin on the wrong word).
-  const label =
-    state === 'offline'
-      ? everConnected
-        ? 'Reconnecting…'
-        : 'Connecting…'
-      : state === 'away'
-        ? 'Away'
-        : 'Online';
+  const label = state === 'offline' ? 'Reconnecting…' : state === 'away' ? 'Away' : 'Online';
   return (
     <div className="avail" ref={ref}>
       <button className="avail-current" onClick={() => setOpenMenu((v) => !v)} disabled={!connected}>

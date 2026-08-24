@@ -506,15 +506,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
           </div>
           <div className="chat-head-actions">
             {showAccept && (
-              /* Zopim-style one-key join: the Accept button auto-focuses when
-                 a chat needs picking up, so Enter/Space activates it — the
-                 agent never has to reach for the mouse. */
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={accept}
-                autoFocus
-                title="Accept (Enter)"
-              >
+              <button className="btn btn-primary btn-sm" onClick={accept}>
                 <IconCheck size={15} /> Accept
               </button>
             )}
@@ -655,17 +647,21 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                       <span className="sc-body">{s.body}</span>
                     </button>
                   ))}
-                  <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
-                    Manage shortcuts…
-                  </button>
+                  {(me?.role === 'ADMIN' || me?.role === 'MANAGER') && (
+                    <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
+                      Manage shortcuts…
+                    </button>
+                  )}
                 </div>
               )}
               {scOpen && !scVisible && (
                 <div className="sc-pop">
                   <div className="sc-empty">No shortcuts yet.</div>
-                  <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
-                    Add shortcuts…
-                  </button>
+                  {(me?.role === 'ADMIN' || me?.role === 'MANAGER') && (
+                    <button className="sc-manage" onClick={() => { setScOpen(false); setScManage(true); }}>
+                      Add shortcuts…
+                    </button>
+                  )}
                 </div>
               )}
               <textarea

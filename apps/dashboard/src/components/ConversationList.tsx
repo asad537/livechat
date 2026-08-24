@@ -90,15 +90,7 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
 
   const showAllTab = me != null && me.role !== 'CSR';
 
-  // When search results are active, keep them live: prefer whatever the socket
-  // stream has cached for each hit, so new messages/status changes appear right
-  // away instead of waiting for the next server search.
-  const displayItems = useMemo(() => {
-    if (!searchResults) return items;
-    return searchResults
-      .map((r) => conversations[r.id] ?? r)
-      .sort((a, b) => lastActivity(b) - lastActivity(a));
-  }, [searchResults, items, conversations]);
+  const displayItems = searchResults ?? items;
 
   return (
     <div className="conv-list">

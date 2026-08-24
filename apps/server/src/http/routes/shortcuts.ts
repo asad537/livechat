@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppDeps } from '../../core/deps.js';
-import { requireAgent } from '../../core/auth.js';
+import { requireAgent, requireRole } from '../../core/auth.js';
 import { newId, nowIso } from '../../core/db.js';
 import { HttpError, asString, h } from '../helpers.js';
 
@@ -11,7 +11,7 @@ interface ShortcutRow {
   created_at: string;
 }
 
-/** Canned response shortcuts — team-wide list; any signed-in agent can add or prune. */
+/** Canned response shortcuts — readable by every agent, managed by ADMIN/MANAGER. */
 export function buildShortcutsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAgent(deps.db, deps.config);
@@ -30,6 +30,7 @@ export function buildShortcutsRouter(deps: AppDeps): Router {
   router.post(
     '/api/shortcuts',
     auth,
+    requireRole('ADMIN', 'MANAGER'),
     h(async (req, res) => {
       const b = (req.body ?? {}) as Record<string, unknown>;
       const title = asString(b.title)?.trim().slice(0, 80);
@@ -47,6 +48,7 @@ export function buildShortcutsRouter(deps: AppDeps): Router {
   router.delete(
     '/api/shortcuts/:id',
     auth,
+    requireRole('ADMIN', 'MANAGER'),
     h(async (req, res) => {
       await deps.db.run('DELETE FROM shortcuts WHERE id = ?', [req.params.id as string]);
       res.json({ ok: true });
