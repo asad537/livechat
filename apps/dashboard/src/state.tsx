@@ -108,6 +108,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // two rapid-fire InboxUpdate events (message + status) can't fire twice
   // before React re-renders and refreshes `conversationsRef.current`.
   const notifiedArrivalRef = useRef<Set<string>>(new Set());
+  // Same dedupe pattern for the 'Visitor is back' chime — the server can emit
+  // two InboxUpdates for the same system message in a burst, and `prev` in
+  // the handler is only refreshed on React render.
+  const notifiedReturnRef = useRef<Set<string>>(new Set());
   meRef.current = me;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
@@ -351,8 +355,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         conv.lastMessage.body === 'Visitor is back on the site' &&
         !!user &&
         conv.assignedUserId === user.id &&
-        prev?.lastMessage?.id !== conv.lastMessage.id
+        prev?.lastMessage?.id !== conv.lastMessage.id &&
+        !notifiedReturnRef.current.has(conv.lastMessage.id)
       ) {
+        notifiedReturnRef.current.add(conv.lastMessage.id);
         setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-7), conv.id]));
         const who = conv.visitor?.name || 'Visitor';
         pushToast('Visitor is back', `${who} returned to the site.`, 'info');
@@ -549,6 +555,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setConnected(false);
     setIncomingCall(null);
     setActiveCall(null);
+    // Wipe leftover UI + dedupe state so a different user logging in on the
+    // same tab doesn't briefly see the previous agent's dock tiles or miss a
+    // legitimate first-arrival chime because it was marked notified before.
+    setOpenChats([]);
+    setDockedChatId(null);
+    setToasts([]);
+    notifiedArrivalRef.current.clear();
+    notifiedReturnRef.current.clear();
   }, []);
 
   // ─── Calls ─────────────────────────────────────────────────
