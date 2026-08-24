@@ -335,23 +335,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           `chat-${conv.id}`,
         );
       }
-      // The visitor left the site → close their floating chat window AND drop
-      // its tab from the bottom dock (nothing lingers once they're gone).
+      // The visitor left the site → only MINIMIZE the floating window; keep
+      // the chat head in the bottom dock so the agent can still add notes,
+      // capture details, and see the tab wake up the moment the visitor
+      // returns. (Dropping the tab was the "chat head disappeared" complaint.)
       if (conv.lastMessage?.kind === 'SYSTEM' && conv.lastMessage.body === 'Visitor left the site') {
         setDockedChatId((prevId) => (prevId === conv.id ? null : prevId));
-        setOpenChats((prev) => prev.filter((c) => c !== conv.id));
       }
-      // The visitor came back → restore the tab so the agent can resume in a
-      // click — but ONLY for the agent who actually handles this chat, never for
-      // someone just watching the website (or the tab would be a dead "Forbidden"
-      // tile for another CSR's conversation).
+      // The visitor came back → restore the tab (if it slipped) and ping the
+      // agent so they know to resume. Only for the agent actually handling
+      // this chat — never for someone just watching the website (or the tab
+      // would be a dead "Forbidden" tile for another CSR's conversation).
       if (
         conv.lastMessage?.kind === 'SYSTEM' &&
         conv.lastMessage.body === 'Visitor is back on the site' &&
         !!user &&
-        conv.assignedUserId === user.id
+        conv.assignedUserId === user.id &&
+        prev?.lastMessage?.id !== conv.lastMessage.id
       ) {
-        setOpenChats((prev) => (prev.includes(conv.id) ? prev : [...prev.slice(-7), conv.id]));
+        setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-7), conv.id]));
+        const who = conv.visitor?.name || 'Visitor';
+        pushToast('Visitor is back', `${who} returned to the site.`, 'info');
+        playChime('message');
+        desktopNotify('Visitor is back', `${who} returned to the site.`, `chat-${conv.id}`);
       }
       setConversations((current) => ({ ...current, [conv.id]: { ...current[conv.id], ...conv } }));
     };
