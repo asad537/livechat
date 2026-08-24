@@ -341,15 +341,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setOpenChats((prev) => (prev.includes(conv.id) ? prev : [...prev.slice(-19), conv.id]));
       }
       // A visitor reply on an assigned-to-me chat that has slipped out of the
-      // dock — resurrect the tile so the unread badge fires and no reply gets
-      // lost behind the tab limit. Guard on `prev` so a cold-start hydration
-      // (where every conv is "new" to the client) doesn't mass-dock everything.
+      // dock (or was never docked this session) — resurrect the tile so the
+      // unread badge fires and no reply gets lost behind the tab limit.
       if (
         user &&
-        prev &&
         conv.assignedUserId === user.id &&
         conv.lastMessage?.senderType === 'VISITOR' &&
-        prev.lastMessage?.id !== conv.lastMessage.id
+        prev?.lastMessage?.id !== conv.lastMessage.id
       ) {
         setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-19), conv.id]));
       }
