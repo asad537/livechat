@@ -293,6 +293,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         playChime('new-chat');
         desktopNotify(title, `${who} on ${where}.`, `chat-${conv.id}`);
       } else if (
+        // Unclaimed queue chat — a visitor started a chat but nobody is
+        // handling it yet. Ring EVERY agent watching this site (CSR, Lead,
+        // Manager, Admin) so the offline queue isn't missed. Fires once, on
+        // the first inbox update for this conversation (i.e. when it first
+        // appears — either genuinely new, or newly returned to WAITING).
+        user &&
+        !conv.assignedUserId &&
+        conv.status === 'WAITING' &&
+        (!prev || prev.assignedUserId || prev.status !== 'WAITING')
+      ) {
+        const who = conv.visitor?.name || 'A visitor';
+        const where = conv.website?.label?.trim() || conv.website?.name || 'your site';
+        pushToast('New chat in queue', `${who} on ${where}.`, 'info');
+        playChime('new-chat');
+        desktopNotify('New chat in queue', `${who} on ${where}.`, `chat-${conv.id}`);
+      } else if (
         user &&
         conv.assignedUserId === user.id &&
         conv.lastMessage?.senderType === 'VISITOR' &&
