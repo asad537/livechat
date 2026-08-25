@@ -8,6 +8,8 @@ import React, {
   useState,
 } from 'react';
 import type {
+  AgentDirectMessage,
+  AgentDirectThread,
   CallKind,
   CallMeta,
   ChatMessage,
@@ -70,6 +72,16 @@ interface AppContextValue {
   acceptIncomingCall(): void;
   declineIncomingCall(): void;
   clearActiveCall(): void;
+
+  // ─── Internal team chat (agent ↔ agent DMs) ──
+  dmThreads: AgentDirectThread[];
+  dmMessages: Record<string, AgentDirectMessage[]>; // peerUserId → messages
+  dmUnreadTotal: number;
+  dmOpenPeerId: string | null;
+  openDMDrawer(peerId: string): void;
+  closeDMDrawer(): void;
+  sendDM(peerId: string, body: string): Promise<void>;
+  markDMRead(peerId: string): void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -100,6 +112,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [activeCall, setActiveCall] = useState<CallMeta | null>(null);
+  // Internal team chat — DM threads (one per peer) + open drawer target.
+  const [dmThreads, setDmThreads] = useState<AgentDirectThread[]>([]);
+  const [dmMessages, setDmMessages] = useState<Record<string, AgentDirectMessage[]>>({});
+  const [dmOpenPeerId, setDmOpenPeerId] = useState<string | null>(null);
+  const dmOpenPeerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    dmOpenPeerIdRef.current = dmOpenPeerId;
+  }, [dmOpenPeerId]);
+  const refreshDMThreadsMeta = useCallback(async () => {
+    try {
+      const threads = await api.agentDMThreads();
+      setDmThreads(threads);
+    } catch {
+      /* transient */
+    }
+  }, []);
 
   const meRef = useRef<UserPublic | null>(null);
   // Known online-visitor ids per website — to knock only for genuinely new ones.
@@ -462,6 +490,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     socket.on(EV.CallStatus, onCallStatus);
     socket.on(EV.AppError, onAppError);
 
+    // ─── Internal team chat (agent ↔ agent DMs) ──
+    const onAgentDM = (payload: { message: AgentDirectMessage }) => {
+      const msg = payload?.message;
+      const user = meRef.current;
+      if (!msg || !user) return;
+      const peerId = msg.fromUserId === user.id ? msg.toUserId : msg.fromUserId;
+      const incoming = msg.toUserId === user.id;
+      setDmMessages((prev) => {
+        const list = prev[peerId] ?? [];
+        // Dedupe by id (server echoes back the sender's own message too).
+        if (list.some((m) => m.id === msg.id)) return prev;
+        // If the sender optimistically added a temp-id row, swap it out.
+        const filtered = msg.tempId
+          ? list.filter((m) => m.id !== msg.tempId)
+          : list;
+        return { ...prev, [peerId]: [...filtered, msg] };
+      });
+      // Bump the thread list — the peer moves to the top and unread grows if
+      // it's an incoming message not currently open in the drawer.
+      setDmThreads((prev) => {
+        const drawerOpen = dmOpenPeerIdRef.current === peerId && document.hasFocus();
+        const shouldMarkUnread = incoming && !drawerOpen;
+        const existing = prev.find((t) => t.peerUserId === peerId);
+        const bumped: AgentDirectThread = existing
+          ? {
+              ...existing,
+              lastMessage: msg,
+              unread: shouldMarkUnread ? existing.unread + 1 : existing.unread,
+            }
+          : {
+              peerUserId: peerId,
+              // We may not know the name yet — filled in by the next thread refresh.
+              peerName: 'Agent',
+              peerAvatarColor: null,
+              lastMessage: msg,
+              unread: shouldMarkUnread ? 1 : 0,
+            };
+        const rest = prev.filter((t) => t.peerUserId !== peerId);
+        return [bumped, ...rest];
+      });
+      if (incoming) {
+        const drawerOpen = dmOpenPeerIdRef.current === peerId && document.hasFocus();
+        if (drawerOpen) {
+          // Auto-mark as read since we're actively looking at this thread.
+          getSocket()?.emit(EV.AgentDMRead, { fromUserId: peerId });
+        } else {
+          playChime('message');
+          if (!document.hasFocus()) {
+            void refreshDMThreadsMeta();
+          }
+        }
+      }
+    };
+    const onAgentDMReadReceipt = (payload: {
+      fromUserId: string;
+      toUserId: string;
+      readAt: string;
+    }) => {
+      const user = meRef.current;
+      if (!user || !payload) return;
+      // Either "peer read my DMs to them" or "I read peer's DMs" — both zero unread on that side.
+      const peerId = payload.toUserId === user.id ? payload.fromUserId : payload.toUserId;
+      setDmMessages((prev) => {
+        const list = prev[peerId];
+        if (!list) return prev;
+        let changed = false;
+        const next = list.map((m) => {
+          if (m.readAt == null && (m.fromUserId === user.id ? m.toUserId === peerId : true)) {
+            changed = true;
+            return { ...m, readAt: payload.readAt };
+          }
+          return m;
+        });
+        return changed ? { ...prev, [peerId]: next } : prev;
+      });
+      // Zero the peer's unread badge if we are the reader.
+      if (payload.toUserId === user.id) {
+        setDmThreads((prev) =>
+          prev.map((t) => (t.peerUserId === peerId ? { ...t, unread: 0 } : t)),
+        );
+      }
+    };
+    socket.on(EV.AgentDM, onAgentDM);
+    socket.on(EV.AgentDMReadReceipt, onAgentDMReadReceipt);
+
     return () => {
       cancelled = true;
       socket.off('connect', onConnect);
@@ -477,6 +590,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       socket.off(EV.CallInvite, onCallInvite);
       socket.off(EV.CallStatus, onCallStatus);
       socket.off(EV.AppError, onAppError);
+      socket.off(EV.AgentDM, onAgentDM);
+      socket.off(EV.AgentDMReadReceipt, onAgentDMReadReceipt);
     };
   }, [token, pushToast, refreshConversations]);
 
@@ -561,6 +676,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOpenChats([]);
     setDockedChatId(null);
     setToasts([]);
+    setDmThreads([]);
+    setDmMessages({});
+    setDmOpenPeerId(null);
     notifiedArrivalRef.current.clear();
     notifiedReturnRef.current.clear();
   }, []);
@@ -594,6 +712,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const clearActiveCall = useCallback(() => {
     setActiveCall(null);
   }, []);
+
+  // ─── Internal team chat ─────────────────────────────────────
+  const openDMDrawer = useCallback(
+    (peerId: string) => {
+      setDmOpenPeerId(peerId);
+      // Lazily hydrate messages for this peer the first time we open the thread.
+      setDmMessages((prev) => {
+        if (prev[peerId]) return prev;
+        void api
+          .agentDMMessages(peerId)
+          .then((msgs) => setDmMessages((cur) => ({ ...cur, [peerId]: msgs })))
+          .catch(() => undefined);
+        return prev;
+      });
+      // Mark as read on both sides.
+      getSocket()?.emit(EV.AgentDMRead, { fromUserId: peerId });
+      setDmThreads((prev) =>
+        prev.map((t) => (t.peerUserId === peerId ? { ...t, unread: 0 } : t)),
+      );
+    },
+    [],
+  );
+  const closeDMDrawer = useCallback(() => setDmOpenPeerId(null), []);
+  const markDMRead = useCallback((peerId: string) => {
+    getSocket()?.emit(EV.AgentDMRead, { fromUserId: peerId });
+    setDmThreads((prev) =>
+      prev.map((t) => (t.peerUserId === peerId ? { ...t, unread: 0 } : t)),
+    );
+  }, []);
+  const sendDM = useCallback(async (peerId: string, body: string) => {
+    const trimmed = body.trim().slice(0, 4000);
+    if (!trimmed) return;
+    const socket = getSocket();
+    if (!socket) return;
+    const tempId = `tmp_${Math.random().toString(36).slice(2)}_${performance.now()}`;
+    const user = meRef.current;
+    if (!user) return;
+    // Optimistic echo — the server's own AgentDM event will replace this row.
+    const nowTs = new Date().toISOString();
+    const optimistic: AgentDirectMessage = {
+      id: tempId,
+      fromUserId: user.id,
+      toUserId: peerId,
+      body: trimmed,
+      createdAt: nowTs,
+      readAt: null,
+      tempId,
+    };
+    setDmMessages((prev) => ({
+      ...prev,
+      [peerId]: [...(prev[peerId] ?? []), optimistic],
+    }));
+    socket.emit(EV.AgentDMSend, { toUserId: peerId, body: trimmed, tempId });
+  }, []);
+  // Refresh DM thread metadata (unread counts, peer names) whenever we (re)connect.
+  useEffect(() => {
+    if (!token || !me) return;
+    void refreshDMThreadsMeta();
+  }, [token, me, refreshDMThreadsMeta]);
+
+  const dmUnreadTotal = React.useMemo(
+    () => dmThreads.reduce((n, t) => n + t.unread, 0),
+    [dmThreads],
+  );
 
   const value: AppContextValue = {
     authed: !!token,
@@ -630,6 +812,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     acceptIncomingCall,
     declineIncomingCall,
     clearActiveCall,
+    dmThreads,
+    dmMessages,
+    dmUnreadTotal,
+    dmOpenPeerId,
+    openDMDrawer,
+    closeDMDrawer,
+    sendDM,
+    markDMRead,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -222,3 +222,17 @@ ALTER TABLE messages ADD COLUMN translated_body TEXT;
 ALTER TABLE messages ADD COLUMN orig_lang VARCHAR(8);
 -- Cached detected language of a visitor, so we skip re-detecting every message.
 ALTER TABLE visitors ADD COLUMN lang VARCHAR(8);
+
+-- Agent-to-agent direct messages (internal team chat, Slack-style DMs).
+-- Never touches the widget namespace; used only between signed-in agents.
+CREATE TABLE IF NOT EXISTS agent_messages (
+  id VARCHAR(36) PRIMARY KEY,
+  from_user_id VARCHAR(36) NOT NULL,
+  to_user_id VARCHAR(36) NOT NULL,
+  body TEXT NOT NULL,
+  created_at VARCHAR(40) NOT NULL,
+  read_at VARCHAR(40)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_to_read ON agent_messages (to_user_id, read_at);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_pair ON agent_messages (from_user_id, to_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_created ON agent_messages (created_at);

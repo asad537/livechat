@@ -13,6 +13,7 @@ import { buildVisitorsRouter } from './routes/visitors.js';
 import { buildReportsRouter } from './routes/reports.js';
 import { buildBlocklistRouter } from './routes/blocklist.js';
 import { buildShortcutsRouter } from './routes/shortcuts.js';
+import { buildAgentDMRouter } from './routes/agent-dm.js';
 import { buildWidgetRouter } from './routes/widget.js';
 
 /**
@@ -32,6 +33,7 @@ export function buildApiRouter(deps: AppDeps): Router {
   router.use(buildReportsRouter(deps)); // /api/reports/overview
   router.use(buildBlocklistRouter(deps)); // /api/blocklist (ADMIN)
   router.use(buildShortcutsRouter(deps)); // /api/shortcuts (canned responses)
+  router.use(buildAgentDMRouter(deps)); // /api/agent-dm (internal team chat)
 
   router.use(buildFilesRouter(deps)); // /api/uploads, /api/files/:id/download
   router.use(buildCallsRouter(deps)); // /api/calls/daily-webhook

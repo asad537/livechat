@@ -163,6 +163,27 @@ export interface AssignmentRecord {
   toUser?: UserPublic | null;
 }
 
+// ─── Internal team chat (agent ↔ agent DMs) ─────────────────
+export interface AgentDirectMessage {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+  /** Client-supplied dedupe key for optimistic echo — server echoes it back. */
+  tempId?: string;
+}
+
+/** One conversation thread between the current user and a peer. */
+export interface AgentDirectThread {
+  peerUserId: string;
+  peerName: string;
+  peerAvatarColor: string | null;
+  lastMessage: AgentDirectMessage | null;
+  unread: number;
+}
+
 // ─── Socket.IO namespaces ────────────────────────────────────
 export const WIDGET_NAMESPACE = '/widget';
 export const AGENT_NAMESPACE = '/agent';
@@ -219,11 +240,17 @@ export const EV = {
   AgentCallStart: 'agent:call:start',        // { conversationId, kind: CallKind }
   AgentCallInvite: 'agent:call:invite-participant', // { callId, userId }
 
+  // internal team chat (agent ↔ agent DMs, Slack-style)
+  AgentDMSend: 'agent:dm:send',              // { toUserId, body, tempId } → ack { message } | { error }
+  AgentDMRead: 'agent:dm:read',              // { fromUserId } — mark every message from that agent as read
+
   // server → agent
   AgentReady: 'agent:ready',                 // { me: UserPublic, websites: Website[], teams: Team[], csrIds: string[] }
   InboxUpdate: 'inbox:update',               // { conversation: ConversationSummary }
   VisitorsUpdate: 'visitors:update',         // { websiteId, visitors: Visitor[] }
   PresenceUpdate: 'presence:update',         // { userId, online: boolean, away?: boolean }
+  AgentDM: 'agent:dm',                       // { message: AgentDirectMessage } — new / echoed DM
+  AgentDMReadReceipt: 'agent:dm:read-receipt', // { fromUserId, toUserId, readAt } — someone read our DMs
 
   // errors (both namespaces)
   AppError: 'app:error',                     // { message: string }
@@ -241,6 +268,8 @@ export const API = {
   files: '/api/files',
   reports: '/api/reports/overview',
   widgetBoot: '/api/widget/boot',
+  agentDMThreads: '/api/agent-dm/threads',
+  agentDMMessages: '/api/agent-dm/messages',
 } as const;
 
 export const DEFAULT_MAX_CHATS = 3;

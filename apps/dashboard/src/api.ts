@@ -1,4 +1,6 @@
 import type {
+  AgentDirectMessage,
+  AgentDirectThread,
   AssignmentRecord,
   ChatMessage,
   ConversationSummary,
@@ -484,6 +486,21 @@ export const api = {
     unwrapList<VisitorChat>(
       await request<unknown>(`/api/visitors/${encodeURIComponent(visitorId)}/conversations`),
       'conversations',
+    ),
+
+  // ─── Internal team chat ────────────────────────────────────
+  agentDMThreads: async (): Promise<AgentDirectThread[]> =>
+    unwrapList<AgentDirectThread>(
+      await request<unknown>(API.agentDMThreads),
+      'threads',
+    ),
+
+  agentDMMessages: async (peerId: string): Promise<AgentDirectMessage[]> =>
+    unwrapList<AgentDirectMessage>(
+      await request<unknown>(
+        `${API.agentDMMessages}?peerId=${encodeURIComponent(peerId)}`,
+      ),
+      'messages',
     ),
 };
 

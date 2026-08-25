@@ -1582,6 +1582,85 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       }),
     );
 
+    // ── Internal team chat (agent ↔ agent DMs) ──
+    const allowDM = makeLimiter(MSG_RATE_MAX * 2, MSG_RATE_WINDOW_MS);
+    socket.on(
+      EV.AgentDMSend,
+      safe(socket, async (payload: unknown, ack?: unknown) => {
+        const reply = typeof ack === 'function' ? (ack as (res: unknown) => void) : () => {};
+        if (!allowDM()) {
+          reply({ error: 'Slow down — too many messages.' });
+          return;
+        }
+        const p = (payload ?? {}) as Record<string, unknown>;
+        const toUserId = asString(p.toUserId);
+        const body = asString(p.body)?.trim().slice(0, 4000);
+        const tempId = asString(p.tempId);
+        if (!toUserId || !body) {
+          reply({ error: 'toUserId and body are required' });
+          return;
+        }
+        if (toUserId === data.userId) {
+          reply({ error: 'You cannot DM yourself' });
+          return;
+        }
+        // Sanity check: peer must be a real user (any signed-in agent can DM
+        // anyone in the org — same trust model as canned response shortcuts).
+        const peer = await deps.db.get<{ id: string }>('SELECT id FROM users WHERE id = ?', [
+          toUserId,
+        ]);
+        if (!peer) {
+          reply({ error: 'Recipient not found' });
+          return;
+        }
+        const id = newId();
+        const createdAt = nowIso();
+        await deps.db.run(
+          'INSERT INTO agent_messages (id, from_user_id, to_user_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
+          [id, data.userId, toUserId, body, createdAt],
+        );
+        const message = {
+          id,
+          fromUserId: data.userId,
+          toUserId,
+          body,
+          createdAt,
+          readAt: null,
+          tempId,
+        };
+        // Echo to sender (all their tabs) AND deliver to recipient (all theirs).
+        deps.io.of(AGENT_NAMESPACE).to(userRoom(data.userId)).emit(EV.AgentDM, { message });
+        deps.io.of(AGENT_NAMESPACE).to(userRoom(toUserId)).emit(EV.AgentDM, { message });
+        reply({ message });
+      }),
+    );
+
+    socket.on(
+      EV.AgentDMRead,
+      safe(socket, async (payload: unknown) => {
+        const p = (payload ?? {}) as Record<string, unknown>;
+        const fromUserId = asString(p.fromUserId);
+        if (!fromUserId) return;
+        const readAt = nowIso();
+        await deps.db.run(
+          'UPDATE agent_messages SET read_at = ? WHERE to_user_id = ? AND from_user_id = ? AND read_at IS NULL',
+          [readAt, data.userId, fromUserId],
+        );
+        // Tell the ORIGINAL sender their DMs were seen (so their side updates read state).
+        deps.io.of(AGENT_NAMESPACE).to(userRoom(fromUserId)).emit(EV.AgentDMReadReceipt, {
+          fromUserId,
+          toUserId: data.userId,
+          readAt,
+        });
+        // Also fan out to the reader's own tabs so unread badge clears everywhere.
+        deps.io.of(AGENT_NAMESPACE).to(userRoom(data.userId)).emit(EV.AgentDMReadReceipt, {
+          fromUserId,
+          toUserId: data.userId,
+          readAt,
+        });
+      }),
+    );
+
     // ── Calls (contract implemented by the features agent) ──
     registerAgentCallHandlers(deps, socket);
 

@@ -20,6 +20,7 @@ import Toasts from './components/Toasts';
 import CallOverlay from './components/CallOverlay';
 import ChatDock from './components/ChatDock';
 import DockedChatWindow from './components/DockedChatWindow';
+import AgentDMDrawer from './components/AgentDMDrawer';
 import {
   IconBriefcase,
   IconChart,
@@ -60,7 +61,8 @@ function Landing() {
 }
 
 function Sidebar() {
-  const { me, logout, connected, conversations, online, awayMap, teams } = useApp();
+  const { me, logout, connected, conversations, online, awayMap, teams, openDMDrawer, dmThreads } =
+    useApp();
   const navigate = useNavigate();
   if (!me) return null;
 
@@ -142,15 +144,27 @@ function Sidebar() {
           <div className="sidebar-online">
             <div className="nav-section-label">Online now · {onlineAgents.length}</div>
             <div className="sidebar-online-list">
-              {onlineAgents.map((a) => (
-                <div className="sidebar-online-item" key={a.id} title={a.name}>
-                  <span className={classNames('dot', awayMap[a.id] ? 'dot-away' : 'dot-online')} />
-                  <span className="sidebar-online-name">
-                    {a.name}
-                    {a.id === me.id ? ' (you)' : ''}
-                  </span>
-                </div>
-              ))}
+              {onlineAgents.map((a) => {
+                const isMe = a.id === me.id;
+                const unread = dmThreads.find((t) => t.peerUserId === a.id)?.unread ?? 0;
+                return (
+                  <button
+                    type="button"
+                    className={classNames('sidebar-online-item', !isMe && 'is-clickable')}
+                    key={a.id}
+                    title={isMe ? a.name : `Message ${a.name}`}
+                    onClick={isMe ? undefined : () => openDMDrawer(a.id)}
+                    disabled={isMe}
+                  >
+                    <span className={classNames('dot', awayMap[a.id] ? 'dot-away' : 'dot-online')} />
+                    <span className="sidebar-online-name">
+                      {a.name}
+                      {isMe ? ' (you)' : ''}
+                    </span>
+                    {unread > 0 && <span className="sidebar-online-badge">{unread}</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -381,6 +395,7 @@ export default function App() {
       </main>
       <DockedChatWindow />
       <ChatDock />
+      <AgentDMDrawer />
       <Toasts />
       {activeCall && <CallOverlay call={activeCall} />}
     </div>
