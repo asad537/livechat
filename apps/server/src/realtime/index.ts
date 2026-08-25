@@ -1315,8 +1315,12 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         const p = (payload ?? {}) as Record<string, unknown>;
         const websiteId = asString(p.websiteId);
         const visitorId = asString(p.visitorId);
-        const body = asString(p.body)?.trim();
-        if (!websiteId || !visitorId || !body) return;
+        // Body is optional — an agent can 'just claim' the visitor by pressing
+        // Space in the visitor drawer, then type the first message once the
+        // chat is open. When body is empty we skip the opener post entirely
+        // (visitor's widget still gets the OFFERED status via emitConversationStatus).
+        const body = asString(p.body)?.trim() ?? '';
+        if (!websiteId || !visitorId) return;
 
         if (!(await userCanAccessWebsite(deps, data.userId, data.role, websiteId))) {
           socket.emit(EV.AppError, { message: 'You do not have access to this website' });
@@ -1338,7 +1342,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           // Already an open conversation — post into it (when allowed) and
           // hand its id back so the client opens that chat instead of erroring.
           await socket.join(convRoom(open.id));
-          if (await canSendAsAgent(deps, open, data.userId, data.role)) {
+          if (body && (await canSendAsAgent(deps, open, data.userId, data.role))) {
             await announceAgentJoin(deps, open.id, data.userId, data.name);
             await postMessage(deps, {
               conversationId: open.id,
@@ -1369,12 +1373,14 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           }
         }
 
-        await postMessage(deps, {
-          conversationId,
-          senderType: 'AGENT',
-          senderUserId: data.userId,
-          body,
-        });
+        if (body) {
+          await postMessage(deps, {
+            conversationId,
+            senderType: 'AGENT',
+            senderUserId: data.userId,
+            body,
+          });
+        }
         await emitConversationStatus(deps, conversationId);
         await emitConversationAgent(deps, conversationId);
 

@@ -227,8 +227,10 @@ export default function VisitorDrawer({
   const pastChats = chats?.filter((c) => c.status === 'CLOSED' || c.status === 'MISSED') ?? null;
 
   const startChatInline = () => {
+    if (!v) return;
     const body = starterDraft.trim();
-    if (!body || !v) return;
+    // Body is optional — Space bar can 'just claim' the visitor without any
+    // opener; the agent then types the first message once the chat is open.
     getSocket()?.emit(
       EV.AgentStartChat,
       { websiteId: v.websiteId, visitorId: v.id, body },
@@ -244,6 +246,27 @@ export default function VisitorDrawer({
     );
     setStarterDraft('');
   };
+
+  // Keyboard shortcut: Space claims the visitor and opens the chat instantly.
+  // Only fires while the drawer is open, the visitor has no existing open
+  // conversation for us, and focus isn't inside a text field (so typing the
+  // opener in the composer is unaffected).
+  useEffect(() => {
+    if (!v || openConv || startedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== ' ') return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
+      e.preventDefault();
+      startChatInline();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v?.id, openConv?.id, startedId]);
 
   const stat = (label: string, value: React.ReactNode) => (
     <div className="vd-stat">
@@ -514,8 +537,7 @@ export default function VisitorDrawer({
                   <button
                     className="btn btn-primary btn-send"
                     onClick={startChatInline}
-                    disabled={!starterDraft.trim()}
-                    title="Send"
+                    title="Send (or press Space to start empty)"
                   >
                     <IconSend size={16} />
                   </button>
