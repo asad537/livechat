@@ -165,45 +165,6 @@ function Sidebar() {
             </div>
           </div>
         )}
-        {(() => {
-          // Direct messages — any thread whose peer isn't already in the online
-          // roster above. Ensures cross-team / cross-role / offline peers are
-          // still reachable and their unread badges are visible.
-          const onlineIds = new Set(onlineAgents.map((a) => a.id));
-          const dmOnly = dmThreads.filter((t) => !onlineIds.has(t.peerUserId));
-          if (dmOnly.length === 0) return null;
-          return (
-            <div className="sidebar-online">
-              <div className="nav-section-label">Direct messages · {dmOnly.length}</div>
-              <div className="sidebar-online-list">
-                {dmOnly.map((t) => (
-                  <button
-                    type="button"
-                    className="sidebar-online-item is-clickable"
-                    key={t.peerUserId}
-                    title={`Message ${t.peerName}`}
-                    onClick={() => openDMDrawer(t.peerUserId)}
-                  >
-                    <span
-                      className={classNames(
-                        'dot',
-                        online[t.peerUserId]
-                          ? awayMap[t.peerUserId]
-                            ? 'dot-away'
-                            : 'dot-online'
-                          : 'dot-offline',
-                      )}
-                    />
-                    <span className="sidebar-online-name">{t.peerName}</span>
-                    {t.unread > 0 && (
-                      <span className="sidebar-online-badge">{t.unread}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
       </nav>
       {(me.role === 'ADMIN' || me.role === 'MANAGER') && (
         <>
