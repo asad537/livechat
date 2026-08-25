@@ -6,7 +6,8 @@ import { IconX } from '../icons';
 
 /** Zendesk-style bottom dock: every opened chat gets a tab you can switch to from any page. */
 export default function ChatDock() {
-  const { me, openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
+  const { me, openChats, closeChatTab, conversations, dockedChatId, openDockedChat, visitorsByWebsite } =
+    useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const onInbox = location.pathname === '/';
@@ -35,6 +36,10 @@ export default function ChatDock() {
         const name = c.visitor?.name || `Visitor ${visitorNumber(c.visitorId)}`;
         const unread = c.unreadCount ?? 0;
         const closed = c.status === 'CLOSED' || c.status === 'MISSED';
+        // Gray the tab name when the visitor has left the site (offline) — the
+        // live stream is authoritative, else use the summary snapshot.
+        const liveVisitor = visitorsByWebsite[c.websiteId]?.find((v) => v.id === c.visitorId);
+        const offline = liveVisitor ? !liveVisitor.online : !c.visitor?.online;
         return (
           <button
             key={c.id}
@@ -52,7 +57,7 @@ export default function ChatDock() {
             >
               {initials(name)}
             </span>
-            <span className="chat-dock-name">{name}</span>
+            <span className={classNames('chat-dock-name', offline && 'is-offline')}>{name}</span>
             {unread > 0 && <span className="badge">{unread}</span>}
             <span
               className="chat-dock-close"

@@ -522,8 +522,17 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
             </span>
             <div className="chat-head-meta">
               <span className="chat-head-name">
-                <span className="chat-head-name-text">{visitorName}</span>
-                {conversation?.visitor?.online && <span className="dot dot-online" title="Online" />}
+                <span
+                  className={classNames(
+                    'chat-head-name-text',
+                    !(liveVisitor?.online ?? conversation?.visitor?.online) && 'is-offline',
+                  )}
+                >
+                  {visitorName}
+                </span>
+                {(liveVisitor?.online ?? conversation?.visitor?.online) && (
+                  <span className="dot dot-online" title="Online" />
+                )}
               </span>
               <span className="chat-head-sub">
                 <span className="chat-head-email">

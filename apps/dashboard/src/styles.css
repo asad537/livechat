@@ -3659,6 +3659,18 @@ th.vt-num {
   white-space: nowrap;
 }
 
+/* Visitor left the site → gray/dim the title everywhere it's shown */
+.chat-dock-name.is-offline,
+.chat-head-name-text.is-offline {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+/* Docked window header sits on a colored bar — dim rather than recolor */
+.docked-chat-title.is-offline {
+  opacity: 0.55;
+  font-weight: 600;
+}
+
 .docked-chat-actions {
   margin-left: auto;
   display: inline-flex;

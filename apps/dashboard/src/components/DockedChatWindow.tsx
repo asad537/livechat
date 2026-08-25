@@ -11,13 +11,20 @@ import VisitorDrawer from './VisitorDrawer';
  * type-to-join) docked above the bottom tab bar — chat from any page.
  */
 export default function DockedChatWindow() {
-  const { dockedChatId, closeDockedChat, closeChatTab, conversations, openDockedChat } = useApp();
+  const { dockedChatId, closeDockedChat, closeChatTab, conversations, openDockedChat, visitorsByWebsite } =
+    useApp();
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
   if (!dockedChatId) return null;
 
   const conv = conversations[dockedChatId];
   const name = conv?.visitor?.name || `Visitor ${visitorNumber(conv?.visitorId)}`;
+  // Live online: the visitors stream only carries currently-online visitors, so
+  // presence there is authoritative; fall back to the summary's snapshot.
+  const liveVisitor = conv
+    ? visitorsByWebsite[conv.websiteId]?.find((v) => v.id === conv.visitorId)
+    : undefined;
+  const isOnline = liveVisitor ? !!liveVisitor.online : !!conv?.visitor?.online;
 
   return (
     <div className="docked-chat">
@@ -28,7 +35,7 @@ export default function DockedChatWindow() {
         >
           {initials(name)}
         </span>
-        <span className="docked-chat-title">{name}</span>
+        <span className={`docked-chat-title${isOnline ? '' : ' is-offline'}`}>{name}</span>
         <span className="docked-chat-actions">
           {conv?.visitorId && (
             <button
