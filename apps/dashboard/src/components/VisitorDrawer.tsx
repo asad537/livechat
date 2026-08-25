@@ -331,6 +331,32 @@ export default function VisitorDrawer({
           </div>
         </section>
 
+        {/* Previously served — surfaces the last agent who handled a past
+            chat with this visitor, so an agent who can't see the full
+            transcript history still knows who to hand off to. */}
+        {(() => {
+          const lastServed = (pastChats ?? [])
+            .filter((c) => c.agentName)
+            .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
+          if (!lastServed?.agentName) return null;
+          return (
+            <section className="vd-section vd-served-by">
+              <div className="vd-served-label">Previously served by</div>
+              <div className="vd-served-agent">
+                <span className="avatar avatar-xs" style={{ background: 'var(--accent)' }}>
+                  {initials(lastServed.agentName)}
+                </span>
+                <div className="vd-served-meta">
+                  <div className="vd-served-name">{lastServed.agentName}</div>
+                  <div className="vd-served-when">
+                    {formatDay(lastServed.createdAt)} · {formatTime(lastServed.createdAt)}
+                  </div>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
+
         {/* Session path */}
         <section className="vd-section">
           <h4 className="vd-section-title">
