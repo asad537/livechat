@@ -472,6 +472,27 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
         conversation.assignedUserId != null &&
         csrIds.includes(conversation.assignedUserId)));
 
+  // Keyboard shortcut: Space or Enter accepts a waiting chat, so the agent
+  // never has to reach for the mouse. Ignored while typing in a field so a
+  // draft note isn't hijacked, and only wired while showAccept is true so
+  // stray keystrokes on an already-live chat do nothing.
+  useEffect(() => {
+    if (!showAccept) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+      }
+      e.preventDefault();
+      accept();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAccept, conversationId]);
+
   let lastDay = '';
 
   return (
@@ -523,7 +544,12 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
           </div>
           <div className="chat-head-actions">
             {showAccept && (
-              <button className="btn btn-primary btn-sm" onClick={accept}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={accept}
+                autoFocus
+                title="Accept (Space / Enter)"
+              >
                 <IconCheck size={15} /> Accept
               </button>
             )}

@@ -552,6 +552,11 @@ async function announceAgentJoin(
     senderType: 'SYSTEM',
     kind: 'SYSTEM',
     body,
+    // Agent-only: never emit this notice to the widget. Visitors don't need
+    // to see "So-and-so has joined the chat" — it's internal bookkeeping,
+    // and showing it as the FIRST message a visitor sees (before the agent's
+    // real greeting) looks robotic.
+    agentOnly: true,
     // Backdate a moment so the notice always sorts ABOVE the message that
     // triggered it, even when both land in the same millisecond.
     createdAt: new Date(Date.now() - 5).toISOString(),
@@ -1276,6 +1281,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
             senderType: 'SYSTEM',
             kind: 'SYSTEM',
             body: `${data.name} has joined the chat`,
+            agentOnly: true, // internal notice — never surface to the visitor
           });
           await activateConversation(deps, conv.id);
         } else {
@@ -1417,6 +1423,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           senderType: 'SYSTEM',
           kind: 'SYSTEM',
           body: `${data.name} has joined the chat`,
+          agentOnly: true, // internal notice — never surface to the visitor
         });
         await activateConversation(deps, conv.id);
       }),
