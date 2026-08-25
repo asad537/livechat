@@ -382,14 +382,7 @@ export default function App() {
           <Route path="/history" element={<Navigate to="/visitors" replace />} />
           <Route path="/chat-history" element={<ChatHistory />} />
           <Route path="/transfers" element={<TransferChats />} />
-          <Route
-            path="/queries"
-            element={
-              <RequireRole roles={['ADMIN', 'MANAGER']}>
-                <Queries />
-              </RequireRole>
-            }
-          />
+          <Route path="/queries" element={<Queries />} />
           <Route path="/profile" element={<Profile />} />
           <Route
             path="/monitoring"
