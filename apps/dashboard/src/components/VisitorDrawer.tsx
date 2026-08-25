@@ -524,11 +524,19 @@ export default function VisitorDrawer({
                     className="composer-input"
                     rows={1}
                     autoFocus
-                    placeholder="Type a message to start the chat…"
+                    placeholder="Type a message — or just press Space to start the chat…"
                     value={starterDraft}
                     onChange={(e) => setStarterDraft(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        startChatInline();
+                        return;
+                      }
+                      // Space in an EMPTY composer claims the visitor (no opener
+                      // needed). If any text is already typed, Space acts as a
+                      // normal word separator so the opener can still contain spaces.
+                      if (e.key === ' ' && !starterDraft) {
                         e.preventDefault();
                         startChatInline();
                       }
