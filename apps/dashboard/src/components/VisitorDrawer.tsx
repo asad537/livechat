@@ -350,30 +350,27 @@ export default function VisitorDrawer({
             Falls back to the live visitorsByWebsite stream when the visitor
             has no persisted conversation yet but is currently being served. */}
         {(() => {
+          // Show the agent who has done the MOST work with this visitor
+          // (ranked by agent message count on the server). Falls back to
+          // any live 'currently serving' agent if the visitor has never
+          // received an agent message yet.
           type Served = { name: string; color: string | null; when: string | null; live: boolean };
           const liveAgent = openConv?.agentName ?? null;
-          // Priority: live 'currently serving' → server 'last-served' (scope-free)
-          // → whatever we can glean from role-scoped past chats.
-          const fromChats = (chats ?? [])
-            .filter((c) => !!c.agentName)
-            .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
-          const served: Served | null = liveAgent
-            ? { name: liveAgent, color: null, when: null, live: true }
-            : lastServed
-              ? {
-                  name: lastServed.name,
-                  color: lastServed.avatarColor,
-                  when: lastServed.servedAt,
-                  live: false,
-                }
-              : fromChats
-                ? { name: fromChats.agentName!, color: null, when: fromChats.createdAt, live: false }
-                : null;
+          const served: Served | null = lastServed
+            ? {
+                name: lastServed.name,
+                color: lastServed.avatarColor,
+                when: lastServed.servedAt,
+                live: liveAgent === lastServed.name,
+              }
+            : liveAgent
+              ? { name: liveAgent, color: null, when: null, live: true }
+              : null;
           if (!served) return null;
           return (
             <section className="vd-section vd-served-by">
               <div className="vd-served-label">
-                {served.live ? 'Currently serving' : 'Previously served by'}
+                {served.live ? 'Currently serving' : 'Most served by'}
               </div>
               <div className="vd-served-agent">
                 <span
@@ -386,7 +383,7 @@ export default function VisitorDrawer({
                   <div className="vd-served-name">{served.name}</div>
                   {served.when && (
                     <div className="vd-served-when">
-                      {formatDay(served.when)} · {formatTime(served.when)}
+                      Last spoke {formatDay(served.when)} · {formatTime(served.when)}
                     </div>
                   )}
                 </div>

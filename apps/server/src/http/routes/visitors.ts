@@ -406,11 +406,12 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     }),
   );
 
-  // GET /api/visitors/:id/last-served — the LAST agent who handled a
-  // conversation with this visitor, regardless of role scope. Returns just
-  // name/avatar/date — no transcript or private detail — so an agent who
-  // can't see the full past-chats list (CSR / LEAD viewing across teams)
-  // still knows who to hand off to.
+  // GET /api/visitors/:id/last-served — the agent who has done the MOST
+  // work with this visitor: ranked by number of AGENT messages sent to
+  // them across every conversation. Ties broken by most-recent activity.
+  // Returns just name/avatar/last-activity — no transcript or private
+  // detail — so a CSR who can't see the full past-chats list still knows
+  // who has the deepest relationship with the visitor.
   router.get(
     '/api/visitors/:id/last-served',
     auth,
@@ -419,30 +420,35 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       // Auth still runs; we only skip conversationScope so a CSR sees the
       // metadata for a colleague's chat with the same visitor.
       const row = await loadScopedVisitor(deps, req, user.id, user.role);
-      const rowLast = await deps.db.get<{
+      const rowTop = await deps.db.get<{
         name: string | null;
         avatar_color: string | null;
         served_at: string | null;
+        msg_count: number;
       }>(
         `SELECT u.name, u.avatar_color,
-                COALESCE(c.activated_at, c.created_at) AS served_at
-           FROM conversations c
-           JOIN users u ON u.id = c.assigned_user_id
+                MAX(m.created_at) AS served_at,
+                COUNT(*) AS msg_count
+           FROM messages m
+           JOIN conversations c ON c.id = m.conversation_id
+           JOIN users u ON u.id = m.sender_user_id
           WHERE c.visitor_id = ?
-            AND c.assigned_user_id IS NOT NULL
-          ORDER BY COALESCE(c.activated_at, c.created_at) DESC
+            AND m.sender_type = 'AGENT'
+            AND m.sender_user_id IS NOT NULL
+          GROUP BY m.sender_user_id, u.name, u.avatar_color
+          ORDER BY msg_count DESC, served_at DESC
           LIMIT 1`,
         [row.id],
       );
-      if (!rowLast?.name) {
+      if (!rowTop?.name) {
         res.json({ agent: null });
         return;
       }
       res.json({
         agent: {
-          name: rowLast.name,
-          avatarColor: rowLast.avatar_color,
-          servedAt: rowLast.served_at,
+          name: rowTop.name,
+          avatarColor: rowTop.avatar_color,
+          servedAt: rowTop.served_at,
         },
       });
     }),
