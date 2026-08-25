@@ -389,5 +389,47 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     }),
   );
 
+  // GET /api/visitors/:id/last-served — the LAST agent who handled a
+  // conversation with this visitor, regardless of role scope. Returns just
+  // name/avatar/date — no transcript or private detail — so an agent who
+  // can't see the full past-chats list (CSR / LEAD viewing across teams)
+  // still knows who to hand off to.
+  router.get(
+    '/api/visitors/:id/last-served',
+    auth,
+    h(async (req, res) => {
+      const user = agent(req);
+      // Auth still runs; we only skip conversationScope so a CSR sees the
+      // metadata for a colleague's chat with the same visitor.
+      const row = await loadScopedVisitor(deps, req, user.id, user.role);
+      const rowLast = await deps.db.get<{
+        name: string | null;
+        avatar_color: string | null;
+        served_at: string | null;
+      }>(
+        `SELECT u.name, u.avatar_color,
+                COALESCE(c.activated_at, c.created_at) AS served_at
+           FROM conversations c
+           JOIN users u ON u.id = c.assigned_user_id
+          WHERE c.visitor_id = ?
+            AND c.assigned_user_id IS NOT NULL
+          ORDER BY COALESCE(c.activated_at, c.created_at) DESC
+          LIMIT 1`,
+        [row.id],
+      );
+      if (!rowLast?.name) {
+        res.json({ agent: null });
+        return;
+      }
+      res.json({
+        agent: {
+          name: rowLast.name,
+          avatarColor: rowLast.avatar_color,
+          servedAt: rowLast.served_at,
+        },
+      });
+    }),
+  );
+
   return router;
 }

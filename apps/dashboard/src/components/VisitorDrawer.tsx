@@ -44,6 +44,11 @@ export default function VisitorDrawer({
   const { me, csrIds, openChatTab, openDockedChat } = useApp();
   const [profile, setProfile] = useState<VisitorProfile | null>(null);
   const [chats, setChats] = useState<VisitorChat[] | null>(null);
+  const [lastServed, setLastServed] = useState<{
+    name: string;
+    avatarColor: string | null;
+    servedAt: string;
+  } | null>(null);
   const [tab, setTab] = useState<Tab>('chat');
   const [error, setError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
@@ -91,6 +96,13 @@ export default function VisitorDrawer({
       .visitorConversations(visitorId)
       .then((list) => !cancelled && setChats(list))
       .catch(() => !cancelled && setChats([]));
+    // Scope-free 'last agent who served this visitor' — visible even when
+    // the past-chats list is empty due to role scoping.
+    setLastServed(null);
+    void api
+      .visitorLastServed(visitorId)
+      .then((agent) => !cancelled && setLastServed(agent))
+      .catch(() => !cancelled && setLastServed(null));
     return () => {
       cancelled = true;
     };
@@ -331,26 +343,52 @@ export default function VisitorDrawer({
           </div>
         </section>
 
-        {/* Previously served — surfaces the last agent who handled a past
-            chat with this visitor, so an agent who can't see the full
-            transcript history still knows who to hand off to. */}
+        {/* Currently / previously served — surfaces the agent handling
+            this visitor right now (ongoing OFFERED/ACTIVE chat) OR the last
+            agent from any prior conversation. Uses ALL chats (not just
+            closed) so a live handoff shows up even before the chat closes.
+            Falls back to the live visitorsByWebsite stream when the visitor
+            has no persisted conversation yet but is currently being served. */}
         {(() => {
-          const lastServed = (pastChats ?? [])
-            .filter((c) => c.agentName)
+          type Served = { name: string; color: string | null; when: string | null; live: boolean };
+          const liveAgent = openConv?.agentName ?? null;
+          // Priority: live 'currently serving' → server 'last-served' (scope-free)
+          // → whatever we can glean from role-scoped past chats.
+          const fromChats = (chats ?? [])
+            .filter((c) => !!c.agentName)
             .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
-          if (!lastServed?.agentName) return null;
+          const served: Served | null = liveAgent
+            ? { name: liveAgent, color: null, when: null, live: true }
+            : lastServed
+              ? {
+                  name: lastServed.name,
+                  color: lastServed.avatarColor,
+                  when: lastServed.servedAt,
+                  live: false,
+                }
+              : fromChats
+                ? { name: fromChats.agentName!, color: null, when: fromChats.createdAt, live: false }
+                : null;
+          if (!served) return null;
           return (
             <section className="vd-section vd-served-by">
-              <div className="vd-served-label">Previously served by</div>
+              <div className="vd-served-label">
+                {served.live ? 'Currently serving' : 'Previously served by'}
+              </div>
               <div className="vd-served-agent">
-                <span className="avatar avatar-xs" style={{ background: 'var(--accent)' }}>
-                  {initials(lastServed.agentName)}
+                <span
+                  className="avatar avatar-xs"
+                  style={{ background: served.color ?? 'var(--accent)' }}
+                >
+                  {initials(served.name)}
                 </span>
                 <div className="vd-served-meta">
-                  <div className="vd-served-name">{lastServed.agentName}</div>
-                  <div className="vd-served-when">
-                    {formatDay(lastServed.createdAt)} · {formatTime(lastServed.createdAt)}
-                  </div>
+                  <div className="vd-served-name">{served.name}</div>
+                  {served.when && (
+                    <div className="vd-served-when">
+                      {formatDay(served.when)} · {formatTime(served.when)}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>

@@ -488,6 +488,17 @@ export const api = {
       'conversations',
     ),
 
+  /** Scope-free — returns the last agent who served this visitor, across
+   * every role, so a CSR sees a colleague's chat metadata too. */
+  visitorLastServed: async (
+    visitorId: string,
+  ): Promise<{ name: string; avatarColor: string | null; servedAt: string } | null> => {
+    const data = await request<{
+      agent: { name: string; avatarColor: string | null; servedAt: string } | null;
+    }>(`/api/visitors/${encodeURIComponent(visitorId)}/last-served`);
+    return data.agent;
+  },
+
   // ─── Internal team chat ────────────────────────────────────
   agentDMThreads: async (): Promise<AgentDirectThread[]> =>
     unwrapList<AgentDirectThread>(
