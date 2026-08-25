@@ -337,7 +337,12 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     }),
   );
 
-  // GET /api/visitors/:id/conversations — past chats list
+  // GET /api/visitors/:id/conversations — past chats list.
+  // Metadata (status, agent name, date, message count) is visible to every
+  // signed-in agent so a CSR knows a colleague handled this visitor before.
+  // The `preview` field (last message body) is redacted for chats the caller
+  // can't manage — the row is still there, just no leaked content. Transcript
+  // access is enforced separately by the /messages endpoint.
   router.get(
     '/api/visitors/:id/conversations',
     auth,
@@ -346,8 +351,14 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const row = await loadScopedVisitor(deps, req, user.id, user.role);
 
       const scope = await conversationScope(deps, user);
-      const scopeSql = scope.sql.replace('assigned_user_id', 'c.assigned_user_id');
-      const scopeParams = scope.params;
+      const scopedIds = scope.sql
+        ? await deps.db.all<{ id: string }>(
+            `SELECT id FROM conversations WHERE visitor_id = ?${scope.sql}`,
+            [row.id, ...scope.params],
+          )
+        : null;
+      const canViewSet = new Set(scopedIds?.map((r) => r.id) ?? []);
+      const unrestricted = scope.sql === '';
 
       const convs = await deps.db.all<{
         id: string;
@@ -368,23 +379,29 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
                   ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS preview
            FROM conversations c
            LEFT JOIN users u ON u.id = c.assigned_user_id
-          WHERE c.visitor_id = ?${scopeSql}
+          WHERE c.visitor_id = ?
           ORDER BY c.created_at DESC
           LIMIT 100`,
-        [row.id, ...scopeParams],
+        [row.id],
       );
       res.json(
-        convs.map((c) => ({
-          id: c.id,
-          status: c.status,
-          createdAt: c.created_at,
-          closedAt: c.closed_at,
-          rating: c.rating,
-          assignedUserId: c.assigned_user_id,
-          agentName: c.agent_name,
-          messageCount: Number(c.message_count),
-          preview: c.preview,
-        })),
+        convs.map((c) => {
+          const canView = unrestricted || canViewSet.has(c.id);
+          return {
+            id: c.id,
+            status: c.status,
+            createdAt: c.created_at,
+            closedAt: c.closed_at,
+            rating: c.rating,
+            assignedUserId: c.assigned_user_id,
+            agentName: c.agent_name,
+            messageCount: Number(c.message_count),
+            // Preview is chat content — hide from users who can't see the
+            // transcript. They still see status/agent/date, just not the text.
+            preview: canView ? c.preview : null,
+            canView,
+          };
+        }),
       );
     }),
   );

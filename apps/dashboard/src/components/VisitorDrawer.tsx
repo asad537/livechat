@@ -628,9 +628,25 @@ export default function VisitorDrawer({
           <div className="vd-body">
             {!chats && <p className="vd-muted">Loading…</p>}
             {pastChats && pastChats.length === 0 && <p className="vd-muted">No past conversations yet.</p>}
-            {pastChats?.map((c) => (
-              <div key={c.id} className={classNames('vd-chat card', openChatId === c.id && 'open')}>
-                <button className="vd-chat-head" onClick={() => void toggleTranscript(c.id)}>
+            {pastChats?.map((c) => {
+              // canView === false ⇒ another agent's chat — show the card for
+              // context/handoff but don't let the caller expand the transcript.
+              const restricted = c.canView === false;
+              return (
+              <div
+                key={c.id}
+                className={classNames(
+                  'vd-chat card',
+                  openChatId === c.id && 'open',
+                  restricted && 'restricted',
+                )}
+              >
+                <button
+                  className="vd-chat-head"
+                  onClick={() => !restricted && void toggleTranscript(c.id)}
+                  disabled={restricted}
+                  title={restricted ? "Transcript is restricted to this chat's agent" : undefined}
+                >
                   <div className="vd-chat-main">
                     <span className={classNames('status-badge', `status-${c.status.toLowerCase()}`)}>
                       {c.status}
@@ -640,8 +656,9 @@ export default function VisitorDrawer({
                     </span>
                     {c.agentName && <span className="vd-chat-agent">with {c.agentName}</span>}
                     {c.rating != null && <span className="vd-chat-rating">{'★'.repeat(c.rating)}</span>}
+                    {restricted && <span className="vd-chat-locked">🔒 Transcript restricted</span>}
                   </div>
-                  {c.preview && <div className="vd-chat-preview">{c.preview}</div>}
+                  {c.preview && !restricted && <div className="vd-chat-preview">{c.preview}</div>}
                   <div className="vd-chat-count">{c.messageCount} messages</div>
                 </button>
                 {openChatId === c.id && (
@@ -681,7 +698,8 @@ export default function VisitorDrawer({
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

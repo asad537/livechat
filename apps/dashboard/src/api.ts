@@ -538,6 +538,9 @@ export interface VisitorChat {
   agentName: string | null;
   messageCount: number;
   preview: string | null;
+  /** false when this chat is outside the caller's role scope — the row is
+   * shown for handoff context but the transcript is not readable. */
+  canView?: boolean;
 }
 
 // ─── File upload / download ──────────────────────────────────

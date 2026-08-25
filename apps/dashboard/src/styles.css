@@ -3162,6 +3162,22 @@ th.vt-num {
   gap: 10px;
 }
 
+/* Past chat card whose transcript this agent isn't allowed to read */
+.vd-chat.restricted { opacity: 0.7; }
+.vd-chat.restricted .vd-chat-head { cursor: not-allowed; }
+.vd-chat.restricted .vd-chat-head:hover { background: none; }
+.vd-chat-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
 /* "Previously served by" — subtle card under Save details */
 .vd-served-by {
   background: rgba(88, 101, 242, 0.06);
