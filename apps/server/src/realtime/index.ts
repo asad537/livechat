@@ -1342,14 +1342,19 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           // Already an open conversation — post into it (when allowed) and
           // hand its id back so the client opens that chat instead of erroring.
           await socket.join(convRoom(open.id));
-          if (body && (await canSendAsAgent(deps, open, data.userId, data.role))) {
+          if (await canSendAsAgent(deps, open, data.userId, data.role)) {
+            // Always announce the join (agent-only), whether the opener has
+            // text or not — the chat log otherwise looks empty on the agent
+            // side after a Space-bar claim.
             await announceAgentJoin(deps, open.id, data.userId, data.name);
-            await postMessage(deps, {
-              conversationId: open.id,
-              senderType: 'AGENT',
-              senderUserId: data.userId,
-              body,
-            });
+            if (body) {
+              await postMessage(deps, {
+                conversationId: open.id,
+                senderType: 'AGENT',
+                senderUserId: data.userId,
+                body,
+              });
+            }
           }
           reply?.({ conversationId: open.id });
           return;
@@ -1379,6 +1384,18 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
             senderType: 'AGENT',
             senderUserId: data.userId,
             body,
+          });
+        } else {
+          // No opener typed — leave a 'joined the chat' notice so the agent
+          // side isn't staring at an empty transcript. agentOnly keeps it off
+          // the visitor's widget so they never see 'X has joined' as the
+          // very first line before an actual message.
+          await postMessage(deps, {
+            conversationId,
+            senderType: 'SYSTEM',
+            kind: 'SYSTEM',
+            body: `${data.name} has joined the chat`,
+            agentOnly: true,
           });
         }
         await emitConversationStatus(deps, conversationId);
