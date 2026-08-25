@@ -128,6 +128,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       /* transient */
     }
   }, []);
+  // Forward-ref to clearSessionState so the socket useEffect's auth-failure
+  // path (declared before clearSessionState) can invoke it without a circular
+  // dep. The ref is populated by an effect further down.
+  const clearSessionStateRef = useRef<() => void>(() => {});
 
   const meRef = useRef<UserPublic | null>(null);
   // Known online-visitor ids per website — to knock only for genuinely new ones.
@@ -265,8 +269,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         void api.me().catch((e: unknown) => {
           const status = (e as { status?: number })?.status;
           if (status === 401 || status === 403) {
-            clearToken();
-            setTokenState(null);
+            // Full session reset — a different agent logging in on the same
+            // tab must not inherit our conversations/dock/DM cache.
+            clearSessionStateRef.current();
           }
         });
       }
@@ -657,8 +662,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTokenState(res.token);
   }, []);
 
-  const logout = useCallback(() => {
-    disconnectSocket();
+  /** Reset every piece of per-session state without touching the socket
+   * connection. Shared between logout() (user action) and the auth-failure
+   * eviction path (2 consecutive 401/403 handshakes) so a different user
+   * signing in on the same tab never sees the previous agent's cached data. */
+  const clearSessionState = useCallback(() => {
     clearToken();
     setTokenState(null);
     setMe(null);
@@ -667,12 +675,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setConversations({});
     setVisitorsByWebsite({});
     setOnline({});
+    setAwayMap({});
     setConnected(false);
     setIncomingCall(null);
     setActiveCall(null);
-    // Wipe leftover UI + dedupe state so a different user logging in on the
-    // same tab doesn't briefly see the previous agent's dock tiles or miss a
-    // legitimate first-arrival chime because it was marked notified before.
     setOpenChats([]);
     setDockedChatId(null);
     setToasts([]);
@@ -682,6 +688,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     notifiedArrivalRef.current.clear();
     notifiedReturnRef.current.clear();
   }, []);
+
+  // Keep the socket useEffect's auth-failure branch pointed at the latest
+  // clearSessionState — it's a stable useCallback but the ref makes the
+  // dependency explicit and avoids ordering fragility.
+  clearSessionStateRef.current = clearSessionState;
+
+  const logout = useCallback(() => {
+    disconnectSocket();
+    clearSessionState();
+  }, [clearSessionState]);
 
   // ─── Calls ─────────────────────────────────────────────────
   const startCall = useCallback(
@@ -770,7 +786,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!token || !me) return;
     void refreshDMThreadsMeta();
-  }, [token, me, refreshDMThreadsMeta]);
+    // Depend on me?.id (not `me`) so this doesn't re-fetch on every setMe
+    // triggered by setAway / refreshDirectory / socket AgentReady.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, me?.id, refreshDMThreadsMeta]);
 
   const dmUnreadTotal = React.useMemo(
     () => dmThreads.reduce((n, t) => n + t.unread, 0),

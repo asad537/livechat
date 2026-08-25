@@ -61,8 +61,7 @@ function Landing() {
 }
 
 function Sidebar() {
-  const { me, logout, connected, conversations, online, awayMap, teams, openDMDrawer, dmThreads } =
-    useApp();
+  const { me, logout, conversations, online, awayMap, teams, openDMDrawer, dmThreads } = useApp();
   const navigate = useNavigate();
   if (!me) return null;
 

@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { AgentDirectMessage, AgentDirectThread } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requireAgent } from '../../core/auth.js';
-import { nowIso } from '../../core/db.js';
 import { HttpError, agent, asString, h, placeholders } from '../helpers.js';
 
 interface DMRow {
