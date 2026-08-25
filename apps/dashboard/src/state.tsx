@@ -227,6 +227,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
   // Floating docked chat window (opened from the dock or the visitor drawer).
   const [dockedChatId, setDockedChatId] = useState<string | null>(null);
+  const dockedChatIdRef = useRef<string | null>(null);
+  dockedChatIdRef.current = dockedChatId;
   const openDockedChat = useCallback(
     (id: string) => {
       openChatTab(id);
@@ -391,6 +393,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           conv.lastMessage.body || 'New message',
           `chat-${conv.id}`,
         );
+      }
+
+      // Transfer-in blink — independent of the toast dedupe above so the pulse
+      // ALWAYS fires when a chat becomes assigned to me from someone else (or
+      // from unassigned) while it's already live. Dock the tile and blink it
+      // until I open it. Runs even if the toast was skipped (already notified).
+      if (
+        user &&
+        conv.assignedUserId === user.id &&
+        !!prev &&
+        prev.assignedUserId !== user.id &&
+        (conv.status === 'ACTIVE' || conv.status === 'OFFERED' || conv.status === 'WAITING') &&
+        dockedChatIdRef.current !== conv.id
+      ) {
+        setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-7), conv.id]));
+        setBlinkChatIds((cur) => (cur.includes(conv.id) ? cur : [...cur, conv.id]));
       }
       // The visitor left the site → only MINIMIZE the floating window; keep
       // the chat head in the bottom dock so the agent can still add notes,
