@@ -345,6 +345,54 @@ export async function findEligibleCsr(
   return candidates[0]?.id ?? null;
 }
 
+/**
+ * Sticky routing — if this visitor was served by a CSR in the recent past and
+ * that CSR is available now, return them so a returning customer lands back
+ * with the same agent (continuity). Only counts conversations where the CSR
+ * actually sent a message (a real interaction, not just an auto-assign that
+ * was never answered), closed within the window. Returns null if none qualify.
+ */
+export async function findRecentCsr(
+  deps: AppDeps,
+  websiteId: string,
+  visitorId: string,
+  withinMs: number,
+): Promise<string | null> {
+  const cutoff = new Date(Date.now() - withinMs).toISOString();
+  // Most-recent agent who spoke to this visitor on this site within the window.
+  const rows = await deps.db.all<{ agent_id: string }>(
+    `SELECT m.sender_user_id AS agent_id, MAX(m.created_at) AS last_at
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+      WHERE c.visitor_id = ?
+        AND c.website_id = ?
+        AND m.sender_type = 'AGENT'
+        AND m.sender_user_id IS NOT NULL
+        AND m.created_at >= ?
+      GROUP BY m.sender_user_id
+      ORDER BY last_at DESC`,
+    [visitorId, websiteId, cutoff],
+  );
+  if (rows.length === 0) return null;
+  // Confirm the agent is still on this site's team + available; walk in
+  // recency order so the most-recent handler wins, but fall back to an earlier
+  // one who's online if the latest has since gone offline.
+  const website = await deps.db.get<WebsiteRow>('SELECT * FROM websites WHERE id = ?', [websiteId]);
+  if (!website) return null;
+  for (const r of rows) {
+    const member = await deps.db.get<{ id: string; role: string }>(
+      `SELECT u.id, u.role FROM team_members tm
+         JOIN users u ON u.id = tm.user_id
+        WHERE tm.team_id = ? AND u.id = ?`,
+      [website.team_id, r.agent_id],
+    );
+    if (member && member.role !== 'MANAGER' && deps.presence.isAgentAvailable(member.id)) {
+      return member.id;
+    }
+  }
+  return null;
+}
+
 export async function recordAssignment(
   deps: AppDeps,
   conversationId: string,

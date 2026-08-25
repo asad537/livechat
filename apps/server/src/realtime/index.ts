@@ -32,6 +32,7 @@ import {
   emitConversationStatus,
   emitInboxUpdate,
   findEligibleCsr,
+  findRecentCsr,
   hasCapacity,
   loadSummary,
   recordAssignment,
@@ -78,6 +79,9 @@ const INACTIVITY_CLOSE_MS = 12 * 60 * 60 * 1000; // 12 hours
 const INACTIVITY_SWEEP_MS = 15 * 60 * 1000; // re-check every 15 minutes
 // Client's last message unanswered by any AGENT for this long → close as MISSED.
 const UNANSWERED_CLOSE_MS = 60 * 60 * 1000; // 1 hour
+// A returning visitor within this window is routed back to the same CSR who
+// handled them, for continuity ("sticky routing").
+const STICKY_ROUTE_MS = 12 * 60 * 60 * 1000; // 12 hours
 const QUEUE_MESSAGE = "You're in the queue — an agent will be with you shortly.";
 const VISITOR_LEFT_NOTICE = 'Visitor left the site';
 const VISITOR_BACK_NOTICE = 'Visitor is back on the site';
@@ -870,7 +874,12 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         }
 
         if (isNew) {
-          const csrId = await findEligibleCsr(deps, conv.website_id);
+          // Sticky routing first: a returning visitor within 12h goes back to
+          // the CSR who last handled them (if that CSR is available), else fall
+          // back to the normal least-loaded assignment.
+          const csrId =
+            (await findRecentCsr(deps, conv.website_id, data.visitorId, STICKY_ROUTE_MS)) ??
+            (await findEligibleCsr(deps, conv.website_id));
           if (csrId) {
             // Assign (stays WAITING until the CSR accepts) + history AUTO.
             await deps.db.run('UPDATE conversations SET assigned_user_id = ? WHERE id = ?', [
