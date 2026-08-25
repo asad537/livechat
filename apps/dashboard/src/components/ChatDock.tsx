@@ -6,8 +6,17 @@ import { IconX } from '../icons';
 
 /** Zendesk-style bottom dock: every opened chat gets a tab you can switch to from any page. */
 export default function ChatDock() {
-  const { me, openChats, closeChatTab, conversations, dockedChatId, openDockedChat, visitorsByWebsite } =
-    useApp();
+  const {
+    me,
+    openChats,
+    closeChatTab,
+    conversations,
+    dockedChatId,
+    openDockedChat,
+    visitorsByWebsite,
+    blinkChatIds,
+    stopBlink,
+  } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const onInbox = location.pathname === '/';
@@ -43,9 +52,15 @@ export default function ChatDock() {
         return (
           <button
             key={c.id}
-            className={classNames('chat-dock-tab', c.id === activeId && 'active', closed && 'closed')}
+            className={classNames(
+              'chat-dock-tab',
+              c.id === activeId && 'active',
+              closed && 'closed',
+              blinkChatIds.includes(c.id) && 'blink',
+            )}
             title={name}
             onClick={() => {
+              stopBlink(c.id); // looking at it clears the attention pulse
               // Inbox: select there. Any other page: open the floating chat window in place.
               if (onInbox) navigate('/', { state: { conversationId: c.id } });
               else openDockedChat(c.id);

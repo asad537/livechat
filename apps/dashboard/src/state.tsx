@@ -59,6 +59,9 @@ interface AppContextValue {
   dockedChatId: string | null;
   openDockedChat(id: string): void;
   closeDockedChat(): void;
+  /** Dock tabs pulsing for attention (e.g. a just-transferred chat). */
+  blinkChatIds: string[];
+  stopBlink(id: string): void;
   setMeUser(user: UserPublic): void;
   login(email: string, password: string, remember?: boolean): Promise<void>;
   logout(): void;
@@ -213,6 +216,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ── Bottom chat dock (Zendesk-style open-chat tabs) ──
   const [openChats, setOpenChats] = useState<string[]>([]);
+  // Dock tabs that should pulse for attention (e.g. a chat just transferred to
+  // me) until I actually look at them.
+  const [blinkChatIds, setBlinkChatIds] = useState<string[]>([]);
+  const stopBlink = useCallback((id: string) => {
+    setBlinkChatIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev));
+  }, []);
   const openChatTab = useCallback((id: string) => {
     setOpenChats((prev) => (prev.includes(id) ? prev : [...prev.slice(-7), id]));
   }, []);
@@ -222,15 +231,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (id: string) => {
       openChatTab(id);
       setDockedChatId(id);
+      stopBlink(id); // opening it clears the attention pulse
     },
-    [openChatTab],
+    [openChatTab, stopBlink],
   );
   const closeDockedChat = useCallback(() => setDockedChatId(null), []);
 
-  const closeChatTab = useCallback((id: string) => {
-    setOpenChats((prev) => prev.filter((c) => c !== id));
-    setDockedChatId((prev) => (prev === id ? null : prev));
-  }, []);
+  const closeChatTab = useCallback(
+    (id: string) => {
+      setOpenChats((prev) => prev.filter((c) => c !== id));
+      setDockedChatId((prev) => (prev === id ? null : prev));
+      stopBlink(id);
+    },
+    [stopBlink],
+  );
 
   // ─── Socket lifecycle ──────────────────────────────────────
   useEffect(() => {
@@ -339,6 +353,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         pushToast(title, `${who} on ${where}.`, 'info');
         playChime('new-chat');
         desktopNotify(title, `${who} on ${where}.`, `chat-${conv.id}`);
+        // Transferred chat → dock the tile and make it blink so the receiving
+        // agent notices the hand-off even if they're on another page.
+        if (transferred) {
+          setOpenChats((cur) => (cur.includes(conv.id) ? cur : [...cur.slice(-7), conv.id]));
+          setBlinkChatIds((cur) => (cur.includes(conv.id) ? cur : [...cur, conv.id]));
+        }
       } else if (
         // Unclaimed queue chat — a visitor started a chat but nobody is
         // handling it yet. Ring EVERY agent watching this site (CSR, Lead,
@@ -680,6 +700,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
     setActiveCall(null);
     setOpenChats([]);
+    setBlinkChatIds([]);
     setDockedChatId(null);
     setToasts([]);
     setDmThreads([]);
@@ -818,6 +839,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dockedChatId,
     openDockedChat,
     closeDockedChat,
+    blinkChatIds,
+    stopBlink,
     setMeUser: setMe,
     login,
     logout,
