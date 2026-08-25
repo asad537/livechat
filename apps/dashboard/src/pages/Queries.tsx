@@ -22,7 +22,7 @@ function pageNumbers(total: number, current: number): (number | '…')[] {
 /** Queries — chats whose visitor shared a name or email. Every role can view;
  *  the server scopes results by role (CSR own, LEAD own+team, ADMIN/MANAGER all). */
 export default function Queries() {
-  const { websites, openDockedChat } = useApp();
+  const { me, websites, teams, csrIds, openDockedChat } = useApp();
   const [rows, setRows] = useState<ChatHistoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -31,9 +31,32 @@ export default function Queries() {
 
   const [q, setQ] = useState('');
   const [websiteId, setWebsiteId] = useState('');
+  const [agentId, setAgentId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const debounceRef = useRef<number | null>(null);
+
+  // Agent filter roster: LEAD sees themselves + their CSRs; ADMIN/MANAGER see
+  // every teammate; CSR gets nothing (they only see their own queries anyway,
+  // so the dropdown is hidden below).
+  const agentOptions = React.useMemo(() => {
+    if (!me) return [];
+    if (me.role === 'CSR') return [];
+    const seen = new Map<string, string>();
+    if (me.role === 'LEAD') {
+      seen.set(me.id, me.name);
+      for (const t of teams) {
+        for (const mem of t.members ?? []) {
+          if (csrIds.includes(mem.id)) seen.set(mem.id, mem.name);
+        }
+      }
+    } else {
+      for (const t of teams) for (const mem of t.members ?? []) seen.set(mem.id, mem.name);
+    }
+    return [...seen.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [me, teams, csrIds]);
 
   const load = useCallback(
     async (p: number) => {
@@ -45,6 +68,7 @@ export default function Queries() {
           status: 'ALL',
           q: q.trim() || undefined,
           websiteId: websiteId || undefined,
+          agentId: agentId || undefined,
           from: from || undefined,
           to: to || undefined,
         });
@@ -58,7 +82,7 @@ export default function Queries() {
         setLoading(false);
       }
     },
-    [q, websiteId, from, to],
+    [q, websiteId, agentId, from, to],
   );
 
   useEffect(() => {
@@ -106,6 +130,19 @@ export default function Queries() {
             ))}
           </select>
         </label>
+        {agentOptions.length > 0 && (
+          <label className="rec-field">
+            <span>Agent</span>
+            <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+              <option value="">All agents</option>
+              {agentOptions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.id === me?.id ? `${a.name} (me)` : a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="rec-field">
           <span>From</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
