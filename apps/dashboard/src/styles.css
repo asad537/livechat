@@ -3670,6 +3670,11 @@ th.vt-num {
   opacity: 0.55;
   font-weight: 600;
 }
+/* Offline visitor avatar → neutral gray instead of the site's brand color */
+.avatar.is-offline {
+  background: var(--text-muted) !important;
+  opacity: 0.7;
+}
 
 .docked-chat-actions {
   margin-left: auto;

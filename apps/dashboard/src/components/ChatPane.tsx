@@ -515,8 +515,15 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
         <div className="chat-head">
           <div className="chat-head-id">
             <span
-              className="avatar"
-              style={{ background: conversation?.website?.primaryColor || 'var(--accent)' }}
+              className={classNames(
+                'avatar',
+                !(liveVisitor?.online ?? conversation?.visitor?.online) && 'is-offline',
+              )}
+              style={{
+                background: (liveVisitor?.online ?? conversation?.visitor?.online)
+                  ? conversation?.website?.primaryColor || 'var(--accent)'
+                  : undefined,
+              }}
             >
               {initials(visitorName)}
             </span>

@@ -30,8 +30,8 @@ export default function DockedChatWindow() {
     <div className="docked-chat">
       <div className="docked-chat-bar">
         <span
-          className="avatar avatar-xs"
-          style={{ background: conv?.website?.primaryColor || 'var(--accent)' }}
+          className={`avatar avatar-xs${isOnline ? '' : ' is-offline'}`}
+          style={{ background: isOnline ? conv?.website?.primaryColor || 'var(--accent)' : undefined }}
         >
           {initials(name)}
         </span>

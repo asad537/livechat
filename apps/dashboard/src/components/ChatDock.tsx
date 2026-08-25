@@ -52,8 +52,8 @@ export default function ChatDock() {
             }}
           >
             <span
-              className="avatar avatar-xs"
-              style={{ background: c.website?.primaryColor || 'var(--accent)' }}
+              className={classNames('avatar', 'avatar-xs', offline && 'is-offline')}
+              style={{ background: offline ? undefined : c.website?.primaryColor || 'var(--accent)' }}
             >
               {initials(name)}
             </span>
