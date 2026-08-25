@@ -433,12 +433,13 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
            JOIN conversations c ON c.id = m.conversation_id
            JOIN users u ON u.id = m.sender_user_id
           WHERE c.visitor_id = ?
+            AND c.website_id = ?
             AND m.sender_type = 'AGENT'
             AND m.sender_user_id IS NOT NULL
           GROUP BY m.sender_user_id, u.name, u.avatar_color
           ORDER BY msg_count DESC, served_at DESC
           LIMIT 1`,
-        [row.id],
+        [row.id, row.website_id],
       );
       if (!rowTop?.name) {
         res.json({ agent: null });
