@@ -212,7 +212,11 @@ export default function Queries() {
       {!loading && rows.length === 0 && (
         <div className="empty-state card">
           <IconUsers size={32} className="empty-state-icon" />
-          <p>{q || websiteId || from || to ? 'No queries match these filters' : 'No queries yet'}</p>
+          <p>
+            {q || websiteId || agentId || from || to
+              ? 'No queries match these filters'
+              : 'No queries yet'}
+          </p>
         </div>
       )}
 
