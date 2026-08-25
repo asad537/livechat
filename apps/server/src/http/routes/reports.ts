@@ -42,12 +42,16 @@ function pktDayStart(daysAgo = 0): string {
   return new Date(boundaryWall - PKT_OFFSET_MS).toISOString(); // convert back to real UTC
 }
 
-function rangeStart(range: string): string | null {
+/** Lower + optional upper bound for a range. `until` is set only for bounded
+ *  windows (yesterday = the previous noon-PKT business day); open-ended ranges
+ *  leave it null so they keep the simple `>= since` behavior. */
+function rangeBounds(range: string): { since: string | null; until: string | null } {
   const now = new Date();
-  if (range === 'today') return pktDayStart(0); // noon-PKT → now
-  if (range === '7d') return new Date(now.getTime() - 7 * 24 * 3600_000).toISOString();
-  if (range === '30d') return new Date(now.getTime() - 30 * 24 * 3600_000).toISOString();
-  return null; // all time
+  if (range === 'today') return { since: pktDayStart(0), until: null }; // noon-PKT → now
+  if (range === 'yesterday') return { since: pktDayStart(1), until: pktDayStart(0) }; // prev noon→noon
+  if (range === '7d') return { since: new Date(now.getTime() - 7 * 24 * 3600_000).toISOString(), until: null };
+  if (range === '30d') return { since: new Date(now.getTime() - 30 * 24 * 3600_000).toISOString(), until: null };
+  return { since: null, until: null }; // all time
 }
 
 const avg = (xs: number[]): number | null =>
@@ -95,7 +99,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         siteIds = [websiteId];
       }
       const range = asString(req.query.range) ?? 'today';
-      const since = rangeStart(range);
+      const { since, until } = rangeBounds(range);
 
       // Agents in scope: ADMIN/MANAGER → everyone; Team Lead → self + own CSRs;
       // CSR → only themselves.
@@ -169,9 +173,19 @@ export function buildReportsRouter(deps: AppDeps): Router {
 
       const siteFilter = `website_id IN (${placeholders(siteIds.length)})`;
       const cSiteFilter = `c.website_id IN (${placeholders(siteIds.length)})`;
-      const rangeFilter = since ? ' AND (created_at >= ? OR closed_at >= ?)' : '';
-      const cRangeFilter = since ? ' AND (c.created_at >= ? OR c.closed_at >= ?)' : '';
-      const rangeParams = since ? [since, since] : [];
+      // Bounded window (yesterday) needs an upper bound; open-ended ranges keep
+      // the simple lower-bound form. "in range" = started OR closed in range.
+      const rangeFilter = since
+        ? until
+          ? ' AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))'
+          : ' AND (created_at >= ? OR closed_at >= ?)'
+        : '';
+      const cRangeFilter = since
+        ? until
+          ? ' AND ((c.created_at >= ? AND c.created_at < ?) OR (c.closed_at >= ? AND c.closed_at < ?))'
+          : ' AND (c.created_at >= ? OR c.closed_at >= ?)'
+        : '';
+      const rangeParams = since ? (until ? [since, until, since, until] : [since, since]) : [];
       // A "conversation" only counts once the CLIENT has actually spoken. Agent
       // outreach the visitor never answered is not a real chat — it must not
       // inflate Closed / Resolution / per-agent / website / outcome numbers.
@@ -186,6 +200,11 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const trendWindow = range === '7d' ? 7 : range === '30d' || range === 'all' ? 30 : 14;
       const trendSince = new Date(Date.now() - trendWindow * 24 * 3600_000).toISOString();
       const visitorSince = since ?? '1970';
+      // Visitor counts filter on last_seen_at >= visitorSince; a bounded window
+      // (yesterday) also caps it with an upper bound. Reused across the three
+      // visitor queries below.
+      const vRangeSql = until ? ' AND last_seen_at < ?' : '';
+      const vRangeParams = until ? [until] : [];
 
       const [
         rows,
@@ -216,14 +235,14 @@ export function buildReportsRouter(deps: AppDeps): Router {
         ),
         deps.db.get<{ n: number; ret: number }>(
           `SELECT COUNT(*) AS n, SUM(CASE WHEN total_visits > 1 THEN 1 ELSE 0 END) AS ret
-             FROM visitors WHERE ${siteFilter} AND last_seen_at >= ?`,
-          [...siteIds, visitorSince],
+             FROM visitors WHERE ${siteFilter} AND last_seen_at >= ?${vRangeSql}`,
+          [...siteIds, visitorSince, ...vRangeParams],
         ),
         deps.db.all<{ country: string; cc: string | null; n: number }>(
           `SELECT geo_country AS country, geo_cc AS cc, COUNT(*) AS n FROM visitors
-            WHERE ${siteFilter} AND last_seen_at >= ? AND geo_country IS NOT NULL
+            WHERE ${siteFilter} AND last_seen_at >= ?${vRangeSql} AND geo_country IS NOT NULL
             GROUP BY geo_country, geo_cc ORDER BY n DESC LIMIT 6`,
-          [...siteIds, visitorSince],
+          [...siteIds, visitorSince, ...vRangeParams],
         ),
         deps.db.all<{ cid: string }>(
           `SELECT DISTINCT h.conversation_id AS cid FROM assignment_history h
@@ -277,15 +296,20 @@ export function buildReportsRouter(deps: AppDeps): Router {
         }
       }
 
-      const inRange = (iso: string | null) => iso != null && (!since || iso >= since);
+      const inRange = (iso: string | null) =>
+        iso != null && (!since || iso >= since) && (!until || iso < until);
 
       // Engagement split for the selected date range: chats where the CLIENT
       // has messaged vs ones where a CSR/agent has messaged (dashboard tiles).
       // STRICTLY chats STARTED in the range — the shared rangeFilter also
       // matches on closed_at, which would count a month-old chat that merely
       // got closed today (e.g. by the inactivity sweep) as "today".
-      const cStartedFilter = since ? ' AND c.created_at >= ?' : '';
-      const startedParams = since ? [since] : [];
+      const cStartedFilter = since
+        ? until
+          ? ' AND c.created_at >= ? AND c.created_at < ?'
+          : ' AND c.created_at >= ?'
+        : '';
+      const startedParams = since ? (until ? [since, until] : [since]) : [];
       const [clientLiveRow, csrLiveRow] = await Promise.all([
         deps.db.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM conversations c
@@ -541,8 +565,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
       // Visitors seen per website in the range (for the dashboard's Visitors column).
       const visitorByWebsite = await deps.db.all<{ website_id: string; n: number }>(
         `SELECT website_id, COUNT(*) AS n FROM visitors
-          WHERE ${siteFilter} AND last_seen_at >= ? GROUP BY website_id`,
-        [...siteIds, visitorSince],
+          WHERE ${siteFilter} AND last_seen_at >= ?${vRangeSql} GROUP BY website_id`,
+        [...siteIds, visitorSince, ...vRangeParams],
       );
       const visitorCount = new Map(visitorByWebsite.map((r) => [r.website_id, Number(r.n)]));
       const websitePerf = siteRows

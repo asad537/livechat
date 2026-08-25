@@ -19,13 +19,15 @@ import { classNames, flagEmoji, formatSeconds, siteLabel } from '../util';
 
 const RANGES: { key: ReportRange; label: string }[] = [
   { key: 'today', label: 'Today' },
+  { key: 'yesterday', label: 'Yesterday' },
   { key: '7d', label: '7 days' },
   { key: '30d', label: '30 days' },
   { key: 'all', label: 'All time' },
 ];
 
 const RANGE_HINT: Record<ReportRange, string> = {
-  today: 'since midnight',
+  today: 'since noon',
+  yesterday: 'yesterday',
   '7d': 'last 7 days',
   '30d': 'last 30 days',
   all: 'all time',

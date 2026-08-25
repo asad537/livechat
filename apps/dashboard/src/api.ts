@@ -94,7 +94,7 @@ export interface AgentReportRow {
   rating: { average: number | null; count: number };
 }
 
-export type ReportRange = 'today' | '7d' | '30d' | 'all';
+export type ReportRange = 'today' | 'yesterday' | '7d' | '30d' | 'all';
 
 export interface WebsitePerfRow {
   id: string;

@@ -20,6 +20,7 @@ import { classNames, formatSeconds, siteLabel } from '../util';
 
 const RANGE_HINT: Record<ReportRange, string> = {
   today: 'today',
+  yesterday: 'yesterday',
   '7d': 'last 7 days',
   '30d': 'last 30 days',
   all: 'all time',
@@ -172,6 +173,7 @@ export default function Dashboard() {
               onChange={(e) => setRange(e.target.value as ReportRange)}
             >
               <option value="today">Today ({today})</option>
+              <option value="yesterday">Yesterday</option>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
               <option value="all">All time</option>
@@ -329,7 +331,7 @@ export default function Dashboard() {
             <div className="card report-card">
               <h3>Visitor to Chat Funnel</h3>
               <p className="db-card-sub">
-                {range === 'today' ? 'Since midnight' : RANGE_HINT[range]}
+                {range === 'today' ? 'Since noon' : RANGE_HINT[range]}
               </p>
               {funnel && funnel.visitors + funnel.chats > 0 ? (
                 <div className="db-funnel">
