@@ -3572,20 +3572,20 @@ th.vt-num {
   opacity: 0.65;
 }
 
-/* Just-transferred chat → pulse the tab until the agent looks at it */
+/* Just-transferred chat → pulse the tab RED until the agent looks at it */
 .chat-dock-tab.blink {
-  animation: chat-dock-blink 1s ease-in-out infinite;
+  animation: chat-dock-blink 0.9s ease-in-out infinite;
 }
 @keyframes chat-dock-blink {
   0%, 100% {
-    background: var(--accent);
-    border-color: var(--accent);
-    box-shadow: 0 0 0 0 rgba(88, 101, 242, 0.5);
+    background: var(--red);
+    border-color: var(--red);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
   }
   50% {
-    background: var(--accent-strong);
-    border-color: var(--accent-strong);
-    box-shadow: 0 0 0 5px rgba(88, 101, 242, 0);
+    background: #b91c1c;
+    border-color: #b91c1c;
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
   }
 }
 .chat-dock-tab.blink .chat-dock-name,
