@@ -24,11 +24,27 @@ interface ConvRow {
   rating: number | null;
 }
 
+// Business "day" boundary — Pakistan NOON (12:00 PKT = 07:00 UTC), not midnight.
+// A support day runs noon→noon so overnight shifts aren't split by a midnight
+// reset. Computed explicitly in PKT (UTC+5, no DST) so it's correct no matter
+// what timezone the server runs in.
+const PKT_OFFSET_MS = 5 * 3600_000;
+const DAY_MS = 24 * 3600_000;
+
+/** ISO timestamp of the most-recent 12:00-PKT boundary, shifted back `daysAgo` days. */
+function pktDayStart(daysAgo = 0): string {
+  const nowPktWall = Date.now() + PKT_OFFSET_MS; // ms in the PKT wall-clock frame
+  const d = new Date(nowPktWall);
+  // Anchor to 12:00 on the PKT calendar date (UTC getters read the shifted wall clock).
+  let boundaryWall = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0, 0);
+  if (nowPktWall < boundaryWall) boundaryWall -= DAY_MS; // before noon → yesterday's noon
+  boundaryWall -= daysAgo * DAY_MS;
+  return new Date(boundaryWall - PKT_OFFSET_MS).toISOString(); // convert back to real UTC
+}
+
 function rangeStart(range: string): string | null {
   const now = new Date();
-  if (range === 'today') {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  }
+  if (range === 'today') return pktDayStart(0); // noon-PKT → now
   if (range === '7d') return new Date(now.getTime() - 7 * 24 * 3600_000).toISOString();
   if (range === '30d') return new Date(now.getTime() - 30 * 24 * 3600_000).toISOString();
   return null; // all time
@@ -163,9 +179,10 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const engaged = `EXISTS (SELECT 1 FROM messages em WHERE em.conversation_id = co.id AND em.sender_type = 'VISITOR')`;
       const cEngaged = `EXISTS (SELECT 1 FROM messages em WHERE em.conversation_id = c.id AND em.sender_type = 'VISITOR')`;
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const yesterdayStart = new Date(Date.parse(todayStart) - 24 * 3600_000).toISOString();
+      // "Today" / "yesterday" both use the noon-PKT business-day boundary so the
+      // dashboard's Today counters and the vs-yesterday deltas reset at 12:00 PKT.
+      const todayStart = pktDayStart(0);
+      const yesterdayStart = pktDayStart(1);
       const trendWindow = range === '7d' ? 7 : range === '30d' || range === 'all' ? 30 : 14;
       const trendSince = new Date(Date.now() - trendWindow * 24 * 3600_000).toISOString();
       const visitorSince = since ?? '1970';
