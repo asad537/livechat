@@ -146,9 +146,13 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const scope = await conversationScope(deps, user); // ' AND assigned_user_id …'
       const cScope = scope.sql.replace('assigned_user_id', 'c.assigned_user_id');
 
-      // "Served" = an agent has messaged them in a conversation that is STILL
-      // OPEN. The moment the chat closes they drop out — back to "Online now"
-      // if they're still browsing, or simply into Chat History if they left.
+      // "Served" = an agent is CURRENTLY on an open conversation with them —
+      // either they've messaged the visitor, or they've claimed the chat via
+      // Space-bar (agent-initiated OFFERED with no opener yet). Once the chat
+      // closes they drop out — back to "Online now" if they're still browsing,
+      // or simply into Chat History if they left. Sort by whichever is more
+      // recent: the last agent message, or the assignment/creation timestamp
+      // (so a just-claimed chat with no message still floats to the top).
       const rows = await deps.db.all<
         VisitorRow & {
           served_at: string;
@@ -159,18 +163,22 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
           conv_agent: string | null;
         }
       >(
-        `SELECT v.*, x.served_at, c.id AS conv_id, c.status AS conv_status,
+        `SELECT v.*,
+                COALESCE(x.served_at, c.activated_at, c.created_at) AS served_at,
+                c.id AS conv_id, c.status AS conv_status,
                 c.assigned_user_id AS conv_assignee, u.name AS conv_agent,
                 (SELECT COUNT(*) FROM conversations cc WHERE cc.visitor_id = v.id) AS n_chats
            FROM conversations c
            JOIN visitors v ON v.id = c.visitor_id
            LEFT JOIN users u ON u.id = c.assigned_user_id
-           JOIN (SELECT conversation_id, MAX(created_at) AS served_at
-                   FROM messages WHERE sender_type = 'AGENT' GROUP BY conversation_id) x
+           LEFT JOIN (SELECT conversation_id, MAX(created_at) AS served_at
+                        FROM messages WHERE sender_type = 'AGENT' GROUP BY conversation_id) x
              ON x.conversation_id = c.id
           WHERE c.status IN ('WAITING', 'OFFERED', 'ACTIVE')
+            AND c.assigned_user_id IS NOT NULL
+            AND (x.served_at IS NOT NULL OR c.status IN ('OFFERED', 'ACTIVE'))
             AND c.website_id IN (${placeholders(scoped.length)})${cScope}
-          ORDER BY x.served_at DESC
+          ORDER BY served_at DESC
           LIMIT ?`,
         [...scoped, ...scope.params, limit],
       );
