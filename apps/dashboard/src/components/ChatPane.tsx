@@ -408,12 +408,16 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   };
 
   const closeConversation = () => {
-    // The visitor is still browsing — make sure this isn't a mis-click that
-    // kills a live conversation.
-    if (conversation?.visitor?.online) {
-      const name = conversation.visitor.name || 'The visitor';
-      if (!window.confirm(`${name} is still on the website. End this chat anyway?`)) return;
-    }
+    // Always confirm before ending a chat, whatever its state — a close is
+    // irreversible for the agent (it moves to history and un-assigns), so a
+    // mis-click shouldn't kill a conversation. If the visitor is still on the
+    // site, say so explicitly.
+    const name = conversation?.visitor?.name || 'the visitor';
+    const online = liveVisitor?.online ?? conversation?.visitor?.online;
+    const msg = online
+      ? `${name} is still on the website. End this chat anyway?`
+      : `End this chat with ${name}? It will move to Chat History.`;
+    if (!window.confirm(msg)) return;
     getSocket()?.emit(EV.AgentClose, { conversationId });
   };
 
