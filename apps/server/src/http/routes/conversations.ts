@@ -242,11 +242,12 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         params.push(...mine);
       }
 
-      // Queries view: only chats whose visitor shared a name or email —
-      // restricted to ADMIN/MANAGER.
+      // Queries view: only chats whose visitor shared a name or email.
+      // Every role can query — the existing People-scope block above already
+      // restricts CSR to own, LEAD to own + team, and ADMIN/MANAGER to all,
+      // so CSRs / Team Leads see queries only from THEIR chats.
       const contactOnly = asString(req.query.contact) === '1';
       if (contactOnly) {
-        if (user.role !== 'ADMIN' && user.role !== 'MANAGER') throw new HttpError(403, 'Forbidden');
         where.push("(NULLIF(v.name, '') IS NOT NULL OR NULLIF(v.email, '') IS NOT NULL)");
       }
 

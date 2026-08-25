@@ -126,11 +126,9 @@ function Sidebar() {
         <NavLink to="/transfers" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconTransfer size={17} />, 'Transfer Chats')}
         </NavLink>
-        {(me.role === 'ADMIN' || me.role === 'MANAGER') && (
-          <NavLink to="/queries" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
-            {navItem(<IconUser size={17} />, 'Queries')}
-          </NavLink>
-        )}
+        <NavLink to="/queries" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(<IconUser size={17} />, 'Queries')}
+        </NavLink>
         {isLeadUp && (
           <NavLink to="/monitoring" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
             {navItem(<IconEye size={17} />, 'Live Monitor')}

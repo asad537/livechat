@@ -19,7 +19,8 @@ function pageNumbers(total: number, current: number): (number | '…')[] {
   return out;
 }
 
-/** Queries — chats whose visitor shared a name or email (ADMIN/MANAGER only). */
+/** Queries — chats whose visitor shared a name or email. Every role can view;
+ *  the server scopes results by role (CSR own, LEAD own+team, ADMIN/MANAGER all). */
 export default function Queries() {
   const { websites, openDockedChat } = useApp();
   const [rows, setRows] = useState<ChatHistoryRow[]>([]);
