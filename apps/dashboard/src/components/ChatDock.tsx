@@ -6,7 +6,7 @@ import { IconX } from '../icons';
 
 /** Zendesk-style bottom dock: every opened chat gets a tab you can switch to from any page. */
 export default function ChatDock() {
-  const { me, csrIds, openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
+  const { me, openChats, closeChatTab, conversations, dockedChatId, openDockedChat } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const onInbox = location.pathname === '/';
@@ -17,15 +17,12 @@ export default function ChatDock() {
   // Admins oversee rather than handle chats — no bottom chat dock for them.
   if (me?.role === 'ADMIN') return null;
 
-  // Only dock chats this user can actually open — a CSR sees their own, a Team
-  // Lead theirs + their CSRs', a Manager any. Otherwise a tab could be a dead
-  // "Forbidden" tile for someone else's conversation.
-  const canDock = (assignedUserId: string | null): boolean => {
-    if (me?.role === 'MANAGER') return true;
-    if (assignedUserId && assignedUserId === me?.id) return true;
-    if (me?.role === 'LEAD' && assignedUserId && csrIds.includes(assignedUserId)) return true;
-    return false;
-  };
+  // Strictly OWN chats — every role (CSR / LEAD / MANAGER) only sees tiles
+  // for conversations assigned to them personally. Team leads and managers
+  // can still open a supervised chat from the Inbox / Live Monitor to
+  // review, but it won't leave a dock tile for someone else's work.
+  const canDock = (assignedUserId: string | null): boolean =>
+    !!assignedUserId && assignedUserId === me?.id;
 
   const tabs = openChats
     .map((id) => conversations[id])
