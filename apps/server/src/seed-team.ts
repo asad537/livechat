@@ -170,10 +170,10 @@ async function main(): Promise<void> {
     teams = [{ id, name: 'Customer Support' }];
   }
 
-  // Team Leads / CSRs are created without any IP restriction. Admin can add
-  // office IPs per-user from the dashboard afterwards; hardcoding a specific
-  // office subnet here was surfacing as a confusing 'default' in Agents view.
-  const DEFAULT_ALLOWED_IPS = null;
+  // Default office IPs applied to seeded Team Leads and CSRs. The Admin
+  // > Agents > New user form pre-fills the same string so a manually-created
+  // agent gets the same policy out of the box; admin can edit/remove per user.
+  const DEFAULT_ALLOWED_IPS = '122.129.75.18, 202.166.170.138';
 
   // 1. Admins + Managers (global access — unrestricted IP, no team membership needed).
   for (const [email, name] of ADMINS) {

@@ -21,6 +21,11 @@ function embedSnippet(widgetKey: string): string {
   return `<script src="${window.location.origin}/widget.js" data-livechat-key="${widgetKey}" async></script>`;
 }
 
+// Office allow-list pre-filled in the New user form. Kept in sync with
+// DEFAULT_ALLOWED_IPS in apps/server/src/seed-team.ts so a manually-created
+// Lead/CSR gets the same policy as a seeded one out of the box.
+const DEFAULT_ALLOWED_IPS = '122.129.75.18, 202.166.170.138';
+
 // ─── Website form ────────────────────────────────────────────
 interface WebsiteFormProps {
   initial?: Website;
@@ -587,7 +592,9 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('CSR');
   const [teamLeadId, setTeamLeadId] = useState('');
-  const [allowedIps, setAllowedIps] = useState('');
+  // Default office allow-list pre-filled so a manually-created Lead/CSR
+  // matches the seed policy out of the box. Admin can edit or clear per user.
+  const [allowedIps, setAllowedIps] = useState(DEFAULT_ALLOWED_IPS);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<UserPublic | null>(null);
 
@@ -647,7 +654,7 @@ function UsersTab({ users, reload }: { users: UserPublic[]; reload(): void }) {
       setPassword('');
       setRole('CSR');
       setTeamLeadId('');
-      setAllowedIps('');
+      setAllowedIps(DEFAULT_ALLOWED_IPS);
       reload();
     } catch (err) {
       pushToast('Create failed', err instanceof Error ? err.message : undefined, 'error');
