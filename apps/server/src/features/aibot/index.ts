@@ -13,6 +13,7 @@ import { EV, WIDGET_NAMESPACE, type ChatMessage } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { postMessage, type MessageRow } from '../../domain/messages.js';
 import { findRelevantKnowledge } from '../knowledge/index.js';
+import { SALES_STYLE, SALES_FEWSHOT } from './salesExamples.js';
 
 interface ConvRow {
   id: string;
@@ -205,7 +206,11 @@ async function aiReply(
     `If they return to English, you return to English. Never start a conversation in any language other than English. ` +
     `Keep replies short (1-3 sentences), warm and helpful. ` +
     `Collect useful details (order number, issue summary, contact info) so the human agent can start faster. ` +
-    `Do not promise exact wait times.` +
+    `Do not promise exact wait times. ` +
+    // ── Real-agent sales style + few-shot, distilled from production chats ──
+    `\n\nHOUSE STYLE (how our human sales team actually chats — follow this):\n` +
+    SALES_STYLE.map((s) => `• ${s}`).join('\n') +
+    `\n\n${SALES_FEWSHOT}` +
     knowledgeBlock;
 
   if (deps.config.aiProvider === 'anthropic') {
