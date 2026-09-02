@@ -116,11 +116,22 @@ p {
   flex-direction: column;
   padding: 20px 14px 16px;
   border-right: 1px solid rgba(255, 255, 255, 0.07);
-  /* On a short screen the nav + online list + user card can exceed the
-     viewport; scroll inside the sidebar so the bottom (availability + user
-     card) is never clipped and unreachable. */
+  overflow: hidden;
+}
+/* Brand (top) and foot (availability + user card, bottom) stay pinned; only the
+   nav in between scrolls when the screen is too short — so the user card /
+   logout is ALWAYS visible and nothing gets cut off. */
+.sidebar-brand,
+.sidebar-foot {
+  flex-shrink: 0;
+}
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  margin: 0 -14px; /* let scrollbar sit at the edge; children keep their padding */
+  padding: 0 14px;
 }
 
 .sidebar-brand {
