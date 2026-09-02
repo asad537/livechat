@@ -35,6 +35,7 @@ interface VisitorRow {
   id: string;
   name: string | null;
   email: string | null;
+  phone?: string | null;
 }
 
 /** Per-conversation lock so overlapping visitor messages produce one reply. */
@@ -42,7 +43,10 @@ const inFlight = new Set<string>();
 /** Conversations where the built-in bot already introduced itself. */
 const greeted = new Set<string>();
 
-const HISTORY_LIMIT = 14;
+// Sales chats run long (30-40 short turns): dimensions/quantity are often given
+// early, so a small window makes the bot "forget" and re-ask. Keep the whole
+// conversation in context — the messages are short, so the token cost is fine.
+const HISTORY_LIMIT = 80;
 const DEBOUNCE_MS = 900;
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -76,7 +80,7 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
           'SELECT id, name, greeting, primary_color, ai_enabled FROM websites WHERE id = ?',
           [conv.website_id],
         ),
-        deps.db.get<VisitorRow>('SELECT id, name, email FROM visitors WHERE id = ?', [
+        deps.db.get<VisitorRow>('SELECT id, name, email, phone FROM visitors WHERE id = ?', [
           conv.visitor_id,
         ]),
         deps.db.all<MessageRow>(
@@ -180,11 +184,26 @@ async function aiReply(
       `<website_content>\n${knowledge}\n</website_content>`
     : ` Never invent order status, prices, refunds, or policies specific to ${website.name} — for those, say a human agent will confirm shortly.`;
 
+  // Contact details we ALREADY hold for this customer (captured earlier in the
+  // chat or from a form). Tell the model explicitly so it never re-asks.
+  const known: string[] = [];
+  if (visitor?.name) known.push(`name (${visitor.name})`);
+  if (visitor?.email) known.push(`email (${visitor.email})`);
+  if (visitor?.phone) known.push(`phone (${visitor.phone})`);
+  const knownContactBlock =
+    known.length > 0
+      ? `You ALREADY have the customer's ${known.join(', ')}. ` +
+        `NEVER ask for any of these again — you have them. ` +
+        `Also never re-ask for any box detail (size, quantity, printing, material, timeline, address, use) they already stated earlier in this chat; ` +
+        `read the whole conversation, track what's known, and only ask for what is genuinely still missing. `
+      : `Ask for the customer's name and email only ONCE, and only after box requirements are captured — never re-ask once given. `;
+
   const system =
     `You are the customer-support AI assistant for "${website.name}" only. ` +
     `All human support agents are currently busy; you are keeping the customer company until one joins. ` +
     `Website greeting (tone reference): "${website.greeting}". ` +
     (visitor?.name ? `The customer's name is ${visitor.name}. ` : '') +
+    knownContactBlock +
     // ── Hard scope: this is NOT a general chatbot ──
     `STRICT SCOPE — you exist ONLY to help with ${website.name}: its products, services, pricing, orders, policies, ` +
     `and general support for this business. You are NOT a general-purpose assistant. ` +
