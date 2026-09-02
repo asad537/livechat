@@ -840,6 +840,12 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               </div>
             )}
           </div>
+          {conversation.quoteSpec && (
+            <div className="side-section">
+              <h4>📦 Quote spec <span className="quote-spec-tag">AI-captured</span></h4>
+              <pre className="quote-spec">{conversation.quoteSpec}</pre>
+            </div>
+          )}
           <div className="side-section">
             <h4>Assignment history</h4>
             <HistoryTimeline history={history} />

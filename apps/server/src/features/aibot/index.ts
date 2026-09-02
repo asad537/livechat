@@ -219,6 +219,64 @@ async function aiReply(
   return openAiCompatReply(deps, system, messages);
 }
 
+/** Dispatch a one-off system+messages LLM call to whichever provider is set. */
+async function llmComplete(
+  deps: AppDeps,
+  system: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+): Promise<string | null> {
+  if (deps.config.aiProvider === 'builtin') return null;
+  if (deps.config.aiProvider === 'anthropic') return anthropicReply(deps, system, messages);
+  return openAiCompatReply(deps, system, messages);
+}
+
+/**
+ * Extract a structured quote/lead spec from a conversation and save it to
+ * conversations.quote_spec, so agents see the box requirements at a glance
+ * instead of re-reading the transcript. Best-effort: silently no-ops when no
+ * LLM provider is configured, when there's nothing captured yet, or on error.
+ * Only fills fields the customer actually stated — never invents values.
+ */
+export async function extractQuoteSpec(deps: AppDeps, conversationId: string): Promise<void> {
+  try {
+    if (deps.config.aiProvider === 'builtin') return;
+    const rows = await deps.db.all<MessageRow>(
+      `SELECT * FROM messages
+        WHERE conversation_id = ? AND kind = 'TEXT' AND (agent_only = 0 OR agent_only IS NULL)
+        ORDER BY created_at ASC, id ASC LIMIT 120`,
+      [conversationId],
+    );
+    const transcript = rows
+      .filter((m) => m.body && (m.sender_type === 'VISITOR' || m.sender_type === 'AGENT' || m.sender_type === 'BOT'))
+      .map((m) => {
+        const who = m.sender_type === 'VISITOR' ? 'CUSTOMER' : m.sender_type === 'AGENT' ? 'AGENT' : 'ASSISTANT';
+        return `${who}: ${m.body}`;
+      })
+      .join('\n');
+    if (!transcript.trim()) return;
+
+    const system =
+      'You extract a custom-box quote spec from a sales chat. ' +
+      'Output ONLY the fields the customer actually stated — omit any field they did not mention. ' +
+      'Never guess or invent values. Never include a price. Keep it terse. ' +
+      'Format as short "Label: value" lines, using only these labels when present: ' +
+      'Product, Box style, Dimensions, Unit, Quantity, Printing, Material, Finishing, Inserts, Timeline, Delivery location, Name, Email, Phone. ' +
+      'If the customer requested multiple variations, list them as "Option A: …" / "Option B: …". ' +
+      'If nothing concrete was captured, reply with exactly: NONE';
+    const spec = await llmComplete(deps, system, [
+      { role: 'user', content: `Chat transcript:\n${transcript}\n\nExtract the quote spec.` },
+    ]);
+    const clean = spec?.trim();
+    if (!clean || clean.toUpperCase() === 'NONE') return;
+    await deps.db.run('UPDATE conversations SET quote_spec = ? WHERE id = ?', [
+      clean.slice(0, 4000),
+      conversationId,
+    ]);
+  } catch {
+    /* best-effort — never block the chat flow on spec extraction */
+  }
+}
+
 async function anthropicReply(
   deps: AppDeps,
   system: string,

@@ -19,7 +19,7 @@ import {
   type VisitorTokenPayload,
 } from '../core/auth.js';
 import { hydrateMessages, postMessage, type MessageRow } from '../domain/messages.js';
-import { maybeBotReply } from '../features/aibot/index.js';
+import { maybeBotReply, extractQuoteSpec } from '../features/aibot/index.js';
 import { sendTranscriptEmail } from '../features/email/index.js';
 import { captureVisitorInfo } from '../features/capture/index.js';
 import { clientIp, localCountry, lookupCountry, updateVisitorGeo } from '../features/geo/index.js';
@@ -865,6 +865,10 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         if (await captureVisitorInfo(deps, data.visitorId, body)) {
           await emitInboxUpdate(deps, conv.id);
           void broadcastVisitors(deps, data.websiteId);
+          // Contact shared → this is now a qualified lead. Snapshot the box
+          // requirements into a structured quote spec (best-effort, async) so
+          // agents see them without re-reading the transcript.
+          void extractQuoteSpec(deps, conv.id).then(() => emitInboxUpdate(deps, conv.id));
         }
 
         if (wasOffered) {
@@ -1473,6 +1477,9 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           return;
         }
         await closeConversation(deps, conv.id);
+        // Finalize the structured quote spec from the full transcript (specs
+        // often arrive after contact was shared), best-effort.
+        void extractQuoteSpec(deps, conv.id).then(() => emitInboxUpdate(deps, conv.id));
       }),
     );
 

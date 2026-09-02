@@ -230,6 +230,7 @@ export async function loadSummaries(
       lastMessage: lastHydrated.get(conv.id) ?? null,
       unreadCount: unread.get(conv.id) ?? 0,
       hasVisitorMessage: visitorSpoke.has(conv.id),
+      quoteSpec: (conv as { quote_spec?: string | null }).quote_spec ?? null,
     });
   }
   return summaries;

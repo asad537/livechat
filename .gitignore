@@ -5,3 +5,6 @@ storage/
 .env
 *.log
 .DS_Store
+backups/
+*.sql
+*.sql.gz

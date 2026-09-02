@@ -236,3 +236,9 @@ CREATE TABLE IF NOT EXISTS agent_messages (
 CREATE INDEX IF NOT EXISTS idx_agent_messages_to_read ON agent_messages (to_user_id, read_at);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_pair ON agent_messages (from_user_id, to_user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_created ON agent_messages (created_at);
+
+-- AI-extracted structured quote/lead spec for a conversation (product, box
+-- style, dimensions, quantity, printing, timeline …). Populated by the AI
+-- greeter once the customer shares contact info, refreshed on close. Shown to
+-- agents alongside the chat so they don't have to re-read the whole transcript.
+ALTER TABLE conversations ADD COLUMN quote_spec TEXT;
