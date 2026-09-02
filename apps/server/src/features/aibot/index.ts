@@ -362,7 +362,12 @@ function builtinReply(
   const lastVisitor = [...history].reverse().find((m) => m.sender_type === 'VISITOR');
   const text = (lastVisitor?.body ?? '').toLowerCase();
 
-  if (!greeted.has(conversationId)) {
+  // Greet ONLY on the very first bot turn. If the assistant has already spoken
+  // in this conversation (e.g. the LLM handled it and then hit a transient
+  // error, dropping us here), NEVER re-greet — that reads as the bot forgetting
+  // the whole chat and starting over. Fall through to intent-matching instead.
+  const botAlreadySpoke = history.some((m) => m.sender_type === 'BOT' && m.body);
+  if (!botAlreadySpoke && !greeted.has(conversationId)) {
     greeted.add(conversationId);
     return (
       `Hi! I'm the ${website.name} AI assistant 🤖 All of our agents are helping other customers right now, ` +
