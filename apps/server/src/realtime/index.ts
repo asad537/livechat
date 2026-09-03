@@ -1181,7 +1181,7 @@ async function onWidgetConnected(
 }
 
 // ─── Proactive AI greeting (bot opens the chat) ──────────────
-const PROACTIVE_DELAY_MS = 8_000; // give the visitor a moment to settle in
+const PROACTIVE_DELAY_MS = 800; // greet almost immediately on landing
 const proactiveGreeted = new Set<string>(); // per-process: greet a visitor once
 
 function scheduleProactiveGreeting(
