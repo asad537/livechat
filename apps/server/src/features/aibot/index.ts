@@ -166,6 +166,15 @@ async function aiReply(
   const messages = toClaudeMessages(history);
   if (messages.length === 0) return null;
 
+  // If the assistant has already spoken (e.g. a proactive greeting opened the
+  // chat), tell the model NOT to greet again — otherwise it opens with a second
+  // "Hi there!". The few-shot examples all start with a greeting, so this guard
+  // is needed to stop it pattern-matching another opener.
+  const alreadyGreeted = messages.some((m) => m.role === 'assistant');
+  const greetingRule = alreadyGreeted
+    ? `\n\nIMPORTANT: You have ALREADY greeted this customer earlier in this chat. Do NOT greet again or say "Hi/Hello". Continue the conversation naturally and just ask the next thing you still need.`
+    : '';
+
   // Live website knowledge: index finds the right pages, which are
   // re-fetched fresh so today's products/prices are what the AI sees.
   const lastQuestions = messages
@@ -230,6 +239,7 @@ async function aiReply(
     `\n\nHOUSE STYLE (how our human sales team actually chats — follow this):\n` +
     SALES_STYLE.map((s) => `• ${s}`).join('\n') +
     `\n\n${SALES_FEWSHOT}` +
+    greetingRule +
     knowledgeBlock;
 
   if (deps.config.aiProvider === 'anthropic') {
