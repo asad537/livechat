@@ -1173,6 +1173,72 @@ async function onWidgetConnected(
   });
 
   await broadcastVisitors(deps, data.websiteId);
+
+  // Proactive greeting — if the visitor has NO open conversation, the AI opens
+  // the chat itself a few seconds after they land (like Intercom/Drift), instead
+  // of waiting for them to type first.
+  if (!conv) scheduleProactiveGreeting(deps, data.websiteId, data.visitorId, ctx.page);
+}
+
+// ─── Proactive AI greeting (bot opens the chat) ──────────────
+const PROACTIVE_DELAY_MS = 8_000; // give the visitor a moment to settle in
+const proactiveGreeted = new Set<string>(); // per-process: greet a visitor once
+
+function scheduleProactiveGreeting(
+  deps: AppDeps,
+  websiteId: string,
+  visitorId: string,
+  page: string | null,
+): void {
+  if (!deps.config.aiGreeter) return;
+  if (proactiveGreeted.has(visitorId)) return;
+  proactiveGreeted.add(visitorId);
+  const t = setTimeout(() => {
+    void (async () => {
+      try {
+        // Visitor must still be online, the site's AI on, and there must STILL
+        // be no conversation (they didn't start one in the meantime).
+        if (!deps.presence.isVisitorOnline(visitorId)) return;
+        const website = await deps.db.get<{ id: string; name: string; ai_enabled: number }>(
+          'SELECT id, name, ai_enabled FROM websites WHERE id = ?',
+          [websiteId],
+        );
+        if (!website || website.ai_enabled === 0) return;
+        const open = await deps.db.get<{ id: string }>(
+          "SELECT id FROM conversations WHERE visitor_id = ? AND status IN ('WAITING','OFFERED','ACTIVE') LIMIT 1",
+          [visitorId],
+        );
+        if (open) return;
+
+        // Open a WAITING conversation the bot owns until a human joins.
+        const conversationId = newId();
+        await deps.db.run(
+          "INSERT INTO conversations (id, website_id, visitor_id, status, assigned_user_id, created_at, activated_at, closed_at) VALUES (?, ?, ?, 'WAITING', NULL, ?, NULL, NULL)",
+          [conversationId, websiteId, visitorId, nowIso()],
+        );
+        // Pull the visitor's live widget sockets into the room so they get the
+        // greeting + status instantly.
+        for (const ws of deps.io.of(WIDGET_NAMESPACE).sockets.values()) {
+          const wd = ws.data as Partial<WidgetSocketData>;
+          if (wd.visitorId === visitorId) {
+            await ws.join(convRoom(conversationId));
+            wd.conversationId = conversationId;
+          }
+        }
+        await postMessage(deps, {
+          conversationId,
+          senderType: 'BOT',
+          body: `Hi there! 👋 Welcome to ${website.name}. Are you looking for custom printed boxes today? I can help you get a quote started.`,
+        });
+        await emitConversationStatus(deps, conversationId);
+        await emitInboxUpdate(deps, conversationId);
+      } catch (err) {
+        console.warn('[proactive] greeting failed:', (err as Error).message);
+      }
+    })();
+  }, PROACTIVE_DELAY_MS);
+  t.unref?.();
+  void page; // reserved: could tailor the opener by landing page later
 }
 
 // ═════════════════════════════ /agent ════════════════════════
