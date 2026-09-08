@@ -82,6 +82,10 @@ function playPing(): void {
 }
 
 export function App({ server, widgetKey }: { server: string; widgetKey: string }): JSX.Element | null {
+  const notifyFlutter = (event: string) => {
+    const bridge = (window as Window & { FlutterChatBridge?: { postMessage?: (value: string) => void } }).FlutterChatBridge;
+    bridge?.postMessage?.(event);
+  };
   const tokenKey = `livechat:token:${widgetKey}`;
   const infoDismissKey = `livechat:info-dismissed:${widgetKey}`;
   const colorKey = `livechat:color:${widgetKey}`;
@@ -345,6 +349,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     socket.on(EV.CallInvite, ({ call: meta, from }: { call: CallMeta; from?: { name: string } }) => {
       if (callRef.current) return; // already in a call
       setInvite({ call: meta, from: from ?? null });
+      notifyFlutter('CALL_RINGING');
     });
 
     socket.on(EV.CallStatus, ({ call: meta }: { call: CallMeta }) => {
@@ -355,6 +360,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       const active = callRef.current;
       if (active && active.meta.id === meta.id) {
         if (meta.status === 'ENDED' || meta.status === 'DECLINED') {
+          notifyFlutter('CALL_ENDED');
           active.session.leave(false);
           setCall(null);
         } else {
@@ -695,12 +701,14 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     }
     socket.emit(EV.WidgetCallAccept, { callId: inv.call.id });
     session.join();
+    notifyFlutter('CALL_STARTED');
     setCall({ session, meta: { ...inv.call, status: 'ACTIVE' } });
     setInvite(null);
   };
 
   const declineCall = (inv: Invite) => {
     socketRef.current?.emit(EV.WidgetCallDecline, { callId: inv.call.id });
+    notifyFlutter('CALL_ENDED');
     setInvite(null);
   };
 
