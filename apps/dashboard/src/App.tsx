@@ -103,7 +103,6 @@ function Sidebar() {
           <span className="sidebar-brand-sub">The Custom Boxes</span>
         </span>
       </div>
-      <div className="sidebar-scroll">
       <div className="nav-section-label">Workspace</div>
       <nav className="sidebar-nav">
         {isDashboardRole && (
@@ -206,7 +205,6 @@ function Sidebar() {
           </nav>
         </>
       )}
-      </div>
       <div className="sidebar-foot">
         <AvailabilityToggle />
         <div

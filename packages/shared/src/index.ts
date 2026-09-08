@@ -150,8 +150,6 @@ export interface ConversationSummary {
   lastMessage?: ChatMessage | null;
   unreadCount?: number;
   hasVisitorMessage?: boolean; // the visitor has sent at least one message
-  /** AI-extracted structured quote/lead spec (box requirements), if captured. */
-  quoteSpec?: string | null;
 }
 
 export interface AssignmentRecord {

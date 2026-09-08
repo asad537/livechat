@@ -116,22 +116,6 @@ p {
   flex-direction: column;
   padding: 20px 14px 16px;
   border-right: 1px solid rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-}
-/* Brand (top) and foot (availability + user card, bottom) stay pinned; only the
-   nav in between scrolls when the screen is too short — so the user card /
-   logout is ALWAYS visible and nothing gets cut off. */
-.sidebar-brand,
-.sidebar-foot {
-  flex-shrink: 0;
-}
-.sidebar-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  margin: 0 -14px; /* let scrollbar sit at the edge; children keep their padding */
-  padding: 0 14px;
 }
 
 .sidebar-brand {
@@ -1483,30 +1467,6 @@ p {
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 12px;
-}
-/* AI-captured quote spec card */
-.quote-spec-tag {
-  margin-left: auto;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #fff;
-  background: var(--accent);
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-.quote-spec {
-  margin: 0;
-  padding: 10px 12px;
-  background: rgba(88, 101, 242, 0.06);
-  border: 1px solid rgba(88, 101, 242, 0.16);
-  border-radius: 8px;
-  font-family: var(--font);
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--text);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 .side-empty {
   font-size: 12.5px;
