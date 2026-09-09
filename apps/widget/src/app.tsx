@@ -294,6 +294,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
         playPing();
       }
       if (message.senderType === 'AGENT' && !openRef.current) {
+        notifyFlutter('CHAT_MESSAGE_RECEIVED');
         // Auto-open on an agent message — unless the visitor closed the
         // widget themselves, then just keep counting on the launcher badge.
         if (dismissedRef.current) setUnread((u) => u + 1);
