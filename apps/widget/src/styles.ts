@@ -344,6 +344,25 @@ export const WIDGET_CSS = `
 .lc-send:hover:not(:disabled) { filter: brightness(1.08); transform: scale(1.05); }
 .lc-send:disabled { opacity: .45; cursor: default; box-shadow: none; }
 
+/* ── Recording-consent gate ───────────────────────────────── */
+.lc-consent {
+  flex-shrink: 0; padding: 12px 14px;
+  background: #fff; border-top: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; gap: 10px;
+  animation: lc-msg .2s ease;
+}
+.lc-consent-text { font-size: 12.5px; color: #475569; line-height: 1.5; }
+.lc-consent-actions { display: flex; gap: 10px; }
+.lc-consent-actions button {
+  flex: 1; padding: 9px 12px; border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: #fff;
+  transition: filter .15s ease, transform .1s ease;
+}
+.lc-consent-actions button:hover { filter: brightness(1.08); }
+.lc-consent-actions button:active { transform: scale(.98); }
+.lc-consent-accept { background: #16a34a; }
+.lc-consent-decline { background: #ef4444; }
+
 /* ── Closed / ended bar ───────────────────────────────────── */
 .lc-closedbar {
   flex-shrink: 0; padding: 14px; background: #fff; border-top: 1px solid #e2e8f0;

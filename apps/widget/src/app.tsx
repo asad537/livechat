@@ -89,6 +89,9 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const tokenKey = `livechat:token:${widgetKey}`;
   const infoDismissKey = `livechat:info-dismissed:${widgetKey}`;
   const colorKey = `livechat:color:${widgetKey}`;
+  // Recording-consent gate (FSCA-style): the visitor must Accept before they can
+  // reply. Remembered per browser so we don't re-ask on every visit/refresh.
+  const consentKey = `livechat:consent:${widgetKey}`;
 
   const [open, setOpen] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -145,6 +148,8 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     });
   };
   const [forceInfoForm, setForceInfoForm] = useState(false);
+  // The visitor has accepted the recording-consent notice (this browser).
+  const [consented, setConsented] = useState(() => lsGet(consentKey) === '1');
 
   // Fetch branding over a fast HTTP call at boot so the launcher shows the real
   // brand colour right away — within ~100ms on a first visit, and instantly
@@ -293,8 +298,11 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       if ((message.senderType === 'AGENT' || message.senderType === 'BOT') && soundOnRef.current) {
         playPing();
       }
-      if (message.senderType === 'AGENT' && !openRef.current) {
+      if (message.senderType === 'AGENT') {
         notifyFlutter('CHAT_MESSAGE_RECEIVED');
+        setUnread((u) => u + 1);
+      }
+      if (message.senderType === 'AGENT' && !openRef.current) {
         // Auto-open on an agent message — unless the visitor closed the
         // widget themselves, then just keep counting on the launcher badge.
         if (dismissedRef.current) setUnread((u) => u + 1);
@@ -677,6 +685,20 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     taRef.current?.focus();
   };
 
+  // ── Recording consent ──────────────────────────────────────
+  // Accept → remember it and let the visitor type. Decline → just close the
+  // chat window; if they reopen, they're asked again (nothing is recorded).
+  const acceptConsent = () => {
+    lsSet(consentKey, '1');
+    setConsented(true);
+    window.setTimeout(() => taRef.current?.focus(), 0);
+  };
+  const declineConsent = () => {
+    setDraft('');
+    markDismissed(true);
+    setOpen(false);
+  };
+
   // ── CSAT rating after close ────────────────────────────────
   const submitRating = (rating: number, comment: string) => {
     socketRef.current?.emit(EV.WidgetRate, { rating, comment: comment || undefined });
@@ -956,12 +978,28 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 <span>Thank you for your feedback! 💚</span>
               </div>
             )}
+            {!consented && (
+              <div class="lc-consent">
+                <div class="lc-consent-text">
+                  By continuing, you consent to this chat being recorded and handled in
+                  accordance with {website.name}'s privacy policy.
+                </div>
+                <div class="lc-consent-actions">
+                  <button type="button" class="lc-consent-accept" onClick={acceptConsent}>
+                    Accept
+                  </button>
+                  <button type="button" class="lc-consent-decline" onClick={declineConsent}>
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
             <div class="lc-composer">
               <button
                 type="button"
                 class="lc-attach"
                 title={conversation ? 'Attach a file' : 'Send a message first to attach files'}
-                disabled={!conversation || uploading || !connected}
+                disabled={!conversation || uploading || !connected || !consented}
                 onClick={() => {
                   const picker = document.createElement('input');
                   picker.type = 'file';
@@ -975,17 +1013,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 ref={taRef}
                 class="lc-ta"
                 rows={1}
-                placeholder="Type your message…"
+                placeholder={consented ? 'Type your message…' : 'Accept to start chatting…'}
                 value={draft}
                 onInput={onDraftInput}
                 onKeyDown={onKeyDown}
-                disabled={!connected}
+                disabled={!connected || !consented}
               />
               <button
                 type="button"
                 class="lc-send"
                 title="Send"
-                disabled={!draft.trim() || !connected}
+                disabled={!draft.trim() || !connected || !consented}
                 onClick={send}
               >
                 <IconSend />
