@@ -116,6 +116,11 @@ p {
   flex-direction: column;
   padding: 20px 14px 16px;
   border-right: 1px solid rgba(255, 255, 255, 0.07);
+  /* Short screens: never let the foot (availability + profile/logout) get
+     pushed off-screen and clipped by the app-shell. This is the last-resort
+     scroll; normally the workspace nav below absorbs the overflow instead. */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -175,6 +180,22 @@ p {
   flex-direction: column;
   gap: 3px;
   flex: 1;
+}
+
+/* Only the workspace nav scrolls when the sidebar runs out of vertical room
+   (the admin nav also carries .sidebar-nav but keeps its natural height). This
+   keeps the Admin section and the foot — availability + profile/logout —
+   visible on short screens instead of being clipped off the bottom. */
+.sidebar-nav:not(.sidebar-nav-admin) {
+  min-height: 0;
+  overflow-y: auto;
+}
+.sidebar-nav:not(.sidebar-nav-admin)::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-nav:not(.sidebar-nav-admin)::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 3px;
 }
 
 /* Zendesk-style "who's online" roster under the workspace nav. */
@@ -421,6 +442,7 @@ p {
 
 .sidebar-foot {
   padding-top: 12px;
+  flex-shrink: 0; /* keep the availability + profile/logout row from being squeezed away */
 }
 
 .sidebar-user {
@@ -4878,9 +4900,10 @@ img.avatar {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
 }
 
-.sidebar-nav-admin { flex: 0; }
+.sidebar-nav-admin { flex: 0 0 auto; }
 
 /* Figma-match polish */
 .chart-with-y {
