@@ -326,14 +326,27 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       }
 
       const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+      const needsVisitorJoin = contactOnly || q.length >= 2;
+
       const totalRow = await deps.db.get<{ n: number }>(
-        `SELECT COUNT(*) AS n FROM conversations c JOIN visitors v ON v.id = c.visitor_id ${whereSql}`,
+        needsVisitorJoin
+          ? `SELECT COUNT(*) AS n FROM conversations c JOIN visitors v ON v.id = c.visitor_id ${whereSql}`
+          : `SELECT COUNT(*) AS n FROM conversations c ${whereSql}`,
         params,
       );
       const total = Number(totalRow?.n ?? 0);
       const pages = Math.max(1, Math.ceil(total / PER_PAGE));
 
-      const rows = await deps.db.all<{
+      // Step 1: Fetch ONLY the matching conversation IDs for this page (runs in ~5ms)
+      const pageRowIds = await deps.db.all<{ id: string }>(
+        needsVisitorJoin
+          ? `SELECT c.id FROM conversations c JOIN visitors v ON v.id = c.visitor_id ${whereSql} ORDER BY c.created_at DESC LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`
+          : `SELECT c.id FROM conversations c ${whereSql} ORDER BY c.created_at DESC LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
+        params,
+      );
+
+      // Step 2: Hydrate full details for ONLY the 20 page items
+      let rows: Array<{
         id: string;
         status: string;
         created_at: string;
@@ -347,20 +360,24 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         visitor_id: string;
         visitor_name: string | null;
         visitor_email: string | null;
-      }>(
-        `SELECT c.id, c.status, c.created_at, c.activated_at, c.closed_at, c.rating,
-                c.website_id, COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
-                u.name AS agent_name,
-                v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email
-           FROM conversations c
-           JOIN visitors v ON v.id = c.visitor_id
-           JOIN websites w ON w.id = c.website_id
-           LEFT JOIN users u ON u.id = c.assigned_user_id
-          ${whereSql}
-          ORDER BY c.created_at DESC
-          LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
-        params,
-      );
+      }> = [];
+
+      if (pageRowIds.length > 0) {
+        const ids = pageRowIds.map((r) => r.id);
+        rows = await deps.db.all(
+          `SELECT c.id, c.status, c.created_at, c.activated_at, c.closed_at, c.rating,
+                  c.website_id, COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
+                  u.name AS agent_name,
+                  v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email
+             FROM conversations c
+             JOIN visitors v ON v.id = c.visitor_id
+             JOIN websites w ON w.id = c.website_id
+             LEFT JOIN users u ON u.id = c.assigned_user_id
+            WHERE c.id IN (${placeholders(ids.length)})
+            ORDER BY c.created_at DESC`,
+          ids,
+        );
+      }
 
       // Message counts for JUST this page's rows. Done as one grouped query —
       // inlining COUNT(*) as a per-row subquery made the DB compute it for every
@@ -477,18 +494,41 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       }
 
       const whereSql = `WHERE ${where.join(' AND ')}`;
+      const needsVisitorJoin = q.length >= 2;
+
       const totalRow = await deps.db.get<{ n: number }>(
-        `SELECT COUNT(*) AS n
-           FROM assignment_history h
-           JOIN conversations c ON c.id = h.conversation_id
-           JOIN visitors v ON v.id = c.visitor_id
-          ${whereSql}`,
+        needsVisitorJoin
+          ? `SELECT COUNT(*) AS n
+               FROM assignment_history h
+               JOIN conversations c ON c.id = h.conversation_id
+               JOIN visitors v ON v.id = c.visitor_id
+              ${whereSql}`
+          : `SELECT COUNT(*) AS n
+               FROM assignment_history h
+               JOIN conversations c ON c.id = h.conversation_id
+              ${whereSql}`,
         params,
       );
       const total = Number(totalRow?.n ?? 0);
       const pages = Math.max(1, Math.ceil(total / PER_PAGE));
 
-      const rows = await deps.db.all<{
+      const pageRowIds = await deps.db.all<{ id: string }>(
+        needsVisitorJoin
+          ? `SELECT h.id FROM assignment_history h
+               JOIN conversations c ON c.id = h.conversation_id
+               JOIN visitors v ON v.id = c.visitor_id
+              ${whereSql}
+              ORDER BY h.created_at DESC
+              LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`
+          : `SELECT h.id FROM assignment_history h
+               JOIN conversations c ON c.id = h.conversation_id
+              ${whereSql}
+              ORDER BY h.created_at DESC
+              LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
+        params,
+      );
+
+      let rows: Array<{
         transfer_id: string;
         transferred_at: string;
         from_name: string | null;
@@ -501,23 +541,27 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         visitor_id: string;
         visitor_name: string | null;
         visitor_email: string | null;
-      }>(
-        `SELECT h.id AS transfer_id, h.created_at AS transferred_at,
-                fu.name AS from_name, tu.name AS to_name,
-                c.id, c.status, c.website_id,
-                COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
-                v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email
-           FROM assignment_history h
-           JOIN conversations c ON c.id = h.conversation_id
-           JOIN visitors v ON v.id = c.visitor_id
-           JOIN websites w ON w.id = c.website_id
-           LEFT JOIN users fu ON fu.id = h.from_user_id
-           LEFT JOIN users tu ON tu.id = h.to_user_id
-          ${whereSql}
-          ORDER BY h.created_at DESC
-          LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
-        params,
-      );
+      }> = [];
+
+      if (pageRowIds.length > 0) {
+        const ids = pageRowIds.map((r) => r.id);
+        rows = await deps.db.all(
+          `SELECT h.id AS transfer_id, h.created_at AS transferred_at,
+                  fu.name AS from_name, tu.name AS to_name,
+                  c.id, c.status, c.website_id,
+                  COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
+                  v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email
+             FROM assignment_history h
+             JOIN conversations c ON c.id = h.conversation_id
+             JOIN visitors v ON v.id = c.visitor_id
+             JOIN websites w ON w.id = c.website_id
+             LEFT JOIN users fu ON fu.id = h.from_user_id
+             LEFT JOIN users tu ON tu.id = h.to_user_id
+            WHERE h.id IN (${placeholders(ids.length)})
+            ORDER BY h.created_at DESC`,
+          ids,
+        );
+      }
 
       const payload = {
         transfers: rows.map((r) => ({
