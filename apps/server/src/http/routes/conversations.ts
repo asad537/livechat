@@ -347,13 +347,11 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         visitor_id: string;
         visitor_name: string | null;
         visitor_email: string | null;
-        msgs: number;
       }>(
         `SELECT c.id, c.status, c.created_at, c.activated_at, c.closed_at, c.rating,
                 c.website_id, COALESCE(NULLIF(w.label, ''), w.name) AS website_name, w.primary_color AS website_color,
                 u.name AS agent_name,
-                v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email,
-                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msgs
+                v.id AS visitor_id, v.name AS visitor_name, v.email AS visitor_email
            FROM conversations c
            JOIN visitors v ON v.id = c.visitor_id
            JOIN websites w ON w.id = c.website_id
@@ -363,6 +361,21 @@ export function buildConversationsRouter(deps: AppDeps): Router {
           LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
         params,
       );
+
+      // Message counts for JUST this page's rows. Done as one grouped query —
+      // inlining COUNT(*) as a per-row subquery made the DB compute it for every
+      // matching conversation BEFORE the LIMIT (thousands), which was the main
+      // reason Chat History was slow on large archives.
+      const pageIds = rows.map((r) => r.id);
+      const msgCounts = new Map<string, number>();
+      if (pageIds.length > 0) {
+        const counts = await deps.db.all<{ cid: string; n: number }>(
+          `SELECT conversation_id AS cid, COUNT(*) AS n FROM messages
+            WHERE conversation_id IN (${placeholders(pageIds.length)}) GROUP BY conversation_id`,
+          pageIds,
+        );
+        for (const c of counts) msgCounts.set(c.cid, Number(c.n));
+      }
 
       const payload = {
         chats: rows.map((r) => ({
@@ -382,7 +395,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
           visitorId: r.visitor_id,
           visitor: r.visitor_name || r.visitor_email || null,
           visitorEmail: r.visitor_email,
-          messages: Number(r.msgs),
+          messages: msgCounts.get(r.id) ?? 0,
         })),
         total,
         page,

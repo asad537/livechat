@@ -183,6 +183,11 @@ ALTER TABLE users ADD COLUMN team_lead_id VARCHAR(36);
 CREATE INDEX IF NOT EXISTS idx_conversations_website_created ON conversations (website_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_conversations_assigned_status ON conversations (assigned_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_conversations_status_created ON conversations (status, created_at);
+-- Archive lists order by created_at DESC. When almost every conversation is
+-- CLOSED/MISSED the status filter isn't selective, so a plain created_at index
+-- lets the newest page be read straight from the index instead of filesorting
+-- the whole table.
+CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations (created_at);
 -- Chat History / Queries / Transfers archive: filter by site or agent + status,
 -- ordered by created_at DESC. Without the trailing created_at the DB has to
 -- filesort every matching row before it can return a page — the main reason the
