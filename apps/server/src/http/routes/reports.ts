@@ -176,7 +176,10 @@ export function buildReportsRouter(deps: AppDeps): Router {
       // instantly. Only READ RESULTS are cached (never writes) and they expire
       // in seconds — no data is ever lost or shown wrong for long. Keyed by the
       // viewer (their scope), the website filter and the range.
-      const OVERVIEW_TTL_MS = 20_000;
+      // Longer cache for historical ranges — yesterday/7d/30d/all barely change,
+      // and their heavy per-day message scan (~seconds on large data) should run
+      // rarely. "today" stays short so live counters keep moving. Refresh bypasses.
+      const OVERVIEW_TTL_MS = range === 'today' ? 20_000 : range === 'yesterday' ? 120_000 : 300_000;
       const cacheKey = `overview:${user.id}:${websiteId || 'all'}:${range}`;
       // The Refresh button sends fresh=1 to bypass the cache and recompute now.
       const bypassCache = asString(req.query.fresh) === '1';
