@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type ReportRange, type ReportsOverview } from '../api';
 import { useApp } from '../state';
@@ -77,30 +77,55 @@ export default function Dashboard() {
   const [range, setRange] = useState<ReportRange>('today');
   const [data, setData] = useState<ReportsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  // The reports overview is a heavy multi-query endpoint. Guard against firing
+  // it more than necessary: collapse duplicate in-flight requests, and track
+  // when we last loaded so a tab refocus doesn't re-run it constantly.
+  const inFlightKey = useRef<string | null>(null);
+  const lastLoadAt = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
+    const key = `${websiteId}|${range}`;
+    if (inFlightKey.current === key) return; // an identical request is already running
+    inFlightKey.current = key;
     setLoading(true);
     try {
-      setData(await api.reports(websiteId || undefined, range));
+      setData(await api.reports(websiteId || undefined, range, fresh));
+      lastLoadAt.current = Date.now();
     } catch {
       /* toast-free dashboard; Reports page surfaces errors */
     } finally {
+      if (inFlightKey.current === key) inFlightKey.current = null;
       setLoading(false);
     }
   }, [websiteId, range]);
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
+  // Primary load: the initial mount, and whenever the website filter or range
+  // changes. (Previously a second effect also loaded on socket connect, so the
+  // overview ran twice on every open — this now runs it once.)
   useEffect(() => {
     void load();
   }, [load]);
 
-  // After a sleep/reconnect the initial fetch may have failed while offline —
-  // reload once the socket is back and whenever the tab regains focus so the
-  // dashboard can't get stuck on "Loading…".
+  // Refresh after the socket recovers from an actual outage — but NOT on the
+  // first handshake (the load above already covers the initial open).
+  const everConnected = useRef(false);
   useEffect(() => {
     if (!connected) return;
-    void load();
+    if (everConnected.current) void loadRef.current();
+    everConnected.current = true;
+  }, [connected]);
+
+  // On tab refocus, refresh only if the data is stale (> 60s old) instead of
+  // re-running the whole overview every time the tab regains focus.
+  useEffect(() => {
+    const STALE_MS = 60_000;
     const onFocus = () => {
-      if (document.visibilityState === 'visible') void load();
+      if (document.visibilityState === 'visible' && Date.now() - lastLoadAt.current > STALE_MS) {
+        void loadRef.current();
+      }
     };
     document.addEventListener('visibilitychange', onFocus);
     window.addEventListener('focus', onFocus);
@@ -108,7 +133,7 @@ export default function Dashboard() {
       document.removeEventListener('visibilitychange', onFocus);
       window.removeEventListener('focus', onFocus);
     };
-  }, [connected, load]);
+  }, []);
 
   const today = new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   const y = data?.yesterday;
@@ -187,7 +212,7 @@ export default function Dashboard() {
               </option>
             ))}
           </select>
-          <button className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={loading}>
+          <button className="btn btn-ghost btn-sm" onClick={() => void load(true)} disabled={loading}>
             {loading ? '…' : 'Refresh'}
           </button>
         </div>

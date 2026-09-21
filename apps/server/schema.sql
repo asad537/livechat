@@ -183,6 +183,12 @@ ALTER TABLE users ADD COLUMN team_lead_id VARCHAR(36);
 CREATE INDEX IF NOT EXISTS idx_conversations_website_created ON conversations (website_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_conversations_assigned_status ON conversations (assigned_user_id, status);
 CREATE INDEX IF NOT EXISTS idx_conversations_status_created ON conversations (status, created_at);
+-- Chat History / Queries / Transfers archive: filter by site or agent + status,
+-- ordered by created_at DESC. Without the trailing created_at the DB has to
+-- filesort every matching row before it can return a page — the main reason the
+-- archive gets slow to load once a website/agent has thousands of finished chats.
+CREATE INDEX IF NOT EXISTS idx_conversations_site_status_created ON conversations (website_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_conversations_assigned_status_created ON conversations (assigned_user_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_conversations_visitor ON conversations (visitor_id, status);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages (conversation_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages (conversation_id, sender_type, read_at);

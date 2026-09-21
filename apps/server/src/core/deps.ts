@@ -3,6 +3,7 @@ import type { Config } from './config.js';
 import type { Db } from './db.js';
 import type { PresenceStore } from './presence.js';
 import type { Blocklist } from './blocklist.js';
+import type { Cache } from './cache.js';
 
 /** Bundle of app-wide dependencies passed to every module. */
 export interface AppDeps {
@@ -11,4 +12,5 @@ export interface AppDeps {
   presence: PresenceStore;
   io: Server;
   blocklist: Blocklist;
+  cache: Cache;
 }

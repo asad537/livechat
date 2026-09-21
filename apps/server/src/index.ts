@@ -9,6 +9,7 @@ import { loadConfig } from './core/config.js';
 import { createDb } from './core/db.js';
 import { createPresence } from './core/presence.js';
 import { createBlocklist } from './core/blocklist.js';
+import { createCache } from './core/cache.js';
 import type { AppDeps } from './core/deps.js';
 import { ensureSeed } from './seed.js';
 import { buildApiRouter } from './http/router.js';
@@ -21,6 +22,7 @@ async function main(): Promise<void> {
   await ensureSeed(db, config);
   const presence = createPresence();
   const blocklist = await createBlocklist(db);
+  const cache = await createCache(config);
 
   const app = express();
   app.set('trust proxy', true); // honor X-Forwarded-For (nginx/Cloudflare) for real client IPs
@@ -53,7 +55,8 @@ async function main(): Promise<void> {
     }
   }
 
-  const deps: AppDeps = { config, db, presence, io, blocklist };
+  const deps: AppDeps = { config, db, presence, io, blocklist, cache };
+  console.log(`[cache] ${cache.kind} cache enabled`);
 
   app.use(buildApiRouter(deps));
   attachRealtime(deps);

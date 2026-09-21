@@ -171,6 +171,23 @@ export function buildReportsRouter(deps: AppDeps): Router {
         return;
       }
 
+      // Cache the computed KPI payload briefly. This is a heavy multi-query
+      // endpoint, so serving repeat opens from cache makes the dashboard load
+      // instantly. Only READ RESULTS are cached (never writes) and they expire
+      // in seconds — no data is ever lost or shown wrong for long. Keyed by the
+      // viewer (their scope), the website filter and the range.
+      const OVERVIEW_TTL_MS = 20_000;
+      const cacheKey = `overview:${user.id}:${websiteId || 'all'}:${range}`;
+      // The Refresh button sends fresh=1 to bypass the cache and recompute now.
+      const bypassCache = asString(req.query.fresh) === '1';
+      if (!bypassCache) {
+        const cachedPayload = await deps.cache.get<Record<string, unknown>>(cacheKey);
+        if (cachedPayload) {
+          res.json(cachedPayload);
+          return;
+        }
+      }
+
       const siteFilter = `website_id IN (${placeholders(siteIds.length)})`;
       const cSiteFilter = `c.website_id IN (${placeholders(siteIds.length)})`;
       // Bounded window (yesterday) needs an upper bound; open-ended ranges keep
@@ -264,16 +281,19 @@ export function buildReportsRouter(deps: AppDeps): Router {
         ),
       ]);
 
-      // 14-day message stream for the per-day response-time line (bounded).
-      const msgs14 = await deps.db.all<{ cid: string; st: string; at: string }>(
-        `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at
-           FROM messages m JOIN conversations c ON c.id = m.conversation_id
-          WHERE ${cSiteFilter} AND c.created_at >= ?${cAgentFilter}
-          ORDER BY m.conversation_id, m.created_at LIMIT 30000`,
-        [...siteIds, trendSince, ...agentParams],
-      );
+      // Per-day reply-time line: needs a 14/30-day message stream. Only the
+      // day-trend view (7d/30d/all/yesterday) consumes replyByDay — the default
+      // "today" view renders an hourly trend (hourTrend) instead, so skip this
+      // heavy (up to 30k-row) scan entirely there.
       const replyByDay = new Map<string, number[]>();
-      {
+      if (range !== 'today') {
+        const msgs14 = await deps.db.all<{ cid: string; st: string; at: string }>(
+          `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at
+             FROM messages m JOIN conversations c ON c.id = m.conversation_id
+            WHERE ${cSiteFilter} AND c.created_at >= ?${cAgentFilter}
+            ORDER BY m.conversation_id, m.created_at LIMIT 30000`,
+          [...siteIds, trendSince, ...agentParams],
+        );
         let lastV: string | null = null;
         let lastC = '';
         for (const m of msgs14) {
@@ -658,7 +678,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
       }
 
       const countryTotal = countryRows.reduce((a, b) => a + Number(b.n), 0);
-      res.json({
+      const payload = {
         range,
         totals,
         avgFirstResponseSeconds: avg(frtAll),
@@ -683,7 +703,9 @@ export function buildReportsRouter(deps: AppDeps): Router {
         yesterday: { chats: yChats, closed: yClosed, missed: yMissed, frtSeconds: avg(yFrt) },
         trendWindow,
         trendMode,
-      });
+      };
+      await deps.cache.set(cacheKey, payload, OVERVIEW_TTL_MS);
+      res.json(payload);
     }),
   );
 

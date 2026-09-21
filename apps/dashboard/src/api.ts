@@ -421,10 +421,11 @@ export const api = {
       'history',
     ),
 
-  reports: (websiteId?: string, range?: ReportRange) => {
+  reports: (websiteId?: string, range?: ReportRange, fresh?: boolean) => {
     const qs = new URLSearchParams();
     if (websiteId) qs.set('websiteId', websiteId);
     if (range) qs.set('range', range);
+    if (fresh) qs.set('fresh', '1'); // Refresh button: bypass the server-side KPI cache
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return request<ReportsOverview>(`${API.reports}${suffix}`);
   },

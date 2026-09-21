@@ -24,6 +24,21 @@ import {
 
 const STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE', 'CLOSED', 'MISSED'];
 
+// Short TTL for the read-only archive lists (history / transfers). Repeat opens
+// and paging within a few seconds are served from cache; new activity shows up
+// within this window. Kept small so the lists never feel out of date.
+const ARCHIVE_TTL_MS = 10_000;
+
+/** Stable cache key for a paginated list: the viewer's id + every query param,
+ *  sorted so param order can't produce a cache miss. */
+function archiveCacheKey(prefix: string, userId: string, rawUrl: string): string {
+  const qs = [...new URLSearchParams(rawUrl.split('?')[1] ?? '')]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+  return `${prefix}:${userId}:${qs}`;
+}
+
 type Scope = 'mine' | 'team' | 'all';
 
 /** Clamp the requested scope to what the role allows (CSR→mine, LEAD≤team, ADMIN/MANAGER any). */
@@ -209,6 +224,14 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const page = Math.max(1, Number(asString(req.query.page)) || 1);
       const PER_PAGE = 20;
 
+      // Serve repeat opens / paging from the short-TTL cache (read-only archive).
+      const cacheKey = archiveCacheKey('history', user.id, req.originalUrl);
+      const cachedHistory = await deps.cache.get<Record<string, unknown>>(cacheKey);
+      if (cachedHistory) {
+        res.json(cachedHistory);
+        return;
+      }
+
       const where: string[] = [];
       const params: unknown[] = [];
 
@@ -341,7 +364,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         params,
       );
 
-      res.json({
+      const payload = {
         chats: rows.map((r) => ({
           id: r.id,
           status: r.status,
@@ -364,7 +387,9 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         total,
         page,
         pages,
-      });
+      };
+      await deps.cache.set(cacheKey, payload, ARCHIVE_TTL_MS);
+      res.json(payload);
     }),
   );
 
@@ -378,6 +403,14 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const user = agent(req);
       const page = Math.max(1, Number(asString(req.query.page)) || 1);
       const PER_PAGE = 20;
+
+      // Serve repeat opens / paging from the short-TTL cache (read-only archive).
+      const cacheKey = archiveCacheKey('transfers', user.id, req.originalUrl);
+      const cachedTransfers = await deps.cache.get<Record<string, unknown>>(cacheKey);
+      if (cachedTransfers) {
+        res.json(cachedTransfers);
+        return;
+      }
 
       const where: string[] = ["h.reason = 'TRANSFER'"];
       const params: unknown[] = [];
@@ -473,7 +506,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         params,
       );
 
-      res.json({
+      const payload = {
         transfers: rows.map((r) => ({
           transferId: r.transfer_id,
           conversationId: r.id,
@@ -491,7 +524,9 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         total,
         page,
         pages,
-      });
+      };
+      await deps.cache.set(cacheKey, payload, ARCHIVE_TTL_MS);
+      res.json(payload);
     }),
   );
 
