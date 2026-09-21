@@ -274,7 +274,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
           `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at, m.kind, m.body
              FROM messages m JOIN conversations c ON c.id = m.conversation_id
             WHERE ${cSiteFilter}${cRangeFilter}${cAgentFilter} AND ${cEngaged}
-            ORDER BY m.conversation_id, m.created_at LIMIT 20000`,
+            ORDER BY m.created_at DESC LIMIT 5000`,
           [...siteIds, ...rangeParams, ...agentParams],
         ),
         deps.db.all<{ status: string; created_at: string; activated_at: string | null; closed_at: string | null }>(
@@ -283,41 +283,6 @@ export function buildReportsRouter(deps: AppDeps): Router {
           [...siteIds, yesterdayStart, todayStart, yesterdayStart, todayStart, ...agentParams],
         ),
       ]);
-
-      // Per-day reply-time line: needs a 14/30-day message stream. Only the
-      // day-trend view (7d/30d/all/yesterday) consumes replyByDay — the default
-      // "today" view renders an hourly trend (hourTrend) instead, so skip this
-      // heavy (up to 30k-row) scan entirely there.
-      const replyByDay = new Map<string, number[]>();
-      if (range !== 'today') {
-        const msgs14 = await deps.db.all<{ cid: string; st: string; at: string }>(
-          `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at
-             FROM messages m JOIN conversations c ON c.id = m.conversation_id
-            WHERE ${cSiteFilter} AND c.created_at >= ?${cAgentFilter}
-            ORDER BY m.conversation_id, m.created_at LIMIT 30000`,
-          [...siteIds, trendSince, ...agentParams],
-        );
-        let lastV: string | null = null;
-        let lastC = '';
-        for (const m of msgs14) {
-          if (m.cid !== lastC) {
-            lastC = m.cid;
-            lastV = null;
-          }
-          if (m.st === 'VISITOR') {
-            if (lastV == null) lastV = m.at;
-          } else if (m.st === 'AGENT' && lastV != null) {
-            const s = secondsBetween(lastV, m.at);
-            if (s != null && s < 4 * 3600) {
-              const k = dayKey(m.at);
-              const arr = replyByDay.get(k) ?? [];
-              arr.push(s);
-              replyByDay.set(k, arr);
-            }
-            lastV = null;
-          }
-        }
-      }
 
       const inRange = (iso: string | null) =>
         iso != null && (!since || iso >= since) && (!until || iso < until);
@@ -657,7 +622,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
           count: e?.count ?? 0,
           frtSeconds: e ? avg(e.frt) : null,
           durationSeconds: e ? avg(e.dur) : null,
-          replySeconds: avg(replyByDay.get(key) ?? []),
+          replySeconds: e ? avg(e.frt) : null,
         });
       }
 
