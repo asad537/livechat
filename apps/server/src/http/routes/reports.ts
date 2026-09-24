@@ -760,7 +760,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
                 COALESCE(NULLIF(w.label, ''), w.name) AS website_name,
                 u.name AS agent_name,
                 v.name AS visitor_name, v.email AS visitor_email,
-                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msgs
+                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.kind <> 'SYSTEM') AS msgs
            FROM conversations c
            JOIN websites w ON w.id = c.website_id
            LEFT JOIN users u ON u.id = c.assigned_user_id

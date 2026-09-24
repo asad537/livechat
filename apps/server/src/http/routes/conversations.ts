@@ -388,7 +388,8 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       if (pageIds.length > 0) {
         const counts = await deps.db.all<{ cid: string; n: number }>(
           `SELECT conversation_id AS cid, COUNT(*) AS n FROM messages
-            WHERE conversation_id IN (${placeholders(pageIds.length)}) GROUP BY conversation_id`,
+            WHERE conversation_id IN (${placeholders(pageIds.length)}) AND kind <> 'SYSTEM'
+            GROUP BY conversation_id`,
           pageIds,
         );
         for (const c of counts) msgCounts.set(c.cid, Number(c.n));
