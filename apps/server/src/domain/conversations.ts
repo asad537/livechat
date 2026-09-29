@@ -521,30 +521,13 @@ export async function transferConversation(
 }
 
 /**
- * Assign every WAITING unassigned conversation (oldest first) to an eligible
- * CSR (history reason AUTO) and refresh inboxes. Runs for one website when
- * given, otherwise across all websites.
+ * Auto-assignment is disabled: chats are never handed to a CSR automatically —
+ * agents pick queued chats up manually (type-to-join). This is kept as a no-op
+ * so the many "an agent freed up, drain the queue" call sites stay valid without
+ * changing behaviour.
  */
-export async function drainQueue(deps: AppDeps, websiteId?: string): Promise<void> {
-  const waiting = websiteId
-    ? await deps.db.all<ConversationRow>(
-        "SELECT * FROM conversations WHERE status = 'WAITING' AND assigned_user_id IS NULL AND website_id = ? ORDER BY created_at ASC",
-        [websiteId],
-      )
-    : await deps.db.all<ConversationRow>(
-        "SELECT * FROM conversations WHERE status = 'WAITING' AND assigned_user_id IS NULL ORDER BY created_at ASC",
-      );
-
-  for (const conv of waiting) {
-    const csrId = await findEligibleCsr(deps, conv.website_id);
-    if (!csrId) continue;
-    await deps.db.run('UPDATE conversations SET assigned_user_id = ? WHERE id = ?', [
-      csrId,
-      conv.id,
-    ]);
-    await recordAssignment(deps, conv.id, null, csrId, 'AUTO');
-    await emitInboxUpdate(deps, conv.id);
-  }
+export async function drainQueue(_deps: AppDeps, _websiteId?: string): Promise<void> {
+  // Intentionally does nothing — no automatic assignment.
 }
 
 // ─── Access control ──────────────────────────────────────────

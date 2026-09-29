@@ -56,7 +56,8 @@ const osIcon = (os: string) => {
 };
 
 export default function Visitors({ initialView = 'live' }: { initialView?: 'live' | 'history' }) {
-  const { websites, visitorsByWebsite, pushToast, openDockedChat, connected, me, csrIds } = useApp();
+  const { websites, visitorsByWebsite, pushToast, openDockedChat, connected, me, csrIds, conversations } =
+    useApp();
   const [restVisitors, setRestVisitors] = useState<Visitor[]>([]);
   const [servedVisitors, setServedVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
@@ -194,15 +195,23 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
 
   // The moment serving starts OR a chat closes, pull the served list so the
   // visitor moves between "Online now" and "Recently served" immediately
-  // instead of on the next 60s poll (the fingerprint changes both ways).
+  // instead of on the next 60s poll. We watch TWO live signals so a refetch
+  // fires no matter which arrives first: the visitor stream's assignments AND
+  // the conversations map (InboxUpdate), which updates the instant a chat is
+  // assigned/closed even before the visitor stream catches up.
   const assignedFingerprint = visitors
     .filter((v) => v.activeConversation?.assignedUserId)
     .map((v) => v.id)
     .sort()
     .join(',');
+  const convFingerprint = Object.values(conversations)
+    .filter((c) => c.assignedUserId && (c.status === 'WAITING' || c.status === 'OFFERED' || c.status === 'ACTIVE'))
+    .map((c) => `${c.visitorId}:${c.status}:${c.assignedUserId}`)
+    .sort()
+    .join(',');
   useEffect(() => {
     void api.servedVisitors(40).then(setServedVisitors).catch(() => undefined);
-  }, [assignedFingerprint]);
+  }, [assignedFingerprint, convFingerprint]);
 
   // "Recently served" — visitors an agent messaged who are STILL ONLINE,
   // enriched with live state and filtered by the same search box. Once they
@@ -222,8 +231,11 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
             currentPage: live.currentPage,
             activeConversation: live.activeConversation,
           };
-        // Not in the live stream → offline (the REST online flag is stale).
-        return { ...v, online: false };
+        // Not in the live stream yet — trust the server's online flag from the
+        // served fetch (it's refreshed on every assignment/conversation change),
+        // so a just-served visitor appears immediately instead of only after a
+        // page reload.
+        return v;
       })
       .filter((v) => v.online);
     const q = query.trim().toLowerCase();
