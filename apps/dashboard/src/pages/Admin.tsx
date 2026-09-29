@@ -974,7 +974,7 @@ function WorkflowsTab() {
     { icon: '⚡', title: 'Auto-assigned to an agent', sub: 'Least-busy online agent with spare capacity (per-agent max chats)' },
     { icon: '🤖', title: 'Queue + AI assistant', sub: 'No agent free? The AI answers from the scanned website while the visitor waits' },
     { icon: '👋', title: 'Type-to-join', sub: 'Any allowed agent can just start typing to take a queued chat' },
-    { icon: '⏰', title: 'Missed after 10 minutes', sub: 'Unanswered queued chats are marked missed; a transcript email goes out on close' },
+    { icon: '⏰', title: 'Auto-closed when idle', sub: 'A chat with no reply for a long time is closed automatically; a transcript email goes out on close' },
   ];
 
   return (

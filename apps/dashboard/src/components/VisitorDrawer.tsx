@@ -215,7 +215,7 @@ export default function VisitorDrawer({
   // agent even when history scoping hides another CSR's transcript, and it
   // updates in real time on transfer / start / accept without a reload.
   const liveOpen = live?.activeConversation ?? null;
-  const scopedOpen = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED') ?? null;
+  const scopedOpen = chats?.find((c) => c.status !== 'CLOSED') ?? null;
   const openConv: {
     id: string;
     status: string;
@@ -236,7 +236,7 @@ export default function VisitorDrawer({
   const chatConvId = (canOpenConv ? openConv?.id : undefined) ?? startedId;
   // "Past chats" lists finished conversations only — the ongoing one lives in
   // the Chat tab, so it must not double as history.
-  const pastChats = chats?.filter((c) => c.status === 'CLOSED' || c.status === 'MISSED') ?? null;
+  const pastChats = chats?.filter((c) => c.status === 'CLOSED') ?? null;
 
   const startChatInline = () => {
     if (!v) return;
@@ -480,7 +480,7 @@ export default function VisitorDrawer({
           <div className="vd-head-actions">
             {(() => {
               // An open conversation? "Message" jumps straight into it (docked window).
-              const open = chats?.find((c) => c.status !== 'CLOSED' && c.status !== 'MISSED');
+              const open = chats?.find((c) => c.status !== 'CLOSED');
               if (open) {
                 return (
                   <button

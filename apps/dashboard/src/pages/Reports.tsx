@@ -760,7 +760,6 @@ function RecordsView({
             <option value="CLOSED">Closed</option>
             <option value="ACTIVE">Active</option>
             <option value="WAITING">Waiting</option>
-            <option value="MISSED">Missed</option>
           </select>
         </label>
         <div className="rec-actions">

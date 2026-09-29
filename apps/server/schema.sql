@@ -248,3 +248,14 @@ CREATE TABLE IF NOT EXISTS agent_messages (
 CREATE INDEX IF NOT EXISTS idx_agent_messages_to_read ON agent_messages (to_user_id, read_at);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_pair ON agent_messages (from_user_id, to_user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_created ON agent_messages (created_at);
+
+-- Incoming vs Offline routing: was any human agent (CSR/LEAD) available for this
+-- website the moment the visitor's chat arrived? 1 = show under "Incoming"
+-- (live pickup; AI sends only a greeting), 0 = show under "Offline Chats"
+-- (no human was online, so the AI handles it fully). Idempotent.
+ALTER TABLE conversations ADD COLUMN human_online_on_arrival INTEGER NOT NULL DEFAULT 0;
+
+-- MISSED status retired: chats are never marked "missed" anymore. Fold any
+-- historical MISSED rows into CLOSED so the status disappears from the data.
+-- (Idempotent — re-running just matches nothing.)
+UPDATE conversations SET status = 'CLOSED' WHERE status = 'MISSED';

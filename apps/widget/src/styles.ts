@@ -362,6 +362,8 @@ export const WIDGET_CSS = `
 .lc-consent-actions button:active { transform: scale(.98); }
 .lc-consent-accept { background: #16a34a; }
 .lc-consent-decline { background: #ef4444; }
+.lc-consent-declined { background: #f8fafc; }
+.lc-consent-declined .lc-consent-text { color: #64748b; }
 
 /* ── Closed / ended bar ───────────────────────────────────── */
 .lc-closedbar {

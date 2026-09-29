@@ -6,7 +6,7 @@
 // ADMIN → full control · MANAGER → view everything, edit nothing ·
 // LEAD ("Team Lead") → owns CSRs via teamLeadId · CSR → frontline agent.
 export type Role = 'ADMIN' | 'MANAGER' | 'LEAD' | 'CSR';
-export type ConversationStatus = 'WAITING' | 'OFFERED' | 'ACTIVE' | 'CLOSED' | 'MISSED';
+export type ConversationStatus = 'WAITING' | 'OFFERED' | 'ACTIVE' | 'CLOSED';
 export type SenderType = 'VISITOR' | 'AGENT' | 'SYSTEM' | 'BOT';
 export type MessageKind = 'TEXT' | 'FILE' | 'CALL' | 'SYSTEM';
 export type ScanStatus = 'PENDING' | 'CLEAN' | 'BLOCKED';
@@ -150,6 +150,7 @@ export interface ConversationSummary {
   lastMessage?: ChatMessage | null;
   unreadCount?: number;
   hasVisitorMessage?: boolean; // the visitor has sent at least one message
+  humanOnlineOnArrival?: boolean; // a CSR/Lead was online when the chat arrived
 }
 
 export interface AssignmentRecord {

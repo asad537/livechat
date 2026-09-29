@@ -150,6 +150,8 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [forceInfoForm, setForceInfoForm] = useState(false);
   // The visitor has accepted the recording-consent notice (this browser).
   const [consented, setConsented] = useState(() => lsGet(consentKey) === '1');
+  // The visitor declined recording — they can still chat, we just won't record.
+  const [declined, setDeclined] = useState(false);
 
   // Fetch branding over a fast HTTP call at boot so the launcher shows the real
   // brand colour right away — within ~100ms on a first visit, and instantly
@@ -345,10 +347,10 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
     socket.on(EV.ChatStatus, ({ conversation: conv }: { conversation: ConversationSummary }) => {
       setConversation((prev) => {
-        if (prev && prev.id !== conv.id && prev.status !== 'CLOSED' && prev.status !== 'MISSED') return prev;
+        if (prev && prev.id !== conv.id && prev.status !== 'CLOSED') return prev;
         return { id: conv.id, status: conv.status };
       });
-      if (conv.status === 'CLOSED' || conv.status === 'MISSED') setAgentTyping(false);
+      if (conv.status === 'CLOSED') setAgentTyping(false);
     });
 
     socket.on(EV.ChatAgent, ({ agent: a }: { conversationId: string; agent: { name: string; avatarColor: string; avatarUrl?: string | null } | null }) => {
@@ -528,6 +530,11 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     const body = draft.trim();
     const socket = socketRef.current;
     if (!body || !socket) return;
+    // Sending a message counts as continuing → implicit consent.
+    if (!consented) {
+      lsSet(consentKey, '1');
+      setConsented(true);
+    }
     const tempId = newTempId();
     socket.emit(EV.WidgetMessage, { body, tempId });
     setMessages((prev) => [
@@ -557,7 +564,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
       ta.style.height = 'auto';
       ta.focus();
     }
-  }, [draft, emitTyping]);
+  }, [draft, emitTyping, consented, consentKey]);
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -686,17 +693,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   };
 
   // ── Recording consent ──────────────────────────────────────
-  // Accept → remember it and let the visitor type. Decline → just close the
-  // chat window; if they reopen, they're asked again (nothing is recorded).
+  // Accept → remember it and let the visitor type. Decline → dismiss the notice
+  // and show a short line saying we won't record; the visitor can still chat.
   const acceptConsent = () => {
     lsSet(consentKey, '1');
     setConsented(true);
+    setDeclined(false);
     window.setTimeout(() => taRef.current?.focus(), 0);
   };
   const declineConsent = () => {
-    setDraft('');
-    markDismissed(true);
-    setOpen(false);
+    setDeclined(true);
+    window.setTimeout(() => taRef.current?.focus(), 0);
   };
 
   // ── CSAT rating after close ────────────────────────────────
@@ -755,9 +762,11 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   // socket handshake) so the customer sees it the moment they arrive. Only the
   // open panel's content needs the branding/history from WidgetReady.
   const status = conversation?.status ?? null;
-  const ended = status === 'CLOSED' || status === 'MISSED';
-  const showInfoForm =
-    forceInfoForm || (!infoDismissed && !!visitor && !visitor.name && !visitor.email && !ended);
+  const ended = status === 'CLOSED';
+  // The contact form no longer opens on its own when the visitor arrives — it
+  // only appears when they choose "Edit contact details" from the menu (which
+  // sets forceInfoForm), so the chat isn't blocked by a form up front.
+  const showInfoForm = forceInfoForm;
   const selfLabel = visitor?.name || 'You';
 
   // Blocked visitor → render nothing at all (no bubble, no "Reconnecting…").
@@ -866,7 +875,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                       Email transcript
                     </button>
                     <button type="button" class="lc-menu-item" onClick={editContact}>
-                      Edit contact details
+                      Submit contact details
                     </button>
                     <button
                       type="button"
@@ -955,11 +964,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 <RatingCard onSubmit={submitRating} />
               ) : (
                 <span>
-                  {status === 'MISSED'
-                    ? 'We missed you — this conversation has ended.'
-                    : rated
-                      ? 'Thank you for your feedback! 💚'
-                      : 'This conversation has ended.'}
+                  {rated ? 'Thank you for your feedback! 💚' : 'This conversation has ended.'}
                 </span>
               )}
               <button type="button" class="lc-btn" onClick={startNewConversation}>
@@ -978,7 +983,14 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 <span>Thank you for your feedback! 💚</span>
               </div>
             )}
-            {!consented && (
+            {!consented && declined && (
+              <div class="lc-consent lc-consent-declined">
+                <div class="lc-consent-text">
+                  Thanks — we won’t record this chat. You can still send us a message below.
+                </div>
+              </div>
+            )}
+            {!consented && !declined && (
               <div class="lc-consent">
                 <div class="lc-consent-text">
                   By continuing, you consent to this chat being recorded and handled in
@@ -999,7 +1011,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 type="button"
                 class="lc-attach"
                 title={conversation ? 'Attach a file' : 'Send a message first to attach files'}
-                disabled={!conversation || uploading || !connected || !consented}
+                disabled={!conversation || uploading || !connected}
                 onClick={() => {
                   const picker = document.createElement('input');
                   picker.type = 'file';
@@ -1013,17 +1025,17 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 ref={taRef}
                 class="lc-ta"
                 rows={1}
-                placeholder={consented ? 'Type your message…' : 'Accept to start chatting…'}
+                placeholder={'Type your message…'}
                 value={draft}
                 onInput={onDraftInput}
                 onKeyDown={onKeyDown}
-                disabled={!connected || !consented}
+                disabled={!connected}
               />
               <button
                 type="button"
                 class="lc-send"
                 title="Send"
-                disabled={!draft.trim() || !connected || !consented}
+                disabled={!draft.trim() || !connected}
                 onClick={send}
               >
                 <IconSend />

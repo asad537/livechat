@@ -143,8 +143,12 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
         return;
       }
       const limit = Math.min(50, Math.max(1, Number(asString(req.query.limit)) || 10));
-      const scope = await conversationScope(deps, user); // ' AND assigned_user_id …'
-      const cScope = scope.sql.replace('assigned_user_id', 'c.assigned_user_id');
+      // "Recently served" is shown to every agent on the websites they can
+      // access, regardless of which CSR is handling the chat — so a CSR can see
+      // (and, in the drawer, read-only view) a chat another CSR is serving.
+      // Website scoping below still applies; only the per-agent filter is
+      // dropped here on purpose.
+      const cScope = '';
 
       // "Served" = an agent is CURRENTLY on an open conversation with them —
       // either they've messaged the visitor, or they've claimed the chat via
@@ -180,7 +184,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
             AND c.website_id IN (${placeholders(scoped.length)})${cScope}
           ORDER BY served_at DESC
           LIMIT ?`,
-        [...scoped, ...scope.params, limit],
+        [...scoped, limit],
       );
 
       res.json({

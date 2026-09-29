@@ -44,7 +44,7 @@ export default function ChatDock() {
       {tabs.map((c) => {
         const name = c.visitor?.name || `Visitor ${visitorNumber(c.visitorId)}`;
         const unread = c.unreadCount ?? 0;
-        const closed = c.status === 'CLOSED' || c.status === 'MISSED';
+        const closed = c.status === 'CLOSED';
         // Gray the tab name when the visitor has left the site (offline) — the
         // live stream is authoritative, else use the summary snapshot.
         const liveVisitor = visitorsByWebsite[c.websiteId]?.find((v) => v.id === c.visitorId);

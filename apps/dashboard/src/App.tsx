@@ -5,6 +5,7 @@ import { useApp } from './state';
 import { classNames, roleLabel } from './util';
 import Login from './pages/Login';
 import Inbox from './pages/Inbox';
+import Incoming from './pages/Incoming';
 import Visitors from './pages/Visitors';
 import Monitoring from './pages/Monitoring';
 import Reports from './pages/Reports';
@@ -65,9 +66,12 @@ function Sidebar() {
   const navigate = useNavigate();
   if (!me) return null;
 
-  // Offline Chats lists the truly-waiting queue (OFFERED chats are already being
-  // rung to an agent), so the badge counts WAITING chats to match the list.
-  const queueCount = Object.values(conversations).filter((c) => c.status === 'WAITING').length;
+  // The WAITING queue is split by whether a human was online when the chat
+  // arrived: "Incoming" (a CSR/Lead was online → live pickup) vs "Offline Chats"
+  // (nobody online → the AI handled it). Each badge counts its own bucket.
+  const waiting = Object.values(conversations).filter((c) => c.status === 'WAITING');
+  const incomingCount = waiting.filter((c) => c.humanOnlineOnArrival === true).length;
+  const offlineCount = waiting.filter((c) => c.humanOnlineOnArrival !== true).length;
 
   // Live "who's online" roster (Zendesk-style) — every agent the user can see,
   // deduped, currently online, name-sorted.
@@ -110,11 +114,18 @@ function Sidebar() {
             {navItem(<IconHome size={17} />, 'Dashboard')}
           </NavLink>
         )}
+        <NavLink to="/incoming" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+          {navItem(
+            <IconMessage size={17} />,
+            'Incoming',
+            incomingCount > 0 ? <span className="badge nav-badge">{incomingCount}</span> : undefined,
+          )}
+        </NavLink>
         <NavLink to="/" end className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(
             <IconInbox size={17} />,
             'Offline Chats',
-            queueCount > 0 ? <span className="badge nav-badge">{queueCount}</span> : undefined,
+            offlineCount > 0 ? <span className="badge nav-badge">{offlineCount}</span> : undefined,
           )}
         </NavLink>
         <NavLink to="/visitors" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
@@ -339,6 +350,7 @@ export default function App() {
       <main className={openChats.length > 0 && me.role !== 'ADMIN' ? 'content has-dock' : 'content'}>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/incoming" element={<Incoming />} />
           <Route path="/visitors" element={<Visitors key="live" />} />
           <Route path="/history" element={<Navigate to="/visitors" replace />} />
           <Route path="/chat-history" element={<ChatHistory />} />

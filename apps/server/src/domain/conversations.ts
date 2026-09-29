@@ -27,6 +27,7 @@ export interface ConversationRow {
   closed_at: string | null;
   rating: number | null;
   rating_comment: string | null;
+  human_online_on_arrival?: number | null;
 }
 
 export interface VisitorRow {
@@ -230,6 +231,7 @@ export async function loadSummaries(
       lastMessage: lastHydrated.get(conv.id) ?? null,
       unreadCount: unread.get(conv.id) ?? 0,
       hasVisitorMessage: visitorSpoke.has(conv.id),
+      humanOnlineOnArrival: Number(conv.human_online_on_arrival) === 1,
     });
   }
   return summaries;
@@ -343,6 +345,25 @@ export async function findEligibleCsr(
     .sort((a, b) => Number(a.active) - Number(b.active));
 
   return candidates[0]?.id ?? null;
+}
+
+/**
+ * Is any human agent (a CSR or Team Lead) currently available for this
+ * website's team? Available = online AND not marked Away. Managers are
+ * view-only and never count; admins aren't frontline agents so they don't
+ * either. Drives Incoming-vs-Offline routing and whether the AI bot goes into
+ * "greeting only" mode.
+ */
+export async function isAnyHumanAvailable(deps: AppDeps, websiteId: string): Promise<boolean> {
+  const website = await deps.db.get<WebsiteRow>('SELECT * FROM websites WHERE id = ?', [websiteId]);
+  if (!website) return false;
+  const members = await deps.db.all<UserRow>(
+    `SELECT u.* FROM team_members tm
+       JOIN users u ON u.id = tm.user_id
+      WHERE tm.team_id = ? AND u.role IN ('CSR', 'LEAD')`,
+    [website.team_id],
+  );
+  return members.some((m) => deps.presence.isAgentAvailable(m.id));
 }
 
 /**

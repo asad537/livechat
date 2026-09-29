@@ -9,6 +9,12 @@ interface Props {
   onSelect(id: string): void;
   /** Offline Chats view: show only the unassigned queue, no tab switcher. */
   queueOnly?: boolean;
+  /**
+   * Split the WAITING queue by whether a human was online when the chat
+   * arrived: 'incoming' (a CSR/Lead was online → live pickup) or 'offline'
+   * (nobody online → the AI handled it). Undefined shows the whole queue.
+   */
+  queueArrival?: 'incoming' | 'offline';
 }
 
 type Tab = 'mine' | 'queue' | 'all';
@@ -31,7 +37,7 @@ function preview(c: ConversationSummary): string {
   return m.body;
 }
 
-export default function ConversationList({ selectedId, onSelect, queueOnly }: Props) {
+export default function ConversationList({ selectedId, onSelect, queueOnly, queueArrival }: Props) {
   const { me, conversations } = useApp();
   const [tab, setTab] = useState<Tab>(queueOnly ? 'queue' : 'mine');
   const effectiveTab: Tab = queueOnly ? 'queue' : tab;
@@ -67,12 +73,20 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
     if (!me) return [];
     switch (effectiveTab) {
       case 'mine':
-        return all.filter((c) => c.assignedUserId === me.id && c.status !== 'CLOSED' && c.status !== 'MISSED');
+        return all.filter((c) => c.assignedUserId === me.id && c.status !== 'CLOSED');
       case 'queue':
         // Queue = chats truly waiting, nobody handling them yet. OFFERED chats
         // are already ringing a specific agent (being picked up), so they don't
-        // belong here — only WAITING.
-        return all.filter((c) => c.status === 'WAITING');
+        // belong here — only WAITING. Optionally split by arrival bucket so
+        // "Incoming" and "Offline Chats" show disjoint sets.
+        return all.filter(
+          (c) =>
+            c.status === 'WAITING' &&
+            (queueArrival === undefined ||
+              (queueArrival === 'incoming'
+                ? c.humanOnlineOnArrival === true
+                : c.humanOnlineOnArrival !== true)),
+        );
       case 'all':
       default:
         return all;
@@ -82,7 +96,7 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
   const mineCount = useMemo(
     () =>
       me
-        ? all.filter((c) => c.assignedUserId === me.id && c.status !== 'CLOSED' && c.status !== 'MISSED').length
+        ? all.filter((c) => c.assignedUserId === me.id && c.status !== 'CLOSED').length
         : 0,
     [all, me],
   );
@@ -149,7 +163,9 @@ export default function ConversationList({ selectedId, onSelect, queueOnly }: Pr
                 : 'No matches found.'
               : effectiveTab === 'queue'
                 ? queueOnly
-                  ? 'No offline chats waiting.'
+                  ? queueArrival === 'incoming'
+                    ? 'No incoming chats right now.'
+                    : 'No offline chats waiting.'
                   : 'Queue is empty.'
                 : 'No conversations here yet.'}
           </div>

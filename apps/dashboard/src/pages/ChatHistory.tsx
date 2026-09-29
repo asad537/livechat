@@ -139,9 +139,8 @@ export default function ChatHistory() {
         <label className="rec-field">
           <span>Status</span>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Closed + Missed</option>
+            <option value="">Closed</option>
             <option value="CLOSED">Closed</option>
-            <option value="MISSED">Missed</option>
             <option value="ALL">Any status</option>
           </select>
         </label>

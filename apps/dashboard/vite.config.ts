@@ -11,6 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true, // expose on LAN so teammates on the same network can open it
     proxy: {
       '/api': 'http://localhost:4000',
       '/widget.js': 'http://localhost:4000',

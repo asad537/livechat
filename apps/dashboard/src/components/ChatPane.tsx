@@ -159,7 +159,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
 
   const canSend = useMemo(() => {
     if (!me || !conversation) return false;
-    if (conversation.status === 'CLOSED' || conversation.status === 'MISSED') return false;
+    if (conversation.status === 'CLOSED') return false;
     const boss = me.role === 'ADMIN' || me.role === 'MANAGER'; // full chat access
     const assigneeIsMyCsr =
       me.role === 'LEAD' &&
@@ -188,7 +188,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   }, [canSend, conversation?.status]);
 
   const watchingReadOnly = !!conversation && !canSend && !openError &&
-    conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' &&
+    conversation.status !== 'CLOSED' &&
     (me?.role === 'LEAD' || me?.role === 'ADMIN' || me?.role === 'MANAGER') &&
     conversation.assignedUserId !== me?.id;
 
@@ -601,7 +601,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
                 </button>
               </>
             )}
-            {conversation && conversation.status !== 'CLOSED' && conversation.status !== 'MISSED' && (me?.role !== 'CSR' || canSend) && (
+            {conversation && conversation.status !== 'CLOSED' && (me?.role !== 'CSR' || canSend) && (
               <>
                 <button className="icon-btn" title="Transfer" onClick={() => setShowTransfer(true)}>
                   <IconTransfer size={17} />
@@ -659,9 +659,9 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
           </div>
         )}
         <div className="composer">
-          {conversation?.status === 'CLOSED' || conversation?.status === 'MISSED' ? (
+          {conversation?.status === 'CLOSED' ? (
             <div className="composer-closed">
-              This conversation is {conversation.status === 'CLOSED' ? 'closed' : 'marked as missed'}.
+              This conversation is closed.
             </div>
           ) : !canSend ? (
             <div className="composer-closed">

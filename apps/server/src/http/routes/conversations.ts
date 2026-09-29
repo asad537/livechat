@@ -22,7 +22,7 @@ import {
   visitorNumberSql,
 } from '../helpers.js';
 
-const STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE', 'CLOSED', 'MISSED'];
+const STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE', 'CLOSED'];
 
 // Short TTL for the read-only archive lists (history / transfers). Repeat opens
 // and paging within a few seconds are served from cache; new activity shows up
@@ -281,7 +281,7 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         params.push(status);
       } else if (status !== 'ALL') {
         // History defaults to finished chats.
-        where.push("c.status IN ('CLOSED', 'MISSED')");
+        where.push("c.status = 'CLOSED'");
       }
       const agentId = asString(req.query.agentId);
       if (agentId) {

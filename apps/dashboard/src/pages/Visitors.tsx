@@ -56,7 +56,7 @@ const osIcon = (os: string) => {
 };
 
 export default function Visitors({ initialView = 'live' }: { initialView?: 'live' | 'history' }) {
-  const { websites, visitorsByWebsite, pushToast, openDockedChat, connected } = useApp();
+  const { websites, visitorsByWebsite, pushToast, openDockedChat, connected, me, csrIds } = useApp();
   const [restVisitors, setRestVisitors] = useState<Visitor[]>([]);
   const [servedVisitors, setServedVisitors] = useState<Visitor[]>([]);
   const [query, setQuery] = useState('');
@@ -248,23 +248,49 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
       { websiteId: target.websiteId, visitorId: target.id, body },
       (ack: { conversationId?: string } | undefined) => {
         // Chat opens right here in the docked window — no jump to the Inbox.
-        if (ack?.conversationId) openDockedChat(ack.conversationId);
+        // If another agent grabbed the visitor first, the server sends a toast
+        // via AppError, so we stay quiet here rather than claiming success.
+        if (ack?.conversationId) {
+          openDockedChat(ack.conversationId);
+          pushToast('Chat started', `Your message was sent to ${target.name || 'the visitor'}.`, 'success');
+        }
       },
     );
-    pushToast('Chat started', `Your message was sent to ${target.name || 'the visitor'}.`, 'success');
     setStartTarget(null);
     setFirstMessage('');
+  };
+
+  // A served visitor being handled by ANOTHER agent can't be opened by a plain
+  // CSR — the row is inert (no drawer, no chat). Supervisors (ADMIN/MANAGER, or
+  // the assignee's Team Lead) keep full access.
+  const canOpenServed = (v: Visitor) => {
+    const assignee = v.activeConversation?.assignedUserId;
+    if (!assignee || assignee === me?.id) return true;
+    if (me?.role === 'ADMIN' || me?.role === 'MANAGER') return true;
+    if (me?.role === 'LEAD' && csrIds.includes(assignee)) return true;
+    return false;
   };
 
   const row = (v: Visitor, served = false) => {
     const name = v.name || `Visitor ${visitorNumber(v.id)}`;
     const ua = uaParse(v.userAgent);
     const site = siteById.get(v.websiteId);
+    const locked = served && !canOpenServed(v);
+    // A visitor waiting in the queue (they've messaged, nobody has accepted yet)
+    // gets a gentle blink in "Online now" so an agent notices them — same signal
+    // as the Incoming tab badge. Served rows don't blink (already being handled).
+    const needsAttention = !served && v.activeConversation?.status === 'WAITING';
     return (
       <tr
         key={v.id}
-        className={classNames('vt-row', v.online && 'online')}
-        onClick={() => setDrawerId(v.id)}
+        className={classNames(
+          'vt-row',
+          v.online && 'online',
+          locked && 'vt-row-locked',
+          needsAttention && 'vt-row-attn',
+        )}
+        onClick={locked ? undefined : () => setDrawerId(v.id)}
+        title={locked ? `Handled by ${v.activeConversation?.agentName ?? 'another agent'}` : undefined}
       >
         <td className="vt-who">
           <div className="vt-who-cell">

@@ -33,6 +33,7 @@ import {
   emitInboxUpdate,
   findEligibleCsr,
   findRecentCsr,
+  isAnyHumanAvailable,
   hasCapacity,
   loadSummary,
   recordAssignment,
@@ -77,7 +78,7 @@ const websiteRoom = (id: string): string => `website:${id}`;
 // A chat auto-ends only after this long with NO message from EITHER side.
 const INACTIVITY_CLOSE_MS = 12 * 60 * 60 * 1000; // 12 hours
 const INACTIVITY_SWEEP_MS = 15 * 60 * 1000; // re-check every 15 minutes
-// Client's last message unanswered by any AGENT for this long → close as MISSED.
+// Client's last message unanswered by any AGENT for this long → auto-close.
 const UNANSWERED_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 // A returning visitor within this window is routed back to the same CSR who
 // handled them, for continuity ("sticky routing").
@@ -142,15 +143,14 @@ function hostnameOf(origin: string | undefined): string | null {
 
 // ─── Inactivity auto-close (12h) ─────────────────────────────
 // A conversation ends on its own ONLY after 12 hours with no message from either
-// side (agent/CSR or client). At close we label it by who spoke last: if the
-// CLIENT sent the last message they were left unanswered → MISSED; otherwise
-// (agent/AI had the last word, or there were no messages) → a normal CLOSED.
-// A periodic sweep is used instead of per-chat timers so it survives restarts.
+// side (agent/CSR or client), or an hour after an assigned agent left the
+// client's last message unanswered. Either way it just becomes a normal CLOSED
+// — there is no separate "missed" outcome. A periodic sweep is used instead of
+// per-chat timers so it survives restarts.
 
 async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
-  const closeAs = async (conversationId: string, status: 'MISSED' | 'CLOSED') => {
-    await deps.db.run('UPDATE conversations SET status = ?, closed_at = ? WHERE id = ?', [
-      status,
+  const closeAs = async (conversationId: string) => {
+    await deps.db.run("UPDATE conversations SET status = 'CLOSED', closed_at = ? WHERE id = ?", [
       nowIso(),
       conversationId,
     ]);
@@ -159,10 +159,10 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
   };
 
   // Rule 1 — unanswered client: an ASSIGNED agent left the client's last
-  // message without a reply for an hour → the chat was missed; end it as
-  // MISSED. (BOT/SYSTEM chatter doesn't count as an answer.) Chats assigned to
-  // NOBODY are exempt — they stay in the Offline Chats queue waiting to be
-  // picked up; only the 12h total-silence rule can eventually end them.
+  // message without a reply for an hour → close the chat. (BOT/SYSTEM chatter
+  // doesn't count as an answer.) Chats assigned to NOBODY are exempt — they
+  // stay in the Offline Chats queue waiting to be picked up; only the 12h
+  // total-silence rule can eventually end them.
   const unansweredCutoff = new Date(Date.now() - UNANSWERED_CLOSE_MS).toISOString();
   const unanswered = await deps.db.all<{ id: string }>(
     `SELECT c.id
@@ -180,10 +180,9 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
       LIMIT 500`,
     [unansweredCutoff],
   );
-  for (const conv of unanswered) await closeAs(conv.id, 'MISSED');
+  for (const conv of unanswered) await closeAs(conv.id);
 
-  // Rule 2 — total silence: nothing from either side for 12 hours → close,
-  // labelled by whoever spoke last.
+  // Rule 2 — total silence: nothing from either side for 12 hours → close.
   const cutoff = new Date(Date.now() - INACTIVITY_CLOSE_MS).toISOString();
   const stale = await deps.db.all<{ id: string; website_id: string }>(
     `SELECT c.id, c.website_id
@@ -198,11 +197,7 @@ async function sweepInactiveConversations(deps: AppDeps): Promise<void> {
     [cutoff, cutoff],
   );
   for (const conv of stale) {
-    const last = await deps.db.get<{ sender_type: string }>(
-      'SELECT sender_type FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
-      [conv.id],
-    );
-    await closeAs(conv.id, last?.sender_type === 'VISITOR' ? 'MISSED' : 'CLOSED');
+    await closeAs(conv.id);
   }
 }
 
@@ -222,7 +217,7 @@ function scheduleOutreachClose(deps: AppDeps, conversationId: string, visitorId:
         'SELECT * FROM conversations WHERE id = ?',
         [conversationId],
       );
-      if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
+      if (!conv || conv.status === 'CLOSED') return;
       if (deps.presence.isVisitorOnline(visitorId)) return; // they came back
       const replied = await deps.db.get<{ id: string }>(
         "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' LIMIT 1",
@@ -236,76 +231,9 @@ function scheduleOutreachClose(deps: AppDeps, conversationId: string, visitorId:
   outreachTimers.set(conversationId, t);
 }
 
-// ─── Busy notice (client waiting, no agent reply) ────────────────────────────
-// The client sent a message and no human replied for a few minutes → post an
-// automated "our team is busy" note and ask the widget to open the contact
-// form (email/phone) so we can follow up. Sent at most once per conversation.
-const BUSY_NOTICE_AFTER_MS = 5 * 60 * 1000;
-const BUSY_NOTICE_TEXT =
-  'Our support team is a bit busy right now — sorry for the wait! ' +
-  'Please share your email and phone number and we will get back to you as soon as possible.';
-const busyTimers = new Map<string, NodeJS.Timeout>();
-
-/** Cancel the pending busy notice — called whenever an agent replies. */
-function cancelBusyNotice(conversationId: string): void {
-  const t = busyTimers.get(conversationId);
-  if (t) {
-    clearTimeout(t);
-    busyTimers.delete(conversationId);
-  }
-}
-
-function scheduleBusyNotice(deps: AppDeps, conversationId: string): void {
-  // Reset on every client message so the 5-minute clock always measures from the
-  // client's LATEST message — an agent who is actively replying keeps cancelling
-  // it, so it only ever fires when the client is genuinely left waiting.
-  cancelBusyNotice(conversationId);
-  const t = setTimeout(() => {
-    busyTimers.delete(conversationId);
-    void (async () => {
-      const conv = await deps.db.get<ConversationRow>(
-        'SELECT * FROM conversations WHERE id = ?',
-        [conversationId],
-      );
-      if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
-      const lastVisitor = await deps.db.get<{ created_at: string }>(
-        "SELECT created_at FROM messages WHERE conversation_id = ? AND sender_type = 'VISITOR' ORDER BY created_at DESC LIMIT 1",
-        [conversationId],
-      );
-      if (!lastVisitor) return;
-      // Don't nag when an agent is actively handling the chat: skip if any agent
-      // spoke after the client's last message OR within the busy window. The
-      // latter covers a client's closing "okay"/"thanks" right after the agent
-      // replied — the agent is clearly engaged, so no "we're busy" note.
-      const windowStart = new Date(Date.now() - BUSY_NOTICE_AFTER_MS).toISOString();
-      const threshold =
-        lastVisitor.created_at < windowStart ? lastVisitor.created_at : windowStart;
-      const agentReply = await deps.db.get<{ id: string }>(
-        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'AGENT' AND created_at >= ? LIMIT 1",
-        [conversationId, threshold],
-      );
-      if (agentReply) return; // an agent answered recently — actively engaged
-      // Only once per conversation.
-      const already = await deps.db.get<{ id: string }>(
-        "SELECT id FROM messages WHERE conversation_id = ? AND sender_type = 'BOT' AND body = ? LIMIT 1",
-        [conversationId, BUSY_NOTICE_TEXT],
-      );
-      if (already) return;
-      await postMessage(deps, {
-        conversationId,
-        senderType: 'BOT',
-        body: BUSY_NOTICE_TEXT,
-      });
-      // Ask the visitor's widget to open the contact form (it self-checks
-      // whether email/phone are already on file).
-      deps.io.of(WIDGET_NAMESPACE).to(convRoom(conversationId)).emit(EV.ChatRequestInfo, {
-        conversationId,
-      });
-    })().catch((err: unknown) => console.error('[realtime] busy notice', err));
-  }, BUSY_NOTICE_AFTER_MS);
-  t.unref?.();
-  busyTimers.set(conversationId, t);
-}
+// The automated "our support team is busy" notice (posted a few minutes after
+// an unanswered client message) has been retired — visitors are never sent that
+// message anymore, so there is no busy-notice timer.
 
 // TL nudge throttle: one alert per conversation per 10 minutes.
 const leadAlertAt = new Map<string, number>();
@@ -812,7 +740,7 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         }
 
         let conv = await getConversation(deps, data.conversationId);
-        if (conv && (conv.status === 'CLOSED' || conv.status === 'MISSED')) conv = undefined;
+        if (conv && (conv.status === 'CLOSED')) conv = undefined;
         if (!conv) {
           // Another tab may already have an open conversation for this visitor.
           conv = await deps.db.get<ConversationRow>(
@@ -825,9 +753,14 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         if (!conv) {
           isNew = true;
           const id = newId();
+          // Was a human (CSR/Team Lead) online the moment this chat arrived? This
+          // splits the two queues: 1 → "Incoming" (live pickup, AI greets only),
+          // 0 → "Offline Chats" (nobody online, AI handles it fully). Frozen at
+          // arrival so a chat never hops queues when presence later changes.
+          const humanOnline = await isAnyHumanAvailable(deps, data.websiteId);
           await deps.db.run(
-            "INSERT INTO conversations (id, website_id, visitor_id, status, assigned_user_id, created_at, activated_at, closed_at) VALUES (?, ?, ?, 'WAITING', NULL, ?, NULL, NULL)",
-            [id, data.websiteId, data.visitorId, nowIso()],
+            "INSERT INTO conversations (id, website_id, visitor_id, status, assigned_user_id, created_at, activated_at, closed_at, human_online_on_arrival) VALUES (?, ?, ?, 'WAITING', NULL, ?, NULL, NULL, ?)",
+            [id, data.websiteId, data.visitorId, nowIso(), humanOnline ? 1 : 0],
           );
           conv = await deps.db.get<ConversationRow>('SELECT * FROM conversations WHERE id = ?', [
             id,
@@ -845,11 +778,6 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           body,
           tempId,
         });
-
-        // (Re)start the 5-minute busy-notice clock from THIS client message —
-        // for every path (new, queued or agent-initiated). An agent reply cancels
-        // it, so it only fires when the client is genuinely left waiting.
-        scheduleBusyNotice(deps, conv.id);
 
         // Assigned CSR is off-duty and their client is talking → nudge the
         // Team Lead (throttled per conversation) so somebody answers.
@@ -935,7 +863,7 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       EV.WidgetEndChat,
       safe(socket, async () => {
         const conv = await getConversation(deps, data.conversationId);
-        if (!conv || conv.status === 'CLOSED' || conv.status === 'MISSED') return;
+        if (!conv || conv.status === 'CLOSED') return;
         if (conv.visitor_id !== data.visitorId) return;
         await closeConversation(deps, conv.id);
       }),
@@ -1253,7 +1181,7 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         const tempId = asString(p.tempId) ?? undefined;
         const conv = await getConversation(deps, asString(p.conversationId));
         if (!conv || !body) return;
-        if (conv.status === 'CLOSED' || conv.status === 'MISSED') {
+        if (conv.status === 'CLOSED') {
           socket.emit(EV.AppError, { message: 'Conversation is closed' });
           return;
         }
@@ -1310,8 +1238,6 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           body,
           tempId,
         });
-        // An agent just replied — the client isn't being left waiting.
-        cancelBusyNotice(conv.id);
       }),
     );
 
@@ -1320,7 +1246,9 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       EV.AgentStartChat,
       safe(socket, async (payload: unknown, ack?: unknown) => {
         const reply =
-          typeof ack === 'function' ? (ack as (r: { conversationId: string }) => void) : null;
+          typeof ack === 'function'
+            ? (ack as (r: { conversationId: string } | { error: string }) => void)
+            : null;
         const p = (payload ?? {}) as Record<string, unknown>;
         const websiteId = asString(p.websiteId);
         const visitorId = asString(p.visitorId);
@@ -1348,6 +1276,20 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           [visitorId],
         );
         if (open) {
+          // Already claimed by ANOTHER agent and this one can't manage it →
+          // don't hand back an id they'd only fail to open (that races two
+          // Space presses into a white screen). Tell them it's taken instead.
+          if (
+            open.assigned_user_id &&
+            open.assigned_user_id !== data.userId &&
+            !(await canManageConversation(deps, open, data.userId, data.role))
+          ) {
+            reply?.({ error: 'taken' });
+            socket.emit(EV.AppError, {
+              message: 'Another agent is already helping this visitor.',
+            });
+            return;
+          }
           // Already an open conversation — post into it (when allowed) and
           // hand its id back so the client opens that chat instead of erroring.
           await socket.join(convRoom(open.id));
@@ -1370,10 +1312,42 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
         }
 
         const conversationId = newId();
+        // Atomic claim: only create the conversation if this visitor still has
+        // no open one. If two agents press Space at the same instant, the guard
+        // lets exactly one INSERT land — the other finds the winner below.
         await deps.db.run(
-          "INSERT INTO conversations (id, website_id, visitor_id, status, assigned_user_id, created_at, activated_at, closed_at) VALUES (?, ?, ?, 'OFFERED', ?, ?, NULL, NULL)",
-          [conversationId, websiteId, visitorId, data.userId, nowIso()],
+          `INSERT INTO conversations (id, website_id, visitor_id, status, assigned_user_id, created_at, activated_at, closed_at)
+           SELECT ?, ?, ?, 'OFFERED', ?, ?, NULL, NULL
+           WHERE NOT EXISTS (
+             SELECT 1 FROM conversations
+              WHERE visitor_id = ? AND status IN ('WAITING','OFFERED','ACTIVE')
+           )`,
+          [conversationId, websiteId, visitorId, data.userId, nowIso(), visitorId],
         );
+        // Who actually holds the open chat now? Mine if I won the race, else the
+        // agent who beat me to it.
+        const winner = await deps.db.get<ConversationRow>(
+          "SELECT * FROM conversations WHERE visitor_id = ? AND status IN ('WAITING','OFFERED','ACTIVE') ORDER BY created_at ASC LIMIT 1",
+          [visitorId],
+        );
+        if (!winner || winner.id !== conversationId) {
+          // Lost the race (my INSERT was skipped by the guard). Route to the
+          // winner: open it if it's mine/manageable, otherwise report 'taken'.
+          if (winner) {
+            const mine = winner.assigned_user_id === data.userId;
+            const canManage = await canManageConversation(deps, winner, data.userId, data.role);
+            if (mine || canManage) {
+              await socket.join(convRoom(winner.id));
+              reply?.({ conversationId: winner.id });
+              return;
+            }
+          }
+          reply?.({ error: 'taken' });
+          socket.emit(EV.AppError, {
+            message: 'Another agent is already helping this visitor.',
+          });
+          return;
+        }
         await recordAssignment(deps, conversationId, null, data.userId, 'OFFER');
         await socket.join(convRoom(conversationId));
 

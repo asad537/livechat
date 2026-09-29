@@ -682,7 +682,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const unreadTotal = useMemo(() => {
     let total = 0;
     for (const c of Object.values(conversations)) {
-      if (c.status === 'CLOSED' || c.status === 'MISSED') continue;
+      if (c.status === 'CLOSED') continue;
       total += c.unreadCount ?? 0;
     }
     return total;

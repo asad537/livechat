@@ -2874,6 +2874,32 @@ p {
   background: var(--accent-soft);
 }
 
+/* A served chat owned by another agent — a plain CSR can't open it. */
+.vt-row-locked {
+  cursor: default;
+}
+.vt-row-locked:hover {
+  background: transparent;
+}
+
+/* A visitor waiting in the queue (messaged, not yet accepted) — red blink to
+   draw the agent's eye, matching the Incoming tab badge. */
+@keyframes vt-attn-blink {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(239, 68, 68, 0.18); }
+}
+.vt-row-attn {
+  animation: vt-attn-blink 1.1s ease-in-out infinite;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+.vt-row-attn:hover {
+  animation: none;
+  background: rgba(239, 68, 68, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  .vt-row-attn { animation: none; background: rgba(239, 68, 68, 0.18); }
+}
+
 .vt-who {
   min-width: 200px;
 }
@@ -7162,3 +7188,24 @@ tr:hover .vt-open-hint {
   pointer-events: none;
   backdrop-filter: blur(1px);
 }
+
+/* ── App-wide error boundary (replaces the old white screen) ── */
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.error-boundary-card {
+  max-width: 420px;
+  text-align: center;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 28px 26px;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+}
+.error-boundary-card h2 { margin: 0 0 8px; font-size: 18px; }
+.error-boundary-card p { margin: 0 0 18px; color: var(--text-muted, #64748b); line-height: 1.5; }
+.error-boundary-actions { display: flex; gap: 10px; justify-content: center; }

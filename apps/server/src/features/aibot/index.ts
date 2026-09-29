@@ -20,7 +20,14 @@ interface ConvRow {
   visitor_id: string;
   status: string;
   assigned_user_id: string | null;
+  human_online_on_arrival?: number | null;
 }
+
+// When a human (CSR/Team Lead) was online as the chat arrived, the bot doesn't
+// carry the conversation — it just posts ONE friendly hold line so the customer
+// isn't met with silence, then stays quiet for a human to pick up.
+const HOLD_GREETING =
+  "Thanks for reaching out! 🙌 You're now in the queue — one of our agents will be with you in just a moment.";
 
 interface WebsiteRow {
   id: string;
@@ -61,7 +68,7 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
       await sleep(DEBOUNCE_MS);
 
       const conv = await deps.db.get<ConvRow>(
-        'SELECT id, website_id, visitor_id, status, assigned_user_id FROM conversations WHERE id = ?',
+        'SELECT id, website_id, visitor_id, status, assigned_user_id, human_online_on_arrival FROM conversations WHERE id = ?',
         [conversationId],
       );
       // Bot speaks while the visitor is still WAITING — i.e. no human has ACCEPTED
@@ -69,6 +76,21 @@ export function maybeBotReply(deps: AppDeps, conversationId: string): void {
       // before that CSR accepts, so we must NOT gate on assigned_user_id here or
       // the bot would never fire. Once the agent accepts (→ ACTIVE) the bot stops.
       if (!conv || conv.status !== 'WAITING') return;
+
+      // "Incoming" chat (a human was online on arrival): the bot only posts a
+      // single hold greeting, then leaves the conversation for a human. It never
+      // runs the full LLM here. Guard on any existing BOT message so a chatty
+      // visitor doesn't get greeted again on every line.
+      if (conv.human_online_on_arrival) {
+        const priorBot = await deps.db.get<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND sender_type = 'BOT'",
+          [conversationId],
+        );
+        if (!priorBot || Number(priorBot.n) === 0) {
+          await postMessage(deps, { conversationId, senderType: 'BOT', body: HOLD_GREETING });
+        }
+        return;
+      }
 
       const [website, visitor, history] = await Promise.all([
         deps.db.get<WebsiteRow>(
