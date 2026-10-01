@@ -1385,14 +1385,25 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           return;
         }
         if (conv.assigned_user_id !== data.userId) {
-          // A LEAD/ADMIN may take the chat over — record the hand-off.
-          if (data.role !== 'LEAD' && data.role !== 'ADMIN') {
-            socket.emit(EV.AppError, { message: 'This conversation is not assigned to you' });
-            return;
-          }
-          if (!(await canManageConversation(deps, conv, data.userId, data.role))) {
-            socket.emit(EV.AppError, { message: 'You do not have access to this conversation' });
-            return;
+          if (!conv.assigned_user_id) {
+            // Unassigned queued chat — any agent (CSR included) who can access
+            // the website may claim it. Chats are no longer auto-assigned, so
+            // this is the normal pickup path for the Incoming/Offline queues.
+            if (!(await userCanAccessWebsite(deps, data.userId, data.role, conv.website_id))) {
+              socket.emit(EV.AppError, { message: 'You do not have access to this conversation' });
+              return;
+            }
+          } else {
+            // Taking over a chat already assigned to someone else — only a
+            // LEAD/ADMIN who manages it may do that.
+            if (data.role !== 'LEAD' && data.role !== 'ADMIN') {
+              socket.emit(EV.AppError, { message: 'This conversation is not assigned to you' });
+              return;
+            }
+            if (!(await canManageConversation(deps, conv, data.userId, data.role))) {
+              socket.emit(EV.AppError, { message: 'You do not have access to this conversation' });
+              return;
+            }
           }
           await recordAssignment(
             deps,
