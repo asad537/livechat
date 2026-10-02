@@ -94,18 +94,18 @@ export default function Source() {
         </div>
       </div>
 
-      <div className="rec-filters card">
+      <div className="rec-filters ch-filters card">
         <label className="rec-field rec-field-grow">
           <span>Search</span>
-          <span className="conv-search">
-            <IconSearch size={15} />
+          <div className="rec-search">
+            <IconSearch size={14} />
             <input
               type="search"
               placeholder="Search name, email, IP, city…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-          </span>
+          </div>
         </label>
         <label className="rec-field">
           <span>Website</span>
