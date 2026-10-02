@@ -421,10 +421,16 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     getSocket()?.emit(EV.AgentClose, { conversationId });
   };
 
-  const attach = async (file: File) => {
+  // Upload one or many files — sent in order, one after another, so a drop or a
+  // multi-select picks them all up instead of just the first.
+  const attach = async (files: File | FileList | File[]) => {
+    const list = files instanceof File ? [files] : Array.from(files);
+    if (list.length === 0) return;
     setUploading(true);
     try {
-      await uploadFile(conversationId, file);
+      for (const file of list) {
+        await uploadFile(conversationId, file);
+      }
     } catch (err) {
       pushToast('Upload failed', err instanceof Error ? err.message : undefined, 'error');
     } finally {
@@ -433,14 +439,14 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     }
   };
 
-  // Drag & drop a file anywhere over the chat to upload it.
+  // Drag & drop one or several files anywhere over the chat to upload them.
   const [dragOver, setDragOver] = useState(false);
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     if (!canSend) return;
-    const f = e.dataTransfer.files?.[0];
-    if (f) void attach(f);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) void attach(files);
   };
   const onDragOver = (e: React.DragEvent) => {
     if (!canSend) return;
@@ -676,10 +682,11 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 hidden
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void attach(f);
+                  const files = e.target.files;
+                  if (files && files.length > 0) void attach(files);
                 }}
               />
               <button

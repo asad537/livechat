@@ -107,13 +107,26 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
 
       // Chats count only for the returned page — cheap.
       const chatsBy = new Map<string, number>();
+      const landingBy = new Map<string, string>();
       if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
         const counts = await deps.db.all<{ visitor_id: string; n: number }>(
           `SELECT visitor_id, COUNT(*) AS n FROM conversations
             WHERE visitor_id IN (${placeholders(rows.length)}) GROUP BY visitor_id`,
-          rows.map((r) => r.id),
+          ids,
         );
         for (const c of counts) chatsBy.set(c.visitor_id, Number(c.n));
+        // Landing page = the earliest recorded page per visitor (their entry
+        // point). One pass over this page of visitors.
+        const landings = await deps.db.all<{ visitor_id: string; url: string }>(
+          `SELECT vp.visitor_id, vp.url
+             FROM visitor_pages vp
+             JOIN (SELECT visitor_id, MIN(created_at) AS mn FROM visitor_pages
+                    WHERE visitor_id IN (${placeholders(ids.length)}) GROUP BY visitor_id) x
+               ON x.visitor_id = vp.visitor_id AND vp.created_at = x.mn`,
+          ids,
+        );
+        for (const l of landings) if (!landingBy.has(l.visitor_id)) landingBy.set(l.visitor_id, l.url);
       }
 
       res.json({
@@ -121,6 +134,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
           ...toVisitor(r),
           online: deps.presence.isVisitorOnline(r.id),
           chats: chatsBy.get(r.id) ?? 0,
+          landingPage: landingBy.get(r.id) ?? null,
         })),
         total: Number(totalRow?.n ?? 0),
         limit,

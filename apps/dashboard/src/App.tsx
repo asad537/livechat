@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Inbox from './pages/Inbox';
 import Incoming from './pages/Incoming';
 import Visitors from './pages/Visitors';
+import Source from './pages/Source';
 import Monitoring from './pages/Monitoring';
 import Reports from './pages/Reports';
 import Admin from './pages/Admin';
@@ -148,6 +149,11 @@ function Sidebar() {
         <NavLink to="/reports" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
           {navItem(<IconChart size={17} />, 'Performance')}
         </NavLink>
+        {me.role === 'ADMIN' && (
+          <NavLink to="/source" className={({ isActive }) => classNames('nav-item', isActive && 'active')}>
+            {navItem(<IconGlobe size={17} />, 'Source')}
+          </NavLink>
+        )}
         {onlineAgents.length > 0 && (
           <div className="sidebar-online">
             <div className="nav-section-label">Online now · {onlineAgents.length}</div>
@@ -351,6 +357,14 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/incoming" element={<Incoming />} />
+          <Route
+            path="/source"
+            element={
+              <RequireRole roles={['ADMIN']}>
+                <Source />
+              </RequireRole>
+            }
+          />
           <Route path="/visitors" element={<Visitors key="live" />} />
           <Route path="/history" element={<Navigate to="/visitors" replace />} />
           <Route path="/chat-history" element={<ChatHistory />} />

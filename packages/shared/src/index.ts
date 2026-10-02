@@ -61,6 +61,7 @@ export interface Visitor {
   lastSeenAt: string;
   online?: boolean;
   currentPage?: string | null;
+  landingPage?: string | null;      // first page of the visit (entry point)
   ip?: string | null;
   country?: string | null;
   city?: string | null;

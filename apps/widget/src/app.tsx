@@ -607,11 +607,16 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
     }
   };
 
+  // Upload several files in order (picker multi-select or a multi-file drop).
+  const uploadFiles = async (files: FileList | File[]) => {
+    for (const f of Array.from(files)) await uploadFile(f);
+  };
+
   const onPickFile = (e: Event) => {
     const input = e.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = input.files;
     input.value = '';
-    if (file) void uploadFile(file);
+    if (files && files.length > 0) void uploadFiles(files);
   };
 
   const [dragOver, setDragOver] = useState(false);
@@ -801,8 +806,8 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
-            const f = (e as unknown as DragEvent).dataTransfer?.files?.[0];
-            if (f && conversation && !ended) void uploadFile(f);
+            const files = (e as unknown as DragEvent).dataTransfer?.files;
+            if (files && files.length > 0 && conversation && !ended) void uploadFiles(files);
           }}
         >
           {dragOver && (
@@ -1015,6 +1020,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 onClick={() => {
                   const picker = document.createElement('input');
                   picker.type = 'file';
+                  picker.multiple = true;
                   picker.onchange = (ev) => void onPickFile(ev);
                   picker.click();
                 }}
