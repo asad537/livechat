@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { Visitor } from '@livechat/shared';
 import { useApp } from '../state';
 import { api } from '../api';
-import { formatWhen, pageLabel, referrerLabel, siteLabel, uaParse } from '../util';
+import { classNames, formatWhen, pageLabel, referrerLabel, siteLabel, uaParse } from '../util';
 import {
   IconAndroid,
   IconApple,
@@ -35,42 +35,51 @@ export default function Source() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
+  const [dq, setDq] = useState(''); // debounced search term
   const [websiteId, setWebsiteId] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false); // first response has arrived
 
+  // Debounce only the search box so typing doesn't fire a request per keystroke.
+  // Page and website changes fetch immediately (no artificial delay).
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const t = window.setTimeout(() => {
-      void api
-        .visitorHistory({
-          limit: PAGE,
-          offset: page * PAGE,
-          q: query.trim() || undefined,
-          websiteId: websiteId || undefined,
-        })
-        .then((r) => {
-          if (cancelled) return;
-          setRows(r.visitors);
-          setTotal(r.total);
-        })
-        .catch(() => {
-          if (!cancelled) setRows([]);
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [page, query, websiteId]);
+    const t = window.setTimeout(() => setDq(query.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [query]);
 
   // Reset to the first page whenever the filters change.
   useEffect(() => {
     setPage(0);
-  }, [query, websiteId]);
+  }, [dq, websiteId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void api
+      .visitorHistory({
+        limit: PAGE,
+        offset: page * PAGE,
+        q: dq || undefined,
+        websiteId: websiteId || undefined,
+      })
+      .then((r) => {
+        if (cancelled) return;
+        setRows(r.visitors);
+        setTotal(r.total);
+      })
+      .catch(() => {
+        if (!cancelled) setRows([]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setLoaded(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [page, dq, websiteId]);
 
   const pages = Math.max(1, Math.ceil(total / PAGE));
 
@@ -111,8 +120,13 @@ export default function Source() {
         </label>
       </div>
 
-      {rows.length > 0 ? (
-        <div className="card vt-card">
+      {rows.length === 0 && loaded && !loading ? (
+        <div className="empty-state card">
+          <IconUsers size={32} className="empty-state-icon" />
+          <p>No visitors match these filters</p>
+        </div>
+      ) : (
+        <div className={classNames('card vt-card', loading && 'src-loading')}>
           <table className="table vt-table">
             <thead>
               <tr>
@@ -124,7 +138,17 @@ export default function Source() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((v) => {
+              {rows.length === 0 && loading
+                ? Array.from({ length: PAGE }).map((_, i) => (
+                    <tr key={`sk${i}`} className="vt-row src-skel-row">
+                      {Array.from({ length: 5 }).map((__, j) => (
+                        <td key={j}>
+                          <span className="src-skel" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                : rows.map((v) => {
                 const ua = uaParse(v.userAgent);
                 const site = siteById.get(v.websiteId);
                 return (
@@ -169,11 +193,6 @@ export default function Source() {
               })}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <div className="empty-state card">
-          <IconUsers size={32} className="empty-state-icon" />
-          <p>{loading ? 'Loading…' : 'No visitors match these filters'}</p>
         </div>
       )}
 

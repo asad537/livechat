@@ -7209,3 +7209,26 @@ tr:hover .vt-open-hint {
 .error-boundary-card h2 { margin: 0 0 8px; font-size: 18px; }
 .error-boundary-card p { margin: 0 0 18px; color: var(--text-muted, #64748b); line-height: 1.5; }
 .error-boundary-actions { display: flex; gap: 10px; justify-content: center; }
+
+/* ── Source page: loading skeleton + subtle fade while re-fetching ── */
+.src-loading .vt-row:not(.src-skel-row) { opacity: 0.55; transition: opacity .15s ease; }
+.src-skel-row td { padding-top: 14px; padding-bottom: 14px; }
+.src-skel {
+  display: block;
+  height: 12px;
+  width: 70%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--border, #e2e8f0) 25%, rgba(148,163,184,.18) 37%, var(--border, #e2e8f0) 63%);
+  background-size: 400% 100%;
+  animation: src-shimmer 1.2s ease-in-out infinite;
+}
+.src-skel-row td:nth-child(2) .src-skel { width: 90%; }
+.src-skel-row td:nth-child(4) .src-skel { width: 55%; }
+.src-skel-row td:nth-child(5) .src-skel { width: 40%; }
+@keyframes src-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .src-skel { animation: none; }
+}
