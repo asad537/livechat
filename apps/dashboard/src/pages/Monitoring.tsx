@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ConversationStatus } from '@livechat/shared';
+import { EV } from '@livechat/shared';
 import { useApp } from '../state';
+import { getSocket } from '../socket';
 import ChatPane from '../components/ChatPane';
 import { StatusPill } from '../components/ConversationList';
 import { classNames, formatWhen, initials, siteLabel, visitorNumber } from '../util';
@@ -9,13 +11,30 @@ import { IconEye } from '../icons';
 // Live Monitor shows only conversations happening right now.
 const LIVE_STATUSES: ConversationStatus[] = ['WAITING', 'OFFERED', 'ACTIVE'];
 
-// A chat only counts as "live" if it has had activity recently — this keeps
-// stale, never-closed conversations (still flagged ACTIVE/WAITING from hours or
-// days ago) out of the monitor. A live chat keeps refreshing this timestamp.
-const LIVE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+// A chat stays in the monitor only while the visitor is actually present — or
+// for a short grace period after they leave the site, so a chat the customer
+// just stepped away from doesn't vanish instantly. Past that, it drops off.
+const LEFT_GRACE_MS = 3 * 60 * 1000; // 3 minutes
 
 export default function Monitoring() {
-  const { conversations, websites, teams, refreshConversations } = useApp();
+  const { conversations, websites, teams, refreshConversations, visitorsByWebsite, connected } =
+    useApp();
+
+  // Watch every website's live visitor stream so we know who is currently on
+  // the site (presence), independent of the conversation list.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    for (const w of websites) socket.emit(EV.AgentWatchWebsite, { websiteId: w.id });
+  }, [websites, connected]);
+
+  // visitorId -> { online, lastSeenAt } from the live stream. The stream only
+  // carries ONLINE visitors, so presence = "appears in the stream".
+  const onlineVisitorIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const w of websites) for (const v of visitorsByWebsite[w.id] ?? []) ids.add(v.id);
+    return ids;
+  }, [visitorsByWebsite, websites]);
   const [websiteFilter, setWebsiteFilter] = useState('');
   const [agentFilter, setAgentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -26,10 +45,10 @@ export default function Monitoring() {
     void refreshConversations();
   }, [refreshConversations]);
 
-  // Re-evaluate the recency window every minute so chats that go idle drop off
-  // even when no new socket traffic arrives.
+  // Re-evaluate the grace window periodically so a chat drops off soon after the
+  // visitor's 3-minute grace expires, even with no new socket traffic.
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -45,9 +64,17 @@ export default function Monitoring() {
     const now = Date.now();
     const lastActivity = (c: (typeof conversations)[string]) =>
       new Date(c.lastMessage?.createdAt ?? c.createdAt).getTime();
+    // Keep a chat only while the visitor is present, or within the grace window
+    // after they left the site. Once they've been gone longer than the grace,
+    // the chat drops off the monitor even though it's still technically ACTIVE.
+    const visitorStillHere = (c: (typeof conversations)[string]) => {
+      if (onlineVisitorIds.has(c.visitorId)) return true;
+      const seen = c.visitor?.lastSeenAt ? new Date(c.visitor.lastSeenAt).getTime() : NaN;
+      return !Number.isNaN(seen) && now - seen <= LEFT_GRACE_MS;
+    };
     return Object.values(conversations)
       .filter((c) => LIVE_STATUSES.includes(c.status)) // live statuses only
-      .filter((c) => now - lastActivity(c) <= LIVE_WINDOW_MS) // active recently
+      .filter((c) => visitorStillHere(c)) // visitor present, or left < 3 min ago
       // Only real two-way chats: the client must have replied at least once.
       // Agent-only outreach the visitor hasn't answered stays out of the monitor.
       .filter((c) => c.hasVisitorMessage !== false)
@@ -56,7 +83,7 @@ export default function Monitoring() {
       .filter((c) => (statusFilter ? c.status === statusFilter : true))
       .sort((a, b) => lastActivity(b) - lastActivity(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversations, websiteFilter, agentFilter, statusFilter, tick]);
+  }, [conversations, websiteFilter, agentFilter, statusFilter, onlineVisitorIds, tick]);
 
   return (
     <div className="page monitoring-page">
