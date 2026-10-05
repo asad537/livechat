@@ -83,21 +83,66 @@ export default function Dashboard() {
   const inFlightKey = useRef<string | null>(null);
   const lastLoadAt = useRef(0);
 
+  // Every result we've loaded this session, by "website|range". Switching back
+  // to a range already seen (or prefetched below) shows it instantly, then
+  // refreshes quietly. `dataKey` says which filter the visible `data` belongs
+  // to, so numbers from the previous range are never shown under the new label.
+  const store = useRef(new Map<string, ReportsOverview>());
+  const [dataKey, setDataKey] = useState('');
+  const viewKey = `${websiteId}|${range}`;
+  const viewKeyRef = useRef(viewKey);
+  viewKeyRef.current = viewKey;
+
   const load = useCallback(async (fresh = false) => {
     const key = `${websiteId}|${range}`;
+    const seen = store.current.get(key);
+    if (seen) {
+      setData(seen);
+      setDataKey(key);
+    }
     if (inFlightKey.current === key) return; // an identical request is already running
     inFlightKey.current = key;
     setLoading(true);
     try {
-      setData(await api.reports(websiteId || undefined, range, fresh));
-      lastLoadAt.current = Date.now();
+      const result = await api.reports(websiteId || undefined, range, fresh);
+      store.current.set(key, result);
+      // The user may have switched filters while this was loading.
+      if (viewKeyRef.current === key) {
+        setData(result);
+        setDataKey(key);
+        lastLoadAt.current = Date.now();
+      }
     } catch {
       /* toast-free dashboard; Reports page surfaces errors */
     } finally {
       if (inFlightKey.current === key) inFlightKey.current = null;
-      setLoading(false);
+      if (viewKeyRef.current === key) setLoading(false);
     }
   }, [websiteId, range]);
+
+  // Once the default view is up, quietly fetch the other date ranges one by one
+  // so picking "All time" etc. is instant instead of a multi-second wait.
+  const prefetched = useRef(false);
+  useEffect(() => {
+    if (prefetched.current || !dataKey) return;
+    prefetched.current = true;
+    let cancelled = false;
+    void (async () => {
+      for (const r of ['yesterday', '7d', '30d', 'all', 'today'] as ReportRange[]) {
+        if (cancelled) return;
+        const key = `|${r}`;
+        if (store.current.has(key)) continue;
+        try {
+          store.current.set(key, await api.reports(undefined, r));
+        } catch {
+          /* best-effort warm-up */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataKey]);
 
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -218,9 +263,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!data && loading && <div className="empty-hint">Loading dashboard…</div>}
+      {(!data || dataKey !== viewKey) && loading && <div className="empty-hint">Loading dashboard…</div>}
 
-      {data && (
+      {data && dataKey === viewKey && (
         <>
           {/* ── Tiles ── */}
           <div className="db-tiles">

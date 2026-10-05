@@ -1,0 +1,5 @@
+Local-only test logins (created for testing on localhost, safe to delete)
+
+ADMIN: localtest-admin@test.local
+CSR:   localtest-csr@test.local (team: Customer Support)
+Password (both): t-1hjNe89F0rMw

@@ -59,6 +59,25 @@ interface AssignmentHistoryRow {
   created_at: string;
 }
 
+// InnoDB's default FULLTEXT stopwords — never indexed, so never required.
+const FT_STOPWORDS = new Set(
+  'a about an are as at be by com de en for from how i in is it la of on or that the this to was what when where who will with und www'.split(' '),
+);
+
+/**
+ * Boolean-mode FULLTEXT query for a search phrase: every word (3+ letters, not
+ * a stopword) must appear as a word prefix, e.g. "box sty" → "+box* +sty*".
+ * Returns '' when the phrase has no indexable word (caller falls back to LIKE).
+ */
+function fulltextQuery(q: string): string {
+  const words = q
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => /^[\p{L}\p{N}]+/u.exec(w)?.[0] ?? '')
+    .filter((w) => w.length >= 3 && w.length <= 80 && !FT_STOPWORDS.has(w));
+  return [...new Set(words)].map((w) => `+${w}*`).join(' ');
+}
+
 export function buildConversationsRouter(deps: AppDeps): Router {
   const router = Router();
   const auth = requireAgent(deps.db, deps.config);
@@ -320,30 +339,58 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         params.push(new Date(`${to}T23:59:59.999`).toISOString());
       }
       const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
+      // Search = a derived table of matching conversation ids that the main
+      // query JOINs. A chat matches
+      // when the visitor matches (name / email / visitor number) OR the words
+      // appear inside the chat itself (e.g. "box styles").
+      let searchSql = '';
+      const searchParams: unknown[] = [];
       if (q.length >= 2) {
-        where.push(`(v.name LIKE ? OR v.email LIKE ? OR ${visitorNumberSql('v.id')} LIKE ?)`);
-        params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+        const like = `%${q}%`;
+        // Messages: on MySQL the FULLTEXT index narrows to candidate rows in
+        // milliseconds and LIKE then confirms the exact phrase; without usable
+        // words (or on other databases) it falls back to a plain LIKE scan.
+        const ft = deps.db.dialect === 'mysql' ? fulltextQuery(q) : '';
+        const messageSql = ft
+          ? 'MATCH(sm.body, sm.translated_body) AGAINST(? IN BOOLEAN MODE) AND (sm.body LIKE ? OR sm.translated_body LIKE ?)'
+          : '(sm.body LIKE ? OR sm.translated_body LIKE ?)';
+        if (ft) searchParams.push(ft);
+        searchParams.push(like, like);
+        // Visitor numbers are 6 digits — only compute them for a numeric search.
+        const numeric = /^\d+$/.test(q);
+        const visitorSql = numeric
+          ? `sv.name LIKE ? OR sv.email LIKE ? OR ${visitorNumberSql('sv.id')} LIKE ?`
+          : 'sv.name LIKE ? OR sv.email LIKE ?';
+        searchParams.push(like, like);
+        if (numeric) searchParams.push(like);
+        // MySQL otherwise walks every conversation and looks its visitor up;
+        // filtering visitors first (few have a name/email) is far cheaper.
+        const visitorJoin = deps.db.dialect === 'mysql' ? 'STRAIGHT_JOIN' : 'JOIN';
+        searchSql = `(SELECT sm.conversation_id AS id FROM messages sm WHERE ${messageSql}
+            UNION SELECT sc.id FROM visitors sv ${visitorJoin} conversations sc ON sc.visitor_id = sv.id WHERE ${visitorSql}) qm`;
       }
 
       const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-      const needsVisitorJoin = contactOnly || q.length >= 2;
+      // With a search, read the (small) match set FIRST and look each chat up by
+      // id — left to itself MySQL starts from all conversations instead.
+      const join = searchSql && deps.db.dialect === 'mysql' ? 'STRAIGHT_JOIN' : 'JOIN';
+      const fromSql =
+        (searchSql
+          ? `FROM ${searchSql} ${join} conversations c ON c.id = qm.id`
+          : 'FROM conversations c') + (contactOnly ? ` ${join} visitors v ON v.id = c.visitor_id` : '');
+      const allParams = [...searchParams, ...params];
 
-      const totalRow = await deps.db.get<{ n: number }>(
-        needsVisitorJoin
-          ? `SELECT COUNT(*) AS n FROM conversations c JOIN visitors v ON v.id = c.visitor_id ${whereSql}`
-          : `SELECT COUNT(*) AS n FROM conversations c ${whereSql}`,
-        params,
-      );
+      // Count + Step 1 (ONLY the matching conversation IDs for this page) run
+      // together — they are independent reads.
+      const [totalRow, pageRowIds] = await Promise.all([
+        deps.db.get<{ n: number }>(`SELECT COUNT(*) AS n ${fromSql} ${whereSql}`, allParams),
+        deps.db.all<{ id: string }>(
+          `SELECT c.id ${fromSql} ${whereSql} ORDER BY c.created_at DESC LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
+          allParams,
+        ),
+      ]);
       const total = Number(totalRow?.n ?? 0);
       const pages = Math.max(1, Math.ceil(total / PER_PAGE));
-
-      // Step 1: Fetch ONLY the matching conversation IDs for this page (runs in ~5ms)
-      const pageRowIds = await deps.db.all<{ id: string }>(
-        needsVisitorJoin
-          ? `SELECT c.id FROM conversations c JOIN visitors v ON v.id = c.visitor_id ${whereSql} ORDER BY c.created_at DESC LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`
-          : `SELECT c.id FROM conversations c ${whereSql} ORDER BY c.created_at DESC LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`,
-        params,
-      );
 
       // Step 2: Hydrate full details for ONLY the 20 page items
       let rows: Array<{
@@ -490,8 +537,11 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       }
       const q = (asString(req.query.q) ?? '').trim().replace(/[%_\\]/g, ' ').trim();
       if (q.length >= 2) {
-        where.push(`(v.name LIKE ? OR v.email LIKE ? OR ${visitorNumberSql('v.id')} LIKE ?)`);
-        params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+        // Also match words inside the chat itself (e.g. "box styles"), not just the visitor.
+        where.push(
+          `(v.name LIKE ? OR v.email LIKE ? OR ${visitorNumberSql('v.id')} LIKE ? OR c.id IN (SELECT m.conversation_id FROM messages m WHERE m.body LIKE ? OR m.translated_body LIKE ?))`,
+        );
+        params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
       }
 
       const whereSql = `WHERE ${where.join(' AND ')}`;

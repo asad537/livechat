@@ -45,6 +45,11 @@ function pktDayStart(daysAgo = 0): string {
 /** Lower + optional upper bound for a range. `until` is set only for bounded
  *  windows (yesterday = the previous noon-PKT business day); open-ended ranges
  *  leave it null so they keep the simple `>= since` behavior. */
+// How long a historical overview result stays servable (stale) while a
+// background refresh brings it up to date, and which keys are refreshing now.
+const OVERVIEW_KEEP_MS = 12 * 60 * 60 * 1000;
+const overviewRefreshing = new Set<string>();
+
 function rangeBounds(range: string): { since: string | null; until: string | null } {
   const now = new Date();
   if (range === 'today') return { since: pktDayStart(0), until: null }; // noon-PKT → now
@@ -183,13 +188,36 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const cacheKey = `overview:${user.id}:${websiteId || 'all'}:${range}`;
       // The Refresh button sends fresh=1 to bypass the cache and recompute now.
       const bypassCache = asString(req.query.fresh) === '1';
+      // Historical ranges (yesterday / 7d / 30d / all) are stale-while-revalidate:
+      // the last computed result is kept for hours and served INSTANTLY; once it
+      // is older than the TTL above a background recompute refreshes it for the
+      // next open. Without this, the first click on "All time" after 5 idle
+      // minutes re-ran the whole multi-second scan while the user waited.
+      // "today" keeps the plain short cache so live counters are never old.
+      const swr = range !== 'today';
+      const keepMs = swr ? OVERVIEW_KEEP_MS : OVERVIEW_TTL_MS;
       if (!bypassCache) {
-        const cachedPayload = await deps.cache.get<Record<string, unknown>>(cacheKey);
-        if (cachedPayload) {
-          res.json(cachedPayload);
-          return;
+        const hit = await deps.cache.get<{ at?: number; payload?: Record<string, unknown> }>(cacheKey);
+        if (hit && typeof hit.at === 'number' && hit.payload) {
+          const stale = Date.now() - hit.at > OVERVIEW_TTL_MS;
+          if (!stale || swr) {
+            res.json(hit.payload);
+            if (stale && !overviewRefreshing.has(cacheKey)) {
+              overviewRefreshing.add(cacheKey);
+              void compute()
+                .then((payload) => deps.cache.set(cacheKey, { at: Date.now(), payload }, keepMs))
+                .catch((err: unknown) => console.error('[reports] overview refresh', err))
+                .finally(() => overviewRefreshing.delete(cacheKey));
+            }
+            return;
+          }
         }
       }
+      const payload = await compute();
+      await deps.cache.set(cacheKey, { at: Date.now(), payload }, keepMs);
+      res.json(payload);
+
+      async function compute(): Promise<Record<string, unknown>> {
 
       const siteFilter = `website_id IN (${placeholders(siteIds.length)})`;
       const cSiteFilter = `c.website_id IN (${placeholders(siteIds.length)})`;
@@ -672,8 +700,8 @@ export function buildReportsRouter(deps: AppDeps): Router {
         trendWindow,
         trendMode,
       };
-      await deps.cache.set(cacheKey, payload, OVERVIEW_TTL_MS);
-      res.json(payload);
+      return payload;
+      }
     }),
   );
 

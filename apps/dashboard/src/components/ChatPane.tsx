@@ -42,6 +42,11 @@ async function loadShortcuts(force = false): Promise<Shortcut[]> {
   return shortcutsCache;
 }
 
+// Unsent reply text per conversation — survives the pane unmounting (floating
+// window auto-minimized when the visitor leaves, or switching between the chat
+// head, the pop-up and the Inbox) so the agent never loses what they typed.
+const draftCache = new Map<string, string>();
+
 interface OpenAck {
   conversation?: ConversationSummary;
   messages?: ChatMessage[];
@@ -70,7 +75,12 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
   const [openError, setOpenError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [visitorTyping, setVisitorTyping] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState(() => draftCache.get(conversationId) ?? '');
+  const setDraft = (value: string) => {
+    if (value) draftCache.set(conversationId, value);
+    else draftCache.delete(conversationId);
+    setDraftState(value);
+  };
   const [uploading, setUploading] = useState(false);
 
   // ── Canned response shortcuts ──
@@ -220,7 +230,7 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     setOpenError(null);
     setLoading(true);
     setVisitorTyping(false);
-    setDraft('');
+    setDraftState(draftCache.get(conversationId) ?? '');
     readSentRef.current = new Set();
 
     socket.emit(EV.AgentOpen, { conversationId }, (ack: OpenAck) => {
@@ -454,24 +464,9 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     if (!dragOver) setDragOver(true);
   };
 
-  // ─── Render ────────────────────────────────────────────────
-  if (openError) {
-    return (
-      <div className="chatpane">
-        <div className="chat-main">
-          <div className="chat-empty">
-            <p>{openError}</p>
-            <p className="chat-empty-sub">
-              You may not have access yet — queued chats open once they are assigned.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const visitorName = conversation?.visitor?.name || `Visitor ${visitorNumber(conversation?.visitorId)}`;
   const showAccept =
+    !openError &&
     !!conversation &&
     conversation.status === 'WAITING' &&
     !!me &&
@@ -502,6 +497,24 @@ export default function ChatPane({ conversationId, showSidebar = true }: Props) 
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAccept, conversationId]);
+
+  // ─── Render ────────────────────────────────────────────────
+  // Must stay BELOW every hook — an early return above one crashes the whole
+  // dashboard ("Rendered fewer hooks") the moment a chat fails to open.
+  if (openError) {
+    return (
+      <div className="chatpane">
+        <div className="chat-main">
+          <div className="chat-empty">
+            <p>{openError}</p>
+            <p className="chat-empty-sub">
+              You may not have access yet — queued chats open once they are assigned.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   let lastDay = '';
 

@@ -338,6 +338,8 @@ export default function Visitors({ initialView = 'live' }: { initialView?: 'live
             <span className="vt-page-url" title={v.currentPage}>
               {pageLabel(v.currentPage)}
             </span>
+          ) : v.online ? (
+            <span className="vt-muted">—</span>
           ) : (
             <span className="vt-muted">Last seen {formatWhen(v.lastSeenAt) || '—'}</span>
           )}

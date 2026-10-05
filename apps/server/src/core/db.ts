@@ -177,4 +177,21 @@ async function migrate(db: Db, config: Config): Promise<void> {
       throw err;
     }
   }
+  // MySQL-only: FULLTEXT index for Chat History's "words from the chat" search
+  // (kept out of schema.sql — the syntax would fail on SQLite / Postgres), plus
+  // a covering index so the visitor name/email search never reads full rows.
+  if (db.dialect === 'mysql') {
+    for (const stmt of [
+      'ALTER TABLE messages ADD FULLTEXT INDEX ft_messages_body (body, translated_body)',
+      'CREATE INDEX idx_visitors_name_email ON visitors (name, email)',
+    ]) {
+      try {
+        await db.run(stmt);
+      } catch (err) {
+        const msg = String((err as Error).message).toLowerCase();
+        if (msg.includes('exist') || msg.includes('duplicate')) continue;
+        console.error('[db] search index', (err as Error).message);
+      }
+    }
+  }
 }

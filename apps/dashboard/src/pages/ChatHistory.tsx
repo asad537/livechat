@@ -106,7 +106,7 @@ export default function ChatHistory() {
             <IconSearch size={14} />
             <input
               type="search"
-              placeholder="Visitor name or email…"
+              placeholder="Name, email or words from the chat…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -140,7 +140,6 @@ export default function ChatHistory() {
           <span>Status</span>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Closed</option>
-            <option value="CLOSED">Closed</option>
             <option value="ALL">Any status</option>
           </select>
         </label>

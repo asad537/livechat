@@ -1130,9 +1130,15 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           return;
         }
         // MANAGER may open anything to watch; everyone else needs manage access.
+        // Exception: an UNASSIGNED queued chat — chats are no longer
+        // auto-assigned, so any agent on the website (CSR included) must be able
+        // to open it to pick it up (Accept / type-to-join), same rule as those.
         const allowed =
           data.role === 'MANAGER' ||
-          (await canManageConversation(deps, conv, data.userId, data.role));
+          (await canManageConversation(deps, conv, data.userId, data.role)) ||
+          (conv.status === 'WAITING' &&
+            !conv.assigned_user_id &&
+            (await userCanAccessWebsite(deps, data.userId, data.role, conv.website_id)));
         if (!allowed) {
           reply({ error: 'Forbidden' });
           socket.emit(EV.AppError, { message: 'You do not have access to this conversation' });

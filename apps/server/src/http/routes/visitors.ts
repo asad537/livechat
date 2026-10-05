@@ -205,6 +205,9 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
         visitors: rows.map((r) => ({
           ...toVisitor(r),
           online: deps.presence.isVisitorOnline(r.id),
+          // An idle (backgrounded-tab) visitor is still connected but absent from
+          // the live stream — send their page so the row doesn't read "Last seen".
+          currentPage: deps.presence.getVisitorPage(r.id),
           chats: Number(r.n_chats),
           lastSeenAt: r.served_at, // sort/display by when we last served them
           activeConversation: {
