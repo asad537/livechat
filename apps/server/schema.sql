@@ -259,3 +259,48 @@ ALTER TABLE conversations ADD COLUMN human_online_on_arrival INTEGER NOT NULL DE
 -- historical MISSED rows into CLOSED so the status disappears from the data.
 -- (Idempotent — re-running just matches nothing.)
 UPDATE conversations SET status = 'CLOSED' WHERE status = 'MISSED';
+
+-- Dashboard aggregates (features/stats): pre-summed chat numbers per UTC hour,
+-- website and assigned agent, so reports never rescan closed history.
+--   kind S = chats by the hour they STARTED, C = by the hour they CLOSED,
+--   kind K = "CSR clicks" per sending agent (sender_id), by the hour started.
+-- Durations are whole milliseconds. Rebuilt automatically when empty.
+CREATE TABLE IF NOT EXISTS chat_stats_hourly (
+  kind VARCHAR(1) NOT NULL,
+  bucket VARCHAR(13) NOT NULL,
+  website_id VARCHAR(36) NOT NULL,
+  agent_id VARCHAR(36) NOT NULL DEFAULT '',
+  sender_id VARCHAR(36) NOT NULL DEFAULT '',
+  n INTEGER NOT NULL DEFAULT 0,
+  csr_n INTEGER NOT NULL DEFAULT 0,
+  answered INTEGER NOT NULL DEFAULT 0,
+  closed INTEGER NOT NULL DEFAULT 0,
+  open_n INTEGER NOT NULL DEFAULT 0,
+  missed INTEGER NOT NULL DEFAULT 0,
+  transferred INTEGER NOT NULL DEFAULT 0,
+  frt_ms BIGINT NOT NULL DEFAULT 0,
+  frt_n INTEGER NOT NULL DEFAULT 0,
+  dur_ms BIGINT NOT NULL DEFAULT 0,
+  dur_n INTEGER NOT NULL DEFAULT 0,
+  rating_sum INTEGER NOT NULL DEFAULT 0,
+  rating_n INTEGER NOT NULL DEFAULT 0,
+  r1 INTEGER NOT NULL DEFAULT 0,
+  r2 INTEGER NOT NULL DEFAULT 0,
+  r3 INTEGER NOT NULL DEFAULT 0,
+  r4 INTEGER NOT NULL DEFAULT 0,
+  r5 INTEGER NOT NULL DEFAULT 0,
+  extra_n INTEGER NOT NULL DEFAULT 0,
+  extra_frt_ms BIGINT NOT NULL DEFAULT 0,
+  extra_frt_n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (kind, bucket, website_id, agent_id, sender_id)
+);
+CREATE INDEX IF NOT EXISTS idx_chat_stats_site ON chat_stats_hourly (website_id, kind, bucket);
+
+-- Aggregator bookkeeping: 'version' + 'watermark' (chats closed before it are aggregated).
+CREATE TABLE IF NOT EXISTS chat_stats_meta (
+  k VARCHAR(32) NOT NULL PRIMARY KEY,
+  v VARCHAR(64) NOT NULL
+);
+
+-- The aggregator and the live remainder both look chats up by when they closed.
+CREATE INDEX IF NOT EXISTS idx_conversations_closed ON conversations (closed_at);

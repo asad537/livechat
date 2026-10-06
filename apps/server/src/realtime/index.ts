@@ -24,6 +24,7 @@ import { sendTranscriptEmail } from '../features/email/index.js';
 import { captureVisitorInfo } from '../features/capture/index.js';
 import { clientIp, localCountry, lookupCountry, updateVisitorGeo } from '../features/geo/index.js';
 import { ipAllowed } from '../core/ip.js';
+import { refreshStatsForConversation } from '../features/stats/index.js';
 import {
   activateConversation,
   closeConversation,
@@ -349,12 +350,61 @@ async function buildVisitorList(deps: AppDeps, websiteId: string): Promise<Visit
   });
 }
 
+// The live visitor list is sent WHOLE to every dashboard watching the website.
+// On a busy site that used to mean several ~25 KB pushes per second (one per
+// page view / tab idle flip / chat message), which starves an agent on a slow
+// connection: their chat messages and "open chat" replies queue behind the
+// lists. So: send at most one list per website per second (the first change
+// goes out immediately, later ones in the same second are merged into one
+// trailing send), and never resend a list identical to the last one.
+const VISITOR_BROADCAST_GAP_MS = 1000;
+const visitorBroadcast = new Map<
+  string,
+  { sentAt: number; timer: NodeJS.Timeout | null; last: string; queue: Promise<void> }
+>();
+
+function sendVisitorList(deps: AppDeps, websiteId: string): Promise<void> {
+  const state = visitorBroadcast.get(websiteId);
+  const send = async () => {
+    const visitors = await buildVisitorList(deps, websiteId);
+    const json = JSON.stringify(visitors);
+    if (state && state.last === json) return; // nothing changed since the last send
+    if (state) state.last = json;
+    deps.io.of(AGENT_NAMESPACE).to(websiteRoom(websiteId)).emit(EV.VisitorsUpdate, {
+      websiteId,
+      visitors,
+    });
+  };
+  if (!state) return send();
+  // One at a time per website, in order — an older list can never be emitted
+  // after (and so overwrite) a newer one.
+  const run = state.queue.then(send, send);
+  state.queue = run.catch(() => undefined);
+  return run;
+}
+
 async function broadcastVisitors(deps: AppDeps, websiteId: string): Promise<void> {
-  const visitors = await buildVisitorList(deps, websiteId);
-  deps.io.of(AGENT_NAMESPACE).to(websiteRoom(websiteId)).emit(EV.VisitorsUpdate, {
-    websiteId,
-    visitors,
-  });
+  let state = visitorBroadcast.get(websiteId);
+  if (!state) {
+    state = { sentAt: 0, timer: null, last: '', queue: Promise.resolve() };
+    visitorBroadcast.set(websiteId, state);
+  }
+  if (state.timer) return; // a trailing send is already scheduled — it will carry this change
+  const wait = state.sentAt + VISITOR_BROADCAST_GAP_MS - Date.now();
+  if (wait <= 0) {
+    state.sentAt = Date.now();
+    await sendVisitorList(deps, websiteId);
+    return;
+  }
+  const s = state;
+  s.timer = setTimeout(() => {
+    s.timer = null;
+    s.sentAt = Date.now();
+    void sendVisitorList(deps, websiteId).catch((err) =>
+      console.error('[realtime] visitor broadcast', err),
+    );
+  }, wait);
+  s.timer.unref?.();
 }
 
 // ─── Assignment history (for agent-open ack) ─────────────────
@@ -909,6 +959,8 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           comment,
           conv.id,
         ]);
+        // A rating can land after the chat closed — refresh its stats bucket.
+        void refreshStatsForConversation(deps, conv.id);
         await postMessage(deps, {
           conversationId: conv.id,
           senderType: 'SYSTEM',

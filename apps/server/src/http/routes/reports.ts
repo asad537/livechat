@@ -12,17 +12,13 @@ import {
   toUserWithPresence,
   type WebsiteRow,
 } from '../helpers.js';
-
-interface ConvRow {
-  id: string;
-  website_id: string;
-  status: string;
-  assigned_user_id: string | null;
-  created_at: string;
-  activated_at: string | null;
-  closed_at: string | null;
-  rating: number | null;
-}
+import {
+  addMeasures,
+  bucketIso,
+  emptyMeasures,
+  loadOverviewStats,
+  type Measures,
+} from '../../features/stats/index.js';
 
 // Business "day" boundary — Pakistan NOON (12:00 PKT = 07:00 UTC), not midnight.
 // A support day runs noon→noon so overnight shifts aren't split by a midnight
@@ -45,11 +41,6 @@ function pktDayStart(daysAgo = 0): string {
 /** Lower + optional upper bound for a range. `until` is set only for bounded
  *  windows (yesterday = the previous noon-PKT business day); open-ended ranges
  *  leave it null so they keep the simple `>= since` behavior. */
-// How long a historical overview result stays servable (stale) while a
-// background refresh brings it up to date, and which keys are refreshing now.
-const OVERVIEW_KEEP_MS = 12 * 60 * 60 * 1000;
-const overviewRefreshing = new Set<string>();
-
 function rangeBounds(range: string): { since: string | null; until: string | null } {
   const now = new Date();
   if (range === 'today') return { since: pktDayStart(0), until: null }; // noon-PKT → now
@@ -176,58 +167,32 @@ export function buildReportsRouter(deps: AppDeps): Router {
         return;
       }
 
-      // Cache the computed KPI payload briefly. This is a heavy multi-query
-      // endpoint, so serving repeat opens from cache makes the dashboard load
-      // instantly. Only READ RESULTS are cached (never writes) and they expire
-      // in seconds — no data is ever lost or shown wrong for long. Keyed by the
-      // viewer (their scope), the website filter and the range.
-      // Longer cache for historical ranges — yesterday/7d/30d/all barely change,
-      // and their heavy per-day message scan (~seconds on large data) should run
-      // rarely. "today" stays short so live counters keep moving. Refresh bypasses.
+      // Short cache of the finished payload, purely for speed. The numbers
+      // themselves come from the chat_stats_hourly aggregates (features/stats),
+      // which are the source of truth — the cache only saves re-reading them when
+      // the same view is opened again within minutes. Keyed by the viewer (their
+      // scope), the website filter and the range. "today" stays short so live
+      // counters keep moving; the Refresh button bypasses it.
       const OVERVIEW_TTL_MS = range === 'today' ? 20_000 : range === 'yesterday' ? 120_000 : 300_000;
       const cacheKey = `overview:${user.id}:${websiteId || 'all'}:${range}`;
       // The Refresh button sends fresh=1 to bypass the cache and recompute now.
       const bypassCache = asString(req.query.fresh) === '1';
-      // Historical ranges (yesterday / 7d / 30d / all) are stale-while-revalidate:
-      // the last computed result is kept for hours and served INSTANTLY; once it
-      // is older than the TTL above a background recompute refreshes it for the
-      // next open. Without this, the first click on "All time" after 5 idle
-      // minutes re-ran the whole multi-second scan while the user waited.
-      // "today" keeps the plain short cache so live counters are never old.
-      const swr = range !== 'today';
-      const keepMs = swr ? OVERVIEW_KEEP_MS : OVERVIEW_TTL_MS;
       if (!bypassCache) {
-        const hit = await deps.cache.get<{ at?: number; payload?: Record<string, unknown> }>(cacheKey);
-        if (hit && typeof hit.at === 'number' && hit.payload) {
-          const stale = Date.now() - hit.at > OVERVIEW_TTL_MS;
-          if (!stale || swr) {
-            res.json(hit.payload);
-            if (stale && !overviewRefreshing.has(cacheKey)) {
-              overviewRefreshing.add(cacheKey);
-              void compute()
-                .then((payload) => deps.cache.set(cacheKey, { at: Date.now(), payload }, keepMs))
-                .catch((err: unknown) => console.error('[reports] overview refresh', err))
-                .finally(() => overviewRefreshing.delete(cacheKey));
-            }
-            return;
-          }
+        const cachedPayload = await deps.cache.get<Record<string, unknown>>(cacheKey);
+        if (cachedPayload) {
+          res.json(cachedPayload);
+          return;
         }
       }
       const payload = await compute();
-      await deps.cache.set(cacheKey, { at: Date.now(), payload }, keepMs);
+      await deps.cache.set(cacheKey, payload, OVERVIEW_TTL_MS);
       res.json(payload);
 
       async function compute(): Promise<Record<string, unknown>> {
-
       const siteFilter = `website_id IN (${placeholders(siteIds.length)})`;
       const cSiteFilter = `c.website_id IN (${placeholders(siteIds.length)})`;
       // Bounded window (yesterday) needs an upper bound; open-ended ranges keep
       // the simple lower-bound form. "in range" = started OR closed in range.
-      const rangeFilter = since
-        ? until
-          ? ' AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))'
-          : ' AND (created_at >= ? OR closed_at >= ?)'
-        : '';
       const cRangeFilter = since
         ? until
           ? ' AND ((c.created_at >= ? AND c.created_at < ?) OR (c.closed_at >= ? AND c.closed_at < ?))'
@@ -235,10 +200,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         : '';
       const rangeParams = since ? (until ? [since, until, since, until] : [since, since]) : [];
       // A "conversation" only counts once the CLIENT has actually spoken. Agent
-      // outreach the visitor never answered is not a real chat — it must not
-      // inflate Closed / Resolution / per-agent / website / outcome numbers.
-      // (messages also has an `id` column, so the correlation MUST be qualified.)
-      const engaged = `EXISTS (SELECT 1 FROM messages em WHERE em.conversation_id = co.id AND em.sender_type = 'VISITOR')`;
+      // outreach the visitor never answered is not a real chat.
       const cEngaged = `EXISTS (SELECT 1 FROM messages em WHERE em.conversation_id = c.id AND em.sender_type = 'VISITOR')`;
 
       // "Today" / "yesterday" both use the noon-PKT business-day boundary so the
@@ -249,37 +211,31 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const trendSince = new Date(Date.now() - trendWindow * 24 * 3600_000).toISOString();
       const visitorSince = since ?? '1970';
       // Visitor counts filter on last_seen_at >= visitorSince; a bounded window
-      // (yesterday) also caps it with an upper bound. Reused across the three
-      // visitor queries below.
+      // (yesterday) also caps it with an upper bound.
       const vRangeSql = until ? ' AND last_seen_at < ?' : '';
       const vRangeParams = until ? [until] : [];
 
-      const [
-        rows,
-        liveCounts,
-        trendRows,
-        visitorAgg,
-        countryRows,
-        transferRows,
-        msgRows,
-        yesterdayRows,
-      ] = await Promise.all([
-        deps.db.all<ConvRow>(
-          `SELECT id, website_id, status, assigned_user_id, created_at, activated_at, closed_at, rating
-             FROM (SELECT * FROM conversations co WHERE ${siteFilter}${rangeFilter}${agentFilter} AND ${engaged}
-                   ORDER BY created_at DESC LIMIT 10000) t`,
-          [...siteIds, ...rangeParams, ...agentParams],
+      // Chat numbers come from the aggregates (features/stats): closed history
+      // is pre-summed per hour, only open / just-closed chats are read live.
+      // Three windows: the selected range, the trend chart, and yesterday.
+      // Visitors, countries and topics are unique / top-N counts that cannot be
+      // summed from buckets, so they are still counted directly below.
+      const [stats, liveCounts, visitorAgg, countryRows, msgRows, visitorByWebsite] = await Promise.all([
+        loadOverviewStats(
+          deps,
+          { siteIds, agentIds: scopeIds, includeUnassigned },
+          [
+            { since, until },
+            { since: trendSince, until: null },
+            { since: yesterdayStart, until: todayStart },
+          ],
+          [true, false, false],
         ),
         deps.db.all<{ status: string; assigned_user_id: string | null; n: number }>(
           `SELECT status, assigned_user_id, COUNT(*) AS n FROM conversations
             WHERE ${siteFilter} AND status IN ('ACTIVE','WAITING','OFFERED')${agentFilter}
             GROUP BY status, assigned_user_id`,
           [...siteIds, ...agentParams],
-        ),
-        deps.db.all<{ created_at: string; activated_at: string | null; closed_at: string | null; status: string }>(
-          `SELECT created_at, activated_at, closed_at, status FROM conversations co
-            WHERE ${siteFilter} AND created_at >= ?${agentFilter} AND ${engaged}`,
-          [...siteIds, trendSince, ...agentParams],
         ),
         deps.db.get<{ n: number; ret: number }>(
           `SELECT COUNT(*) AS n, SUM(CASE WHEN total_visits > 1 THEN 1 ELSE 0 END) AS ret
@@ -292,12 +248,6 @@ export function buildReportsRouter(deps: AppDeps): Router {
             GROUP BY geo_country, geo_cc ORDER BY n DESC LIMIT 6`,
           [...siteIds, visitorSince, ...vRangeParams],
         ),
-        deps.db.all<{ cid: string }>(
-          `SELECT DISTINCT h.conversation_id AS cid FROM assignment_history h
-             JOIN conversations c ON c.id = h.conversation_id
-            WHERE h.reason = 'TRANSFER' AND ${cSiteFilter}${cRangeFilter}${cAgentFilter} AND ${cEngaged}`,
-          [...siteIds, ...rangeParams, ...agentParams],
-        ),
         deps.db.all<{ cid: string; st: string; at: string; kind: string; body: string | null }>(
           `SELECT m.conversation_id AS cid, m.sender_type AS st, m.created_at AS at, m.kind, m.body
              FROM messages m JOIN conversations c ON c.id = m.conversation_id
@@ -305,46 +255,41 @@ export function buildReportsRouter(deps: AppDeps): Router {
             ORDER BY m.created_at DESC LIMIT 5000`,
           [...siteIds, ...rangeParams, ...agentParams],
         ),
-        deps.db.all<{ status: string; created_at: string; activated_at: string | null; closed_at: string | null }>(
-          `SELECT status, created_at, activated_at, closed_at FROM conversations co
-            WHERE ${siteFilter} AND ((created_at >= ? AND created_at < ?) OR (closed_at >= ? AND closed_at < ?))${agentFilter} AND ${engaged}`,
-          [...siteIds, yesterdayStart, todayStart, yesterdayStart, todayStart, ...agentParams],
+        // Visitors seen per website in the range (for the dashboard's Visitors column).
+        deps.db.all<{ website_id: string; n: number }>(
+          `SELECT website_id, COUNT(*) AS n FROM visitors
+            WHERE ${siteFilter} AND last_seen_at >= ?${vRangeSql} GROUP BY website_id`,
+          [...siteIds, visitorSince, ...vRangeParams],
         ),
       ]);
+      const [mainStats, trendStats, yesterdayStats] = stats.windows;
 
       const inRange = (iso: string | null) =>
         iso != null && (!since || iso >= since) && (!until || iso < until);
+      const total = (map: Map<string, Measures>): Measures => {
+        const out = emptyMeasures();
+        for (const m of map.values()) addMeasures(out, m);
+        return out;
+      };
+      // Re-key a "website|agent" map by one of its two parts.
+      const regroup = (map: Map<string, Measures>, part: 0 | 1): Map<string, Measures> => {
+        const out = new Map<string, Measures>();
+        for (const [dim, m] of map) {
+          const key = dim.split('|')[part];
+          const cur = out.get(key) ?? emptyMeasures();
+          addMeasures(cur, m);
+          out.set(key, cur);
+        }
+        return out;
+      };
+      const avgMs = (ms: number, n: number): number | null => (n > 0 ? Math.round(ms / 1000 / n) : null);
+      const ratingAvg = (m: Measures): number | null =>
+        m.rating_n > 0 ? Math.round((m.rating_sum / m.rating_n) * 10) / 10 : null;
+      const localHour = (bucket: string): number => new Date(bucketIso(bucket)).getHours();
 
-      // Engagement split for the selected date range: chats where the CLIENT
-      // has messaged vs ones where a CSR/agent has messaged (dashboard tiles).
-      // STRICTLY chats STARTED in the range — the shared rangeFilter also
-      // matches on closed_at, which would count a month-old chat that merely
-      // got closed today (e.g. by the inactivity sweep) as "today".
-      const cStartedFilter = since
-        ? until
-          ? ' AND c.created_at >= ? AND c.created_at < ?'
-          : ' AND c.created_at >= ?'
-        : '';
-      const startedParams = since ? (until ? [since, until] : [since]) : [];
-      const [clientLiveRow, csrLiveRow] = await Promise.all([
-        deps.db.get<{ n: number }>(
-          `SELECT COUNT(*) AS n FROM conversations c
-            WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
-              AND EXISTS (SELECT 1 FROM messages m
-                           WHERE m.conversation_id = c.id AND m.sender_type = 'VISITOR')`,
-          [...siteIds, ...startedParams, ...agentParams],
-        ),
-        // CSR chats = every range-started chat a CSR sent a message in —
-        // regardless of status (open, closed or missed) and regardless of
-        // whether the client replied (proactive outreach counts too).
-        deps.db.get<{ n: number }>(
-          `SELECT COUNT(*) AS n FROM conversations c
-            WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
-              AND EXISTS (SELECT 1 FROM messages m
-                           WHERE m.conversation_id = c.id AND m.sender_type = 'AGENT')`,
-          [...siteIds, ...startedParams, ...agentParams],
-        ),
-      ]);
+      // started = chats STARTED in the range; closed = chats CLOSED in the range.
+      const started = total(mainStats.startedByDim);
+      const closed = total(mainStats.closedByDim);
 
       // ── Totals + open pipeline ──
       let activeNow = 0;
@@ -359,43 +304,23 @@ export function buildReportsRouter(deps: AppDeps): Router {
           }
         } else waitingNow += n;
       }
-      const closedRows = rows.filter((r) => r.status === 'CLOSED' && inRange(r.closed_at));
-      const missedCount = rows.filter((r) => r.status === 'MISSED' && inRange(r.created_at)).length;
-      const startedRows = rows.filter((r) => inRange(r.created_at));
+      const missedCount = started.missed;
       const totals = {
         active: activeNow,
         waiting: waitingNow,
         // Closed = chats STARTED in the range that ended CLOSED — an old chat
         // merely swept closed today must not count as "closed today".
-        closed: startedRows.filter((r) => r.status === 'CLOSED').length,
+        closed: started.closed,
         missed: missedCount,
-        clientChats: Number(clientLiveRow?.n ?? 0),
-        csrChats: Number(csrLiveRow?.n ?? 0),
+        // Engagement split: chats where the CLIENT has messaged vs ones where a
+        // CSR/agent has messaged (proactive outreach counts too).
+        clientChats: started.n,
+        csrChats: started.csr_n,
       };
 
-      // ── First response + CSAT ──
-      const frtAll: number[] = [];
-      for (const r of startedRows) {
-        const s = secondsBetween(r.created_at, r.activated_at);
-        if (s != null) frtAll.push(s);
-      }
-      const ratingsAll = closedRows.filter((r) => r.rating != null).map((r) => Number(r.rating));
-      const csat = {
-        average:
-          ratingsAll.length > 0
-            ? Math.round((ratingsAll.reduce((a, b) => a + b, 0) / ratingsAll.length) * 10) / 10
-            : null,
-        count: ratingsAll.length,
-      };
-      const csatDist = [0, 0, 0, 0, 0];
-      for (const r of ratingsAll) if (r >= 1 && r <= 5) csatDist[r - 1] += 1;
-
-      // ── Chat durations ──
-      const durations: number[] = [];
-      for (const r of closedRows) {
-        const s = secondsBetween(r.activated_at, r.closed_at);
-        if (s != null) durations.push(s);
-      }
+      // ── CSAT ──
+      const csat = { average: ratingAvg(closed), count: closed.rating_n };
+      const csatDist = [closed.r1, closed.r2, closed.r3, closed.r4, closed.r5];
 
       // ── Reply gaps (visitor msg → next agent msg) + topic words ──
       const replyGaps: number[] = [];
@@ -421,6 +346,17 @@ export function buildReportsRouter(deps: AppDeps): Router {
           lastVisitorAt = null;
         }
       }
+
+      // ── Chats by hour of day (chat starts in range) ──
+      const hourCounts = Array.from({ length: 24 }, () => 0);
+      const frtByHour = Array.from({ length: 24 }, () => ({ ms: 0, n: 0 }));
+      for (const [bucket, m] of mainStats.startedByHour) {
+        const hh = localHour(bucket);
+        hourCounts[hh] += m.n;
+        frtByHour[hh].ms += m.frt_ms;
+        frtByHour[hh].n += m.frt_n;
+      }
+
       // ── Hourly response trend for the Today view ──
       const trendMode: 'day' | 'hour' = range === 'today' ? 'hour' : 'day';
       let hourTrend: {
@@ -431,11 +367,6 @@ export function buildReportsRouter(deps: AppDeps): Router {
         replySeconds: number | null;
       }[] = [];
       if (trendMode === 'hour') {
-        const frtByHour: number[][] = Array.from({ length: 24 }, () => []);
-        for (const r of startedRows) {
-          const sec = secondsBetween(r.created_at, r.activated_at);
-          if (sec != null) frtByHour[new Date(r.created_at).getHours()].push(sec);
-        }
         const repByHour: number[][] = Array.from({ length: 24 }, () => []);
         {
           let lv: string | null = null;
@@ -457,7 +388,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         hourTrend = Array.from({ length: 24 }, (_, hh) => ({
           day: String(hh),
           count: 0,
-          frtSeconds: avg(frtByHour[hh]),
+          frtSeconds: avgMs(frtByHour[hh].ms, frtByHour[hh].n),
           durationSeconds: null,
           replySeconds: avg(repByHour[hh]),
         }));
@@ -472,22 +403,16 @@ export function buildReportsRouter(deps: AppDeps): Router {
       // ── Outcomes donut ──
       // Cohort = chats STARTED in the range, so the donut total matches the
       // "chats today" numbers (old chats merely swept closed today don't leak in).
-      const transferred = new Set(transferRows.map((t) => t.cid));
-      const outcomes = { resolved: 0, transferred: 0, missed: missedCount, open: 0 };
-      for (const r of startedRows) {
-        if (r.status === 'CLOSED') {
-          if (transferred.has(r.id)) outcomes.transferred += 1;
-          else outcomes.resolved += 1;
-        } else if (r.status === 'ACTIVE' || r.status === 'WAITING' || r.status === 'OFFERED') {
-          outcomes.open += 1;
-        }
-      }
+      const outcomes = {
+        resolved: started.closed - started.transferred,
+        transferred: started.transferred,
+        missed: missedCount,
+        open: started.open_n,
+      };
 
       // ── Peak 2-hour window (chat starts in range) ──
-      const hourCounts = Array.from({ length: 24 }, () => 0);
-      for (const r of startedRows) hourCounts[new Date(r.created_at).getHours()] += 1;
       let peakHour: { start: number; share: number } | null = null;
-      const totalStarts = startedRows.length;
+      const totalStarts = started.n;
       if (totalStarts > 0) {
         let best = -1;
         let bestStart = 0;
@@ -509,16 +434,16 @@ export function buildReportsRouter(deps: AppDeps): Router {
       const returning = Number(visitorAgg?.ret ?? 0);
       const funnel = {
         visitors: visitorsSeen,
-        chats: startedRows.length,
-        answered: startedRows.filter((r) => r.activated_at != null).length,
+        chats: started.n,
+        answered: started.answered,
         // Same cohort as `chats` — otherwise old chats closed today make the
         // resolved step exceed the started step (6000%+ funnels).
-        resolved: startedRows.filter((r) => r.status === 'CLOSED').length,
+        resolved: started.closed,
       };
 
       const tiles = {
-        resolutionRate: pct(closedRows.length, closedRows.length + missedCount),
-        avgChatDurationSeconds: avg(durations),
+        resolutionRate: pct(closed.n, closed.n + missedCount),
+        avgChatDurationSeconds: avgMs(closed.dur_ms, closed.dur_n),
         avgReplySeconds: avg(replyGaps),
         peakHour,
         returningRate: pct(returning, visitorsSeen),
@@ -526,91 +451,65 @@ export function buildReportsRouter(deps: AppDeps): Router {
       };
 
       // ── Per-agent breakdown ──
-      // Per-agent "CSR clicks" = range-started chats this agent sent a message
-      // in (the per-agent breakdown of the csrChats total; outreach counts too).
-      const csrClicksRows = await deps.db.all<{ uid: string; n: number }>(
-        `SELECT m.sender_user_id AS uid, COUNT(DISTINCT m.conversation_id) AS n
-           FROM messages m JOIN conversations c ON c.id = m.conversation_id
-          WHERE ${cSiteFilter}${cStartedFilter}${cAgentFilter}
-            AND m.sender_type = 'AGENT' AND m.sender_user_id IS NOT NULL
-          GROUP BY m.sender_user_id`,
-        [...siteIds, ...startedParams, ...agentParams],
-      );
-      const csrClicksByAgent = new Map(csrClicksRows.map((r) => [r.uid, Number(r.n)]));
+      // "Handled" = the agent's chats that were answered in the range, closed in
+      // the range, or are ACTIVE right now. For closed chats that is "closed in
+      // range", plus — only for a bounded one-day window (yesterday) — chats
+      // answered that day but closed later (`extra_*`). Open chats are checked live.
+      const startedByAgent = regroup(mainStats.startedByDim, 1);
+      const closedByAgent = regroup(mainStats.closedByDim, 1);
       const perAgent = agents.map((a) => {
-        const mine = rows.filter((r) => r.assigned_user_id === a.id);
-        const handledRows = mine.filter(
-          (r) =>
-            (r.activated_at != null && inRange(r.activated_at)) ||
-            (r.status === 'CLOSED' && inRange(r.closed_at)) ||
-            r.status === 'ACTIVE',
+        const sa = startedByAgent.get(a.id) ?? emptyMeasures();
+        const ca = closedByAgent.get(a.id) ?? emptyMeasures();
+        const openHandled = stats.openFacts.filter(
+          (f) =>
+            f.engaged &&
+            f.assigned_user_id === a.id &&
+            inRange(f.created_at) &&
+            ((f.activated_at != null && inRange(f.activated_at)) || f.status === 'ACTIVE'),
         );
-        const myClosed = mine.filter((r) => r.status === 'CLOSED' && inRange(r.closed_at));
-        const myMissed = mine.filter((r) => r.status === 'MISSED' && inRange(r.created_at)).length;
-        const frt: number[] = [];
-        const dur: number[] = [];
-        for (const r of handledRows) {
-          const s = secondsBetween(r.created_at, r.activated_at);
-          if (s != null) frt.push(s);
+        let frtMs = ca.frt_ms + (until ? sa.extra_frt_ms : 0);
+        let frtN = ca.frt_n + (until ? sa.extra_frt_n : 0);
+        for (const f of openHandled) {
+          const s = secondsBetween(f.created_at, f.activated_at);
+          if (s != null) {
+            frtMs += s * 1000;
+            frtN += 1;
+          }
         }
-        for (const r of myClosed) {
-          const s = secondsBetween(r.activated_at, r.closed_at);
-          if (s != null) dur.push(s);
-        }
-        const myRatings = myClosed.filter((r) => r.rating != null).map((r) => Number(r.rating));
         return {
           user: toUserWithPresence(deps, a),
-          closed: myClosed.length,
+          closed: ca.n,
           active: activeByAgent.get(a.id) ?? 0,
-          handled: handledRows.length,
-          csrClicks: csrClicksByAgent.get(a.id) ?? 0,
-          resolutionRate: pct(myClosed.length, myClosed.length + myMissed),
-          avgFirstResponseSeconds: avg(frt),
-          avgDurationSeconds: avg(dur),
-          rating: {
-            average:
-              myRatings.length > 0
-                ? Math.round((myRatings.reduce((x, y) => x + y, 0) / myRatings.length) * 10) / 10
-                : null,
-            count: myRatings.length,
-          },
+          handled: ca.n + (until ? sa.extra_n : 0) + openHandled.length,
+          // Per-agent "CSR clicks" = range-started chats this agent sent a
+          // message in (outreach counts too).
+          csrClicks: mainStats.clicksBySender.get(a.id) ?? 0,
+          resolutionRate: pct(ca.n, ca.n + sa.missed),
+          avgFirstResponseSeconds: avgMs(frtMs, frtN),
+          avgDurationSeconds: avgMs(ca.dur_ms, ca.dur_n),
+          rating: { average: ratingAvg(ca), count: ca.rating_n },
         };
       });
 
       // ── Per-website performance ──
-      // Visitors seen per website in the range (for the dashboard's Visitors column).
-      const visitorByWebsite = await deps.db.all<{ website_id: string; n: number }>(
-        `SELECT website_id, COUNT(*) AS n FROM visitors
-          WHERE ${siteFilter} AND last_seen_at >= ?${vRangeSql} GROUP BY website_id`,
-        [...siteIds, visitorSince, ...vRangeParams],
-      );
       const visitorCount = new Map(visitorByWebsite.map((r) => [r.website_id, Number(r.n)]));
+      const startedBySite = regroup(mainStats.startedByDim, 0);
+      const closedBySite = regroup(mainStats.closedByDim, 0);
       const websitePerf = siteRows
         .filter((w) => siteIds.includes(w.id))
         .map((w: WebsiteRow) => {
-          const mine = rows.filter((r) => r.website_id === w.id);
-          const wClosed = mine.filter((r) => r.status === 'CLOSED' && inRange(r.closed_at));
-          const wMissed = mine.filter((r) => r.status === 'MISSED' && inRange(r.created_at)).length;
-          const wStarted = mine.filter((r) => inRange(r.created_at));
-          const frt: number[] = [];
-          for (const r of wStarted) {
-            const s = secondsBetween(r.created_at, r.activated_at);
-            if (s != null) frt.push(s);
-          }
-          const ratings = wClosed.filter((r) => r.rating != null).map((r) => Number(r.rating));
+          const sw = startedBySite.get(w.id) ?? emptyMeasures();
+          const cw = closedBySite.get(w.id) ?? emptyMeasures();
           return {
             id: w.id,
             name: w.label?.trim() || w.name, // show the agent-facing chip label
             color: w.primary_color,
-            chats: wStarted.length,
-            missed: wMissed,
+            chats: sw.n,
+            missed: sw.missed,
             visitors: visitorCount.get(w.id) ?? 0,
-            avgReplySeconds: avg(frt),
-            resolutionRate: pct(wClosed.length, wClosed.length + wMissed),
-            csat:
-              ratings.length > 0
-                ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
-                : null,
+            avgReplySeconds: avgMs(sw.frt_ms, sw.frt_n),
+            resolutionRate: pct(cw.n, cw.n + sw.missed),
+            csat: ratingAvg(cw),
           };
         })
         // Most chats first; break ties (e.g. all the 0-chat sites) by visitors,
@@ -618,18 +517,12 @@ export function buildReportsRouter(deps: AppDeps): Router {
         .sort((a, b) => b.chats - a.chats || b.visitors - a.visitors);
 
       // ── 14-day trend (count + avg FRT + avg duration per day) ──
-      const byDay = new Map<string, { count: number; frt: number[]; dur: number[] }>();
-      for (const r of trendRows) {
-        const key = dayKey(r.created_at);
-        const e = byDay.get(key) ?? { count: 0, frt: [], dur: [] };
-        e.count += 1;
-        const f = secondsBetween(r.created_at, r.activated_at);
-        if (f != null) e.frt.push(f);
-        if (r.status === 'CLOSED') {
-          const d = secondsBetween(r.activated_at, r.closed_at);
-          if (d != null) e.dur.push(d);
-        }
-        byDay.set(key, e);
+      const byDay = new Map<string, Measures>();
+      for (const [bucket, m] of trendStats.startedByHour) {
+        const key = dayKey(bucketIso(bucket));
+        const cur = byDay.get(key) ?? emptyMeasures();
+        addMeasures(cur, m);
+        byDay.set(key, cur);
       }
       const trend: { day: string; count: number }[] = [];
       const trendDetail: {
@@ -644,40 +537,25 @@ export function buildReportsRouter(deps: AppDeps): Router {
         d.setDate(d.getDate() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const e = byDay.get(key);
-        trend.push({ day: key, count: e?.count ?? 0 });
+        trend.push({ day: key, count: e?.n ?? 0 });
         trendDetail.push({
           day: key,
-          count: e?.count ?? 0,
-          frtSeconds: e ? avg(e.frt) : null,
-          durationSeconds: e ? avg(e.dur) : null,
-          replySeconds: e ? avg(e.frt) : null,
+          count: e?.n ?? 0,
+          frtSeconds: e ? avgMs(e.frt_ms, e.frt_n) : null,
+          durationSeconds: e ? avgMs(e.dur_ms, e.dur_n) : null,
+          replySeconds: e ? avgMs(e.frt_ms, e.frt_n) : null,
         });
       }
 
       // ── Yesterday (for vs-yesterday deltas + insights) ──
-      const yFrt: number[] = [];
-      let yChats = 0;
-      let yClosed = 0;
-      let yMissed = 0;
-      for (const r of yesterdayRows) {
-        const startedY = r.created_at >= yesterdayStart && r.created_at < todayStart;
-        if (startedY) {
-          yChats += 1;
-          if (r.status === 'MISSED') yMissed += 1;
-          const s = secondsBetween(r.created_at, r.activated_at);
-          if (s != null) yFrt.push(s);
-        }
-        // Mirror totals.closed: count chats STARTED yesterday that ended CLOSED.
-        if (startedY && r.status === 'CLOSED') {
-          yClosed += 1;
-        }
-      }
+      const y = total(yesterdayStats.startedByHour);
+      const yFrtSeconds = avgMs(y.frt_ms, y.frt_n);
 
       const countryTotal = countryRows.reduce((a, b) => a + Number(b.n), 0);
       const payload = {
         range,
         totals,
-        avgFirstResponseSeconds: avg(frtAll),
+        avgFirstResponseSeconds: avgMs(started.frt_ms, started.frt_n),
         csat,
         perAgent,
         trend,
@@ -695,8 +573,9 @@ export function buildReportsRouter(deps: AppDeps): Router {
         })),
         topics,
         websitePerf,
-        yesterdayFrtSeconds: avg(yFrt),
-        yesterday: { chats: yChats, closed: yClosed, missed: yMissed, frtSeconds: avg(yFrt) },
+        yesterdayFrtSeconds: yFrtSeconds,
+        // Mirror totals.closed: count chats STARTED yesterday that ended CLOSED.
+        yesterday: { chats: y.n, closed: y.closed, missed: y.missed, frtSeconds: yFrtSeconds },
         trendWindow,
         trendMode,
       };
@@ -770,34 +649,57 @@ export function buildReportsRouter(deps: AppDeps): Router {
         params.push(status);
       }
 
-      const rows = await deps.db.all<{
-        id: string;
-        created_at: string;
-        activated_at: string | null;
-        closed_at: string | null;
-        status: string;
-        rating: number | null;
-        rating_comment: string | null;
-        website_name: string;
-        agent_name: string | null;
-        visitor_name: string | null;
-        visitor_email: string | null;
-        msgs: number;
-      }>(
-        `SELECT c.id, c.created_at, c.activated_at, c.closed_at, c.status, c.rating, c.rating_comment,
-                COALESCE(NULLIF(w.label, ''), w.name) AS website_name,
-                u.name AS agent_name,
-                v.name AS visitor_name, v.email AS visitor_email,
-                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.kind <> 'SYSTEM') AS msgs
-           FROM conversations c
-           JOIN websites w ON w.id = c.website_id
-           LEFT JOIN users u ON u.id = c.assigned_user_id
-           LEFT JOIN visitors v ON v.id = c.visitor_id
-          WHERE ${where}
-          ORDER BY c.created_at DESC
-          LIMIT 2000`,
-        params,
-      );
+      // Step 1: pick ONLY the ids of the newest matching chats. Doing the joins
+      // and the per-chat message COUNT in the same query made the database
+      // compute them for every matching chat before the LIMIT (tens of
+      // thousands), which is why this report took many seconds.
+      const ids = (
+        await deps.db.all<{ id: string }>(
+          `SELECT c.id FROM conversations c WHERE ${where} ORDER BY c.created_at DESC LIMIT 2000`,
+          params,
+        )
+      ).map((r) => r.id);
+
+      // Step 2: details + message counts for just those chats.
+      const [rows, counts] =
+        ids.length === 0
+          ? [[], []]
+          : await Promise.all([
+              deps.db.all<{
+                id: string;
+                created_at: string;
+                activated_at: string | null;
+                closed_at: string | null;
+                status: string;
+                rating: number | null;
+                rating_comment: string | null;
+                website_name: string;
+                agent_name: string | null;
+                visitor_name: string | null;
+                visitor_email: string | null;
+              }>(
+                `SELECT c.id, c.created_at, c.activated_at, c.closed_at, c.status, c.rating, c.rating_comment,
+                        COALESCE(NULLIF(w.label, ''), w.name) AS website_name,
+                        u.name AS agent_name,
+                        v.name AS visitor_name, v.email AS visitor_email
+                   FROM conversations c
+                   JOIN websites w ON w.id = c.website_id
+                   LEFT JOIN users u ON u.id = c.assigned_user_id
+                   LEFT JOIN visitors v ON v.id = c.visitor_id
+                  WHERE c.id IN (${placeholders(ids.length)})`,
+                ids,
+              ),
+              deps.db.all<{ cid: string; n: number }>(
+                `SELECT conversation_id AS cid, COUNT(*) AS n FROM messages
+                  WHERE conversation_id IN (${placeholders(ids.length)}) AND kind <> 'SYSTEM'
+                  GROUP BY conversation_id`,
+                ids,
+              ),
+            ]);
+      // Keep step 1's order (newest first).
+      const position = new Map(ids.map((id, i) => [id, i]));
+      rows.sort((x, y) => (position.get(x.id) ?? 0) - (position.get(y.id) ?? 0));
+      const msgCount = new Map(counts.map((c) => [c.cid, Number(c.n)]));
 
       const records = rows.map((r) => ({
         id: r.id,
@@ -809,7 +711,7 @@ export function buildReportsRouter(deps: AppDeps): Router {
         visitorEmail: r.visitor_email,
         firstResponseSeconds: secondsBetween(r.created_at, r.activated_at),
         durationSeconds: secondsBetween(r.activated_at, r.closed_at),
-        messages: Number(r.msgs),
+        messages: msgCount.get(r.id) ?? 0,
         rating: r.rating != null ? Number(r.rating) : null,
         ratingComment: r.rating_comment,
       }));

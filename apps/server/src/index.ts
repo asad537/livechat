@@ -10,6 +10,7 @@ import { createDb } from './core/db.js';
 import { createPresence } from './core/presence.js';
 import { createBlocklist } from './core/blocklist.js';
 import { createCache } from './core/cache.js';
+import { startStatsAggregator } from './features/stats/index.js';
 import type { AppDeps } from './core/deps.js';
 import { ensureSeed } from './seed.js';
 import { buildApiRouter } from './http/router.js';
@@ -37,6 +38,11 @@ async function main(): Promise<void> {
     // machine still reads offline within ~30s (+ the presence grace).
     pingInterval: 25_000,
     pingTimeout: 30_000,
+    // Compress WebSocket frames over 1 KB. The dashboard's live lists (visitors,
+    // inbox) are repetitive JSON that shrinks ~10×, which is what keeps chat
+    // responsive for agents on slow connections. Small frames (chat messages,
+    // typing) stay uncompressed, so there is no added latency for them.
+    perMessageDeflate: { threshold: 1024 },
   });
 
   // Optional Redis adapter → multi-node fan-out (production scaling)
@@ -57,6 +63,7 @@ async function main(): Promise<void> {
 
   const deps: AppDeps = { config, db, presence, io, blocklist, cache };
   console.log(`[cache] ${cache.kind} cache enabled`);
+  startStatsAggregator(deps); // dashboard aggregates: backfill once, then keep current
 
   app.use(buildApiRouter(deps));
   attachRealtime(deps);

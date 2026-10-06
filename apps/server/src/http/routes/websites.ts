@@ -5,6 +5,7 @@ import type { AppDeps } from '../../core/deps.js';
 import { requireAgent, requireRole } from '../../core/auth.js';
 import { newId, nowIso } from '../../core/db.js';
 import { userCanAccessWebsite } from '../../domain/conversations.js';
+import { dropStatsForWebsite } from '../../features/stats/index.js';
 import {
   HttpError,
   accessibleWebsiteRows,
@@ -128,6 +129,7 @@ export function buildWebsitesRouter(deps: AppDeps): Router {
         await deps.db.run(`DELETE FROM assignment_history WHERE conversation_id IN (${ph})`, convIds);
         await deps.db.run(`DELETE FROM conversations WHERE id IN (${ph})`, convIds);
       }
+      await dropStatsForWebsite(deps, id);
       await deps.db.run('DELETE FROM visitors WHERE website_id = ?', [id]);
       await deps.db.run('DELETE FROM knowledge_pages WHERE website_id = ?', [id]);
       await deps.db.run('DELETE FROM websites WHERE id = ?', [id]);
