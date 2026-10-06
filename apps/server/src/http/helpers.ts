@@ -268,15 +268,11 @@ export async function canViewConversation(
   user: UserRow,
   conv: ConversationRow,
 ): Promise<boolean> {
-  if (user.role === 'ADMIN' || user.role === 'MANAGER') return true;
+  // Team Leads may READ any chat (every agent, every website) — the business
+  // wants every TL able to review any past chat. Replying / transferring /
+  // closing stays limited to their own team (canManageConversation).
+  if (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'LEAD') return true;
   if (conv.assigned_user_id === user.id) return true;
-  if (user.role === 'LEAD' && conv.assigned_user_id) {
-    const csr = await deps.db.get<{ id: string }>(
-      'SELECT id FROM users WHERE id = ? AND team_lead_id = ?',
-      [conv.assigned_user_id, user.id],
-    );
-    return !!csr;
-  }
   if (conv.assigned_user_id) return false;
   // Unassigned queue preview — needs website access via team membership.
   const site = await deps.db.get<{ team_id: string }>(

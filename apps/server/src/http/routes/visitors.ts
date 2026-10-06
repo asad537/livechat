@@ -15,7 +15,6 @@ import {
   agent,
   asString,
   h,
-  myCsrIds,
   placeholders,
   toVisitor,
   visitorNumberSql,
@@ -38,10 +37,7 @@ async function conversationScope(
   if (user.role === 'CSR') {
     return { sql: ' AND assigned_user_id = ?', params: [user.id] };
   }
-  if (user.role === 'LEAD') {
-    const mine = [user.id, ...(await myCsrIds(deps, user.id))];
-    return { sql: ` AND assigned_user_id IN (${placeholders(mine.length)})`, params: mine };
-  }
+  // Team Leads, like admins/managers, may read every past chat.
   return { sql: '', params: [] };
 }
 
@@ -50,10 +46,13 @@ async function loadScopedVisitor(
   req: { params: Record<string, string | undefined> },
   userId: string,
   role: Role,
+  /** Read-only lookups: a Team Lead may view any visitor (they can read any chat). */
+  readOnly = false,
 ): Promise<VisitorRow> {
   const id = req.params.id as string;
   const row = await deps.db.get<VisitorRow>('SELECT * FROM visitors WHERE id = ?', [id]);
   if (!row) throw new HttpError(404, 'Visitor not found');
+  if (readOnly && role === 'LEAD') return row;
   if (!(await userCanAccessWebsite(deps, userId, role, row.website_id))) {
     throw new HttpError(403, 'Forbidden');
   }
@@ -267,7 +266,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     auth,
     h(async (req, res) => {
       const user = agent(req);
-      const row = await loadScopedVisitor(deps, req, user.id, user.role);
+      const row = await loadScopedVisitor(deps, req, user.id, user.role, true);
 
       // Chat counts follow the same past-chat visibility rules (see below).
       const chatScope = await conversationScope(deps, user);
@@ -369,7 +368,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
     auth,
     h(async (req, res) => {
       const user = agent(req);
-      const row = await loadScopedVisitor(deps, req, user.id, user.role);
+      const row = await loadScopedVisitor(deps, req, user.id, user.role, true);
 
       const scope = await conversationScope(deps, user);
       const scopedIds = scope.sql
@@ -440,7 +439,7 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const user = agent(req);
       // Auth still runs; we only skip conversationScope so a CSR sees the
       // metadata for a colleague's chat with the same visitor.
-      const row = await loadScopedVisitor(deps, req, user.id, user.role);
+      const row = await loadScopedVisitor(deps, req, user.id, user.role, true);
       const rowTop = await deps.db.get<{
         name: string | null;
         avatar_color: string | null;

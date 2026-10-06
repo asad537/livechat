@@ -1181,12 +1181,14 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
           reply({ error: 'Conversation not found' });
           return;
         }
-        // MANAGER may open anything to watch; everyone else needs manage access.
-        // Exception: an UNASSIGNED queued chat — chats are no longer
+        // MANAGER and LEAD may open anything to read (a Team Lead can review any
+        // past chat; replying is still checked separately); everyone else needs
+        // manage access. Exception: an UNASSIGNED queued chat — chats are no longer
         // auto-assigned, so any agent on the website (CSR included) must be able
         // to open it to pick it up (Accept / type-to-join), same rule as those.
         const allowed =
           data.role === 'MANAGER' ||
+          data.role === 'LEAD' ||
           (await canManageConversation(deps, conv, data.userId, data.role)) ||
           (conv.status === 'WAITING' &&
             !conv.assigned_user_id &&

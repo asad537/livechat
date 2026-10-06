@@ -254,16 +254,18 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const where: string[] = [];
       const params: unknown[] = [];
 
-      // Website scope
+      // Website scope. Team Leads read the whole archive (every website, every
+      // agent) just like admins/managers; CSRs stay on their own chats.
+      const readsAll = user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'LEAD';
       const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
       const websiteId = asString(req.query.websiteId);
       if (websiteId) {
-        if (user.role !== 'ADMIN' && user.role !== 'MANAGER' && !siteIds.includes(websiteId)) {
+        if (!readsAll && !siteIds.includes(websiteId)) {
           throw new HttpError(403, 'Forbidden');
         }
         where.push('c.website_id = ?');
         params.push(websiteId);
-      } else if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      } else if (!readsAll) {
         if (siteIds.length === 0) {
           res.json({ chats: [], total: 0, page: 1, pages: 1 });
           return;
@@ -272,16 +274,10 @@ export function buildConversationsRouter(deps: AppDeps): Router {
         params.push(...siteIds);
       }
 
-      // People scope
+      // People scope (CSR → own chats only; everyone else reads all)
       if (user.role === 'CSR') {
         where.push('c.assigned_user_id = ?');
         params.push(user.id);
-      } else if (user.role === 'LEAD') {
-        const mine = [user.id, ...(await myCsrIds(deps, user.id))];
-        where.push(
-          `(c.assigned_user_id IN (${placeholders(mine.length)}) OR c.assigned_user_id IS NULL)`,
-        );
-        params.push(...mine);
       }
 
       // Queries view: only chats whose visitor shared a name or email.
@@ -305,10 +301,6 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const agentId = asString(req.query.agentId);
       if (agentId) {
         if (user.role === 'CSR' && agentId !== user.id) throw new HttpError(403, 'Forbidden');
-        if (user.role === 'LEAD') {
-          const mine = [user.id, ...(await myCsrIds(deps, user.id))];
-          if (!mine.includes(agentId)) throw new HttpError(403, 'Forbidden');
-        }
         where.push('c.assigned_user_id = ?');
         params.push(agentId);
       }
@@ -493,16 +485,18 @@ export function buildConversationsRouter(deps: AppDeps): Router {
       const where: string[] = ["h.reason = 'TRANSFER'"];
       const params: unknown[] = [];
 
-      // Website scope
+      // Website scope. Team Leads read the whole archive (every website, every
+      // agent) just like admins/managers; CSRs stay on their own chats.
+      const readsAll = user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'LEAD';
       const siteIds = (await accessibleWebsiteRows(deps, user)).map((w) => w.id);
       const websiteId = asString(req.query.websiteId);
       if (websiteId) {
-        if (user.role !== 'ADMIN' && user.role !== 'MANAGER' && !siteIds.includes(websiteId)) {
+        if (!readsAll && !siteIds.includes(websiteId)) {
           throw new HttpError(403, 'Forbidden');
         }
         where.push('c.website_id = ?');
         params.push(websiteId);
-      } else if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      } else if (!readsAll) {
         if (siteIds.length === 0) {
           res.json({ transfers: [], total: 0, page: 1, pages: 1 });
           return;
