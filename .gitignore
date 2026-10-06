@@ -5,3 +5,6 @@ storage/
 .env
 *.log
 .DS_Store
+
+# local-only test logins (never commit)
+apps/server/local-test-accounts.txt
