@@ -61,7 +61,7 @@ async function loadScopedVisitor(
 
 export function buildVisitorsRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/visitors/history?limit=&offset=&q=&websiteId= — paginated archive.
   // Must be registered before /api/visitors/:id so "history" isn't taken as an id.

@@ -16,6 +16,7 @@ import Dashboard from './pages/Dashboard';
 import ChatHistory from './pages/ChatHistory';
 import TransferChats from './pages/TransferChats';
 import BlockList from './pages/BlockList';
+import AllowedIps from './pages/AllowedIps';
 import Queries from './pages/Queries';
 import Avatar from './components/Avatar';
 import Toasts from './components/Toasts';
@@ -28,6 +29,7 @@ import {
   IconChart,
   IconEye,
   IconGlobe,
+  IconCheck,
   IconHome,
   IconInbox,
   IconLogout,
@@ -219,6 +221,14 @@ function Sidebar() {
                 {navItem(<IconGlobe size={17} />, 'Blocking')}
               </NavLink>
             )}
+            {me.role === 'ADMIN' && (
+              <NavLink
+                to="/admin/allowed-ips"
+                className={({ isActive }) => classNames('nav-item', isActive && 'active')}
+              >
+                {navItem(<IconCheck size={17} />, 'Allowed IPs')}
+              </NavLink>
+            )}
           </nav>
         </>
       )}
@@ -394,6 +404,14 @@ export default function App() {
             element={
               <RequireRole roles={['ADMIN']}>
                 <BlockList />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/allowed-ips"
+            element={
+              <RequireRole roles={['ADMIN']}>
+                <AllowedIps />
               </RequireRole>
             }
           />

@@ -80,7 +80,7 @@ function fulltextQuery(q: string): string {
 
 export function buildConversationsRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/conversations/search?q= — visitor name/email + message content
   router.get(

@@ -39,7 +39,7 @@ function pickAvatarColor(seed: string): string {
 
 export function buildUsersRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/users — ADMIN/MANAGER see everyone; a LEAD sees self + own CSRs.
   router.get(

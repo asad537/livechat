@@ -3,7 +3,7 @@ import { WIDGET_NAMESPACE, EV } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requireAgent, requireRole } from '../../core/auth.js';
 import { newId, nowIso } from '../../core/db.js';
-import { sanitizeAllowedIps } from '../../core/ip.js';
+import { reqIp, sanitizeAllowedIps } from '../../core/ip.js';
 import { clientIp } from '../../features/geo/index.js';
 import { HttpError, asString, h } from '../helpers.js';
 
@@ -51,7 +51,7 @@ const toPublic = (r: BlockRow) => ({
 
 export function buildBlocklistRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/blocklist — all rules (ADMIN only)
   router.get(
@@ -127,6 +127,73 @@ export function buildBlocklistRouter(deps: AppDeps): Router {
     requireRole('ADMIN'),
     h(async (req, res) => {
       await deps.db.run('DELETE FROM blocklist WHERE id = ?', [req.params.id as string]);
+      await deps.blocklist.reload();
+      res.json({ ok: true });
+    }),
+  );
+
+  // ── Admin IP allow-list: networks every IP-locked agent may sign in from ──
+  interface AllowRow {
+    id: string;
+    value: string;
+    note: string | null;
+    created_at: string;
+  }
+  const toAllowed = (r: AllowRow) => ({ id: r.id, value: r.value, note: r.note, createdAt: r.created_at });
+
+  // GET /api/allowed-ips — the list + the caller's own IP (handy when adding the office)
+  router.get(
+    '/api/allowed-ips',
+    auth,
+    requireRole('ADMIN'),
+    h(async (req, res) => {
+      const rows = await deps.db.all<AllowRow>(
+        'SELECT id, value, note, created_at FROM ip_allowlist ORDER BY created_at DESC',
+      );
+      res.json({ ips: rows.map(toAllowed), yourIp: reqIp(req) });
+    }),
+  );
+
+  // POST /api/allowed-ips — add { value (IP/CIDR, comma-separated ok), note? }
+  router.post(
+    '/api/allowed-ips',
+    auth,
+    requireRole('ADMIN'),
+    h(async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const note = asString(body.note)?.slice(0, 255) || null;
+      let clean: string | null;
+      try {
+        clean = sanitizeAllowedIps(asString(body.value) ?? '');
+      } catch (err) {
+        throw new HttpError(400, (err as Error).message || 'Enter a valid IP address or CIDR range');
+      }
+      if (!clean) throw new HttpError(400, 'Enter a valid IP address or CIDR range');
+      const added: ReturnType<typeof toAllowed>[] = [];
+      for (const value of clean.split(',').map((v) => v.trim()).filter(Boolean)) {
+        const existing = await deps.db.get<{ id: string }>('SELECT id FROM ip_allowlist WHERE value = ?', [value]);
+        if (existing) continue; // idempotent add
+        const row: AllowRow = { id: newId(), value, note, created_at: nowIso() };
+        await deps.db.run('INSERT INTO ip_allowlist (id, value, note, created_at) VALUES (?, ?, ?, ?)', [
+          row.id,
+          row.value,
+          row.note,
+          row.created_at,
+        ]);
+        added.push(toAllowed(row));
+      }
+      await deps.blocklist.reload();
+      res.json({ added });
+    }),
+  );
+
+  // DELETE /api/allowed-ips/:id
+  router.delete(
+    '/api/allowed-ips/:id',
+    auth,
+    requireRole('ADMIN'),
+    h(async (req, res) => {
+      await deps.db.run('DELETE FROM ip_allowlist WHERE id = ?', [req.params.id as string]);
       await deps.blocklist.reload();
       res.json({ ok: true });
     }),

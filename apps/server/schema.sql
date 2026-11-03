@@ -304,3 +304,12 @@ CREATE TABLE IF NOT EXISTS chat_stats_meta (
 
 -- The aggregator and the live remainder both look chats up by when they closed.
 CREATE INDEX IF NOT EXISTS idx_conversations_closed ON conversations (closed_at);
+
+-- Admin IP allow-list: agents whose account is locked to specific networks may
+-- ALSO sign in from any IP/CIDR listed here (shared office / VPN addresses).
+CREATE TABLE IF NOT EXISTS ip_allowlist (
+  id VARCHAR(36) PRIMARY KEY,
+  value VARCHAR(64) NOT NULL,         -- IP or CIDR
+  note VARCHAR(255),
+  created_at VARCHAR(40) NOT NULL
+);

@@ -16,7 +16,7 @@ import {
 
 export function buildTeamsRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/teams — ADMIN: all teams, LEAD: own teams
   router.get(

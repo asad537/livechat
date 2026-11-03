@@ -175,6 +175,13 @@ export interface BlockRule {
   createdAt: string;
 }
 
+export interface AllowedIp {
+  id: string;
+  value: string;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface TransferRow {
   transferId: string;
   conversationId: string;
@@ -299,6 +306,13 @@ export const api = {
     request<{ added: BlockRule[] }>('/api/blocklist', { method: 'POST', body: { type, value, note } }),
   removeBlock: (id: string) =>
     request<{ ok: boolean }>(`/api/blocklist/${id}`, { method: 'DELETE' }),
+
+  // ── Admin IP allow-list (networks IP-locked agents may also sign in from) ──
+  allowedIps: () => request<{ ips: AllowedIp[]; yourIp: string }>('/api/allowed-ips'),
+  addAllowedIp: (value: string, note?: string) =>
+    request<{ added: AllowedIp[] }>('/api/allowed-ips', { method: 'POST', body: { value, note } }),
+  removeAllowedIp: (id: string) =>
+    request<{ ok: boolean }>(`/api/allowed-ips/${id}`, { method: 'DELETE' }),
 
   chatHistory: (opts: {
     page?: number;

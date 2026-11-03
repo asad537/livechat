@@ -1146,8 +1146,9 @@ function attachAgentNamespace(deps: AppDeps, ns: Namespace): void {
       if (!payload || payload.typ !== 'agent') return next(new Error('Unauthorized'));
       const user = await deps.db.get<UserRow>('SELECT * FROM users WHERE id = ?', [payload.sub]);
       if (!user) return next(new Error('Unauthorized'));
-      // Per-user IP allow-list also gates the realtime socket.
-      if (!ipAllowed(user.allowed_ips, clientIp(socket) ?? '')) {
+      // Per-user IP allow-list (or the admin-wide allow-list) also gates the socket.
+      const ip = clientIp(socket) ?? '';
+      if (!ipAllowed(user.allowed_ips, ip) && !deps.blocklist.isIpAllowlisted(ip)) {
         return next(new Error('Access is not allowed from your network.'));
       }
 

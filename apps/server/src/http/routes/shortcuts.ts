@@ -14,7 +14,7 @@ interface ShortcutRow {
 /** Canned response shortcuts — team-wide list; any signed-in agent can add or prune. */
 export function buildShortcutsRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   router.get(
     '/api/shortcuts',

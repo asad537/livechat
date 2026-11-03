@@ -27,7 +27,7 @@ function rowToDM(r: DMRow): AgentDirectMessage {
 /** Internal team chat — agent-to-agent DMs (never leaves the /agent namespace). */
 export function buildAgentDMRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/agent-dm/threads — one row per peer with last message + unread count.
   router.get(

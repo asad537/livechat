@@ -15,11 +15,14 @@ export interface Blocklist {
   isCountryBlocked(cc: string | null | undefined): boolean;
   /** Are there any country rules at all? (skip the geo lookup if not) */
   hasCountryBlocks(): boolean;
+  /** Is this IP on the admin allow-list (networks every locked agent may use)? */
+  isIpAllowlisted(ip: string | null | undefined): boolean;
 }
 
 export async function createBlocklist(db: Db): Promise<Blocklist> {
   let ips: string[] = [];
   let countries = new Set<string>();
+  let allowed: string[] = [];
 
   const store: Blocklist = {
     async reload() {
@@ -34,6 +37,7 @@ export async function createBlocklist(db: Db): Promise<Blocklist> {
       }
       ips = nextIps;
       countries = nextCountries;
+      allowed = (await db.all<{ value: string }>('SELECT value FROM ip_allowlist')).map((r) => r.value);
     },
     isIpBlocked(ip) {
       if (!ip || ips.length === 0) return false;
@@ -45,6 +49,10 @@ export async function createBlocklist(db: Db): Promise<Blocklist> {
     },
     hasCountryBlocks() {
       return countries.size > 0;
+    },
+    isIpAllowlisted(ip) {
+      if (!ip || allowed.length === 0) return false;
+      return ipMatchesList(allowed, normalizeIp(ip));
     },
   };
 

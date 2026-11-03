@@ -76,7 +76,7 @@ message chat online agent support help team website site page info question quer
 
 export function buildReportsRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/reports/overview?websiteId=&range=today|7d|30d|all — ADMIN/MANAGER/LEAD
   router.get(

@@ -35,7 +35,7 @@ const AVATAR_MIMES: Record<string, string> = {
 
 export function buildAuthRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // POST /api/auth/login — no auth
   router.post(
@@ -48,8 +48,10 @@ export function buildAuthRouter(deps: AppDeps): Router {
         res.status(401).json({ error: 'Invalid email or password' });
         return;
       }
-      // Per-user IP allow-list: block sign-in from a network not on the list.
-      if (!ipAllowed(user.allowed_ips, reqIp(req))) {
+      // Per-user IP allow-list (or the admin-wide allow-list): block sign-in
+      // from a network not on either list.
+      const ip = reqIp(req);
+      if (!ipAllowed(user.allowed_ips, ip) && !deps.blocklist.isIpAllowlisted(ip)) {
         res.status(403).json({
           error: 'Your account can only be used from an approved network. Contact your admin.',
         });

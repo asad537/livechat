@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { Role, UserPublic } from '@livechat/shared';
 import type { Db } from './db.js';
 import type { Config } from './config.js';
+import type { Blocklist } from './blocklist.js';
 import { ipAllowed, reqIp } from './ip.js';
 
 // ─── Passwords (scrypt, no external deps) ────────────────────
@@ -86,7 +87,7 @@ export interface AuthedRequest extends Request {
   user?: UserRow;
 }
 
-export function requireAgent(db: Db, config: Config) {
+export function requireAgent(db: Db, config: Config, blocklist?: Blocklist) {
   return async (req: AuthedRequest, res: Response, next: NextFunction) => {
     const header = req.headers.authorization || '';
     const token =
@@ -101,8 +102,10 @@ export function requireAgent(db: Db, config: Config) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    // Per-user IP allow-list: a token stolen to another network is useless.
-    if (!ipAllowed(user.allowed_ips, reqIp(req))) {
+    // Per-user IP allow-list (or the admin-wide allow-list): a token stolen to
+    // another network is useless.
+    const ip = reqIp(req);
+    if (!ipAllowed(user.allowed_ips, ip) && !blocklist?.isIpAllowlisted(ip)) {
       res.status(403).json({ error: 'Access is not allowed from your network.' });
       return;
     }

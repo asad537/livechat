@@ -422,7 +422,7 @@ export function startKnowledgeRefresher(deps: AppDeps): void {
 
 export function buildKnowledgeRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // POST /api/websites/:id/scan  { url }
   router.post('/api/websites/:id/scan', auth, requireRole('ADMIN'), (req, res) => {

@@ -40,7 +40,7 @@ function newWidgetKey(): string {
 
 export function buildWebsitesRouter(deps: AppDeps): Router {
   const router = Router();
-  const auth = requireAgent(deps.db, deps.config);
+  const auth = requireAgent(deps.db, deps.config, deps.blocklist);
 
   // GET /api/websites — scoped list
   router.get(
