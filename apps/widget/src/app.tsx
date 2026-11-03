@@ -127,6 +127,7 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
   const [unread, setUnread] = useState(0);
   const [draft, setDraft] = useState('');
   const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [infoDismissed, setInfoDismissed] = useState(() => lsGet(infoDismissKey) === '1');
   const [invite, setInvite] = useState<Invite | null>(null);
@@ -614,9 +615,11 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
 
   const onPickFile = (e: Event) => {
     const input = e.currentTarget as HTMLInputElement;
-    const files = input.files;
-    input.value = '';
-    if (files && files.length > 0) void uploadFiles(files);
+    // Copy the selection BEFORE resetting the input: `input.files` is a live
+    // list, so clearing the value first emptied it and nothing ever uploaded.
+    const files = Array.from(input.files ?? []);
+    input.value = ''; // allow picking the same file again later
+    if (files.length > 0) void uploadFiles(files);
   };
 
   const [dragOver, setDragOver] = useState(false);
@@ -1017,16 +1020,21 @@ export function App({ server, widgetKey }: { server: string; widgetKey: string }
                 class="lc-attach"
                 title={conversation ? 'Attach a file' : 'Send a message first to attach files'}
                 disabled={!conversation || uploading || !connected}
-                onClick={() => {
-                  const picker = document.createElement('input');
-                  picker.type = 'file';
-                  picker.multiple = true;
-                  picker.onchange = (ev) => void onPickFile(ev);
-                  picker.click();
-                }}
+                onClick={() => fileRef.current?.click()}
               >
                 {uploading ? <span class="lc-spin" /> : <IconClip />}
               </button>
+              {/* Kept in the DOM on purpose: a file input created on the fly
+                  and never attached can be garbage-collected while the OS file
+                  dialog is open, so its change event never fires and the chosen
+                  file silently never uploads (seen in Chrome on macOS). */}
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(ev) => void onPickFile(ev)}
+              />
               <textarea
                 ref={taRef}
                 class="lc-ta"
