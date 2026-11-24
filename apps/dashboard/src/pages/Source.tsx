@@ -133,6 +133,7 @@ export default function Source() {
                 <th>Website</th>
                 <th>Landing Page</th>
                 <th>Came from</th>
+                <th>IP address</th>
                 <th>Device</th>
                 <th>Date</th>
               </tr>
@@ -141,7 +142,7 @@ export default function Source() {
               {rows.length === 0 && loading
                 ? Array.from({ length: PAGE }).map((_, i) => (
                     <tr key={`sk${i}`} className="vt-row src-skel-row">
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <td key={j}>
                           <span className="src-skel" />
                         </td>
@@ -173,6 +174,13 @@ export default function Source() {
                       )}
                     </td>
                     <td className="vt-referrer">{referrerLabel(v.referrer)}</td>
+                    <td className="vt-sub">
+                      {v.ip ? (
+                        <span title={[v.city, v.country].filter(Boolean).join(', ') || undefined}>{v.ip}</span>
+                      ) : (
+                        <span className="vt-muted">—</span>
+                      )}
+                    </td>
                     <td className="vt-tech">
                       {v.userAgent ? (
                         <>
