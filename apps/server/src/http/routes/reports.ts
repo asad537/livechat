@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { API } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
+import { pktDayStart, rangeBounds } from '../../core/time.js';
 import { requireAgent, requireRole, type UserRow } from '../../core/auth.js';
 import {
   HttpError,
@@ -24,31 +25,6 @@ import {
 // A support day runs noon→noon so overnight shifts aren't split by a midnight
 // reset. Computed explicitly in PKT (UTC+5, no DST) so it's correct no matter
 // what timezone the server runs in.
-const PKT_OFFSET_MS = 5 * 3600_000;
-const DAY_MS = 24 * 3600_000;
-
-/** ISO timestamp of the most-recent 12:00-PKT boundary, shifted back `daysAgo` days. */
-function pktDayStart(daysAgo = 0): string {
-  const nowPktWall = Date.now() + PKT_OFFSET_MS; // ms in the PKT wall-clock frame
-  const d = new Date(nowPktWall);
-  // Anchor to 12:00 on the PKT calendar date (UTC getters read the shifted wall clock).
-  let boundaryWall = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0, 0);
-  if (nowPktWall < boundaryWall) boundaryWall -= DAY_MS; // before noon → yesterday's noon
-  boundaryWall -= daysAgo * DAY_MS;
-  return new Date(boundaryWall - PKT_OFFSET_MS).toISOString(); // convert back to real UTC
-}
-
-/** Lower + optional upper bound for a range. `until` is set only for bounded
- *  windows (yesterday = the previous noon-PKT business day); open-ended ranges
- *  leave it null so they keep the simple `>= since` behavior. */
-function rangeBounds(range: string): { since: string | null; until: string | null } {
-  const now = new Date();
-  if (range === 'today') return { since: pktDayStart(0), until: null }; // noon-PKT → now
-  if (range === 'yesterday') return { since: pktDayStart(1), until: pktDayStart(0) }; // prev noon→noon
-  if (range === '7d') return { since: new Date(now.getTime() - 7 * 24 * 3600_000).toISOString(), until: null };
-  if (range === '30d') return { since: new Date(now.getTime() - 30 * 24 * 3600_000).toISOString(), until: null };
-  return { since: null, until: null }; // all time
-}
 
 const avg = (xs: number[]): number | null =>
   xs.length > 0 ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null;

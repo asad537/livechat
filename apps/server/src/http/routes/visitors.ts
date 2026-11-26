@@ -9,6 +9,7 @@ import type { Role, Visitor, VisitorPage } from '@livechat/shared';
 import type { AppDeps } from '../../core/deps.js';
 import { requireAgent } from '../../core/auth.js';
 import { userCanAccessWebsite } from '../../domain/conversations.js';
+import { rangeBounds } from '../../core/time.js';
 import {
   HttpError,
   accessibleWebsiteRows,
@@ -86,8 +87,20 @@ export function buildVisitorsRouter(deps: AppDeps): Router {
       const offset = Math.max(0, Number(asString(req.query.offset)) || 0);
       const q = asString(req.query.q)?.trim().slice(0, 100).replace(/[%_\\]/g, ' ') ?? '';
 
+      // Date range — same noon-PKT business day as the dashboard (12:00 PKT →
+      // next 12:00 PKT). Filters on last_seen_at, which is also the Date column.
+      const { since, until } = rangeBounds(asString(req.query.range) ?? 'all');
+
       let where = `website_id IN (${placeholders(siteIds.length)})`;
       const params: unknown[] = [...siteIds];
+      if (since) {
+        where += ' AND last_seen_at >= ?';
+        params.push(since);
+      }
+      if (until) {
+        where += ' AND last_seen_at < ?';
+        params.push(until);
+      }
       if (q) {
         where +=
           ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR ip LIKE ? OR geo_city LIKE ? OR geo_country LIKE ?)';

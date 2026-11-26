@@ -37,6 +37,7 @@ export default function Source() {
   const [query, setQuery] = useState('');
   const [dq, setDq] = useState(''); // debounced search term
   const [websiteId, setWebsiteId] = useState('');
+  const [range, setRange] = useState('all');
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false); // first response has arrived
 
@@ -50,7 +51,7 @@ export default function Source() {
   // Reset to the first page whenever the filters change.
   useEffect(() => {
     setPage(0);
-  }, [dq, websiteId]);
+  }, [dq, websiteId, range]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +62,7 @@ export default function Source() {
         offset: page * PAGE,
         q: dq || undefined,
         websiteId: websiteId || undefined,
+        range,
       })
       .then((r) => {
         if (cancelled) return;
@@ -79,7 +81,7 @@ export default function Source() {
     return () => {
       cancelled = true;
     };
-  }, [page, dq, websiteId]);
+  }, [page, dq, websiteId, range]);
 
   const pages = Math.max(1, Math.ceil(total / PAGE));
 
@@ -116,6 +118,17 @@ export default function Source() {
                 {siteLabel(w)}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="rec-field">
+          <span>Date</span>
+          {/* Same noon-to-noon (12:00 PKT) business day as the dashboard. */}
+          <select value={range} onChange={(e) => setRange(e.target.value)}>
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
           </select>
         </label>
       </div>
