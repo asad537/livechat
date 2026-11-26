@@ -58,6 +58,8 @@ interface WidgetSocketData {
   conversationId: string | null;
   /** Cached country at handshake time — null means "resolve & recheck async". */
   geoCc: string | null;
+  /** First time we've seen this visitor — lets the async country recheck undo their recorded visit. */
+  isNewVisitor: boolean;
 }
 
 interface AgentSocketData {
@@ -657,6 +659,19 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         }
       }
       let visitorToken = rawToken ?? '';
+
+      // Country blocklist — check BEFORE we create or track the visitor, so a
+      // blocked-country visitor is never recorded (they used to still appear in
+      // Source/Visitors because this ran after the INSERT + visitor_pages write).
+      // Country is known synchronously: the returning visitor's cached geo, else
+      // the offline geoip DB (~1ms). The rare IP the offline DB can't resolve is
+      // caught by the post-connect async recheck below.
+      if (deps.blocklist.hasCountryBlocks()) {
+        const cc = visitorRow?.geo_cc ?? localCountry(cip);
+        if (cc && deps.blocklist.isCountryBlocked(cc)) return next(new Error('Access blocked'));
+      }
+
+      const isNewVisitor = !visitorRow;
       if (!visitorRow) {
         const id = newId();
         const now = nowIso();
@@ -675,6 +690,7 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
       data.conversationId = null;
       // Known synchronously: cached geo, else the instant offline lookup.
       data.geoCc = visitorRow.geo_cc ?? localCountry(clientIp(socket));
+      data.isNewVisitor = isNewVisitor;
       widgetCtx.set(socket, {
         visitorToken,
         page: asString(auth.page),
@@ -723,15 +739,6 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
           [newId(), visitorRow.id, pageUrl, asString(auth.pageTitle)?.slice(0, 500) ?? null, now],
         );
       }
-      // Country blocklist — resolved synchronously and instantly: the cached
-      // country if we have it, else the OFFLINE geoip DB (no network, ~1ms). So
-      // a blocked-country visitor is rejected right here, before they connect —
-      // no brief flash in the online list and no slow handshake. The rare IP the
-      // offline DB doesn't know is caught by the async recheck / geo-resolve.
-      if (deps.blocklist.hasCountryBlocks()) {
-        const cc = visitorRow.geo_cc ?? localCountry(cip);
-        if (cc && deps.blocklist.isCountryBlocked(cc)) return next(new Error('Access blocked'));
-      }
 
       // Capture IP + city/country (best-effort, non-blocking).
       updateVisitorGeo(deps, visitorRow.id, clientIp(socket));
@@ -766,6 +773,19 @@ function attachWidgetNamespace(deps: AppDeps, ns: Namespace): void {
         if (deps.blocklist.isCountryBlocked(cc)) {
           socket.emit(EV.AppError, { message: 'Access blocked' });
           socket.disconnect(true);
+          // Country wasn't known at handshake, so this visit was already
+          // recorded. If it's a brand-new visitor with no conversation, remove
+          // the trace so a blocked country never shows up in Source/Visitors.
+          if (data.isNewVisitor) {
+            const open = await deps.db.get<{ n: number }>(
+              'SELECT COUNT(*) AS n FROM conversations WHERE visitor_id = ?',
+              [data.visitorId],
+            );
+            if (Number(open?.n ?? 0) === 0) {
+              await deps.db.run('DELETE FROM visitor_pages WHERE visitor_id = ?', [data.visitorId]);
+              await deps.db.run('DELETE FROM visitors WHERE id = ?', [data.visitorId]);
+            }
+          }
         }
       })().catch(() => {});
     }
